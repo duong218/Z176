@@ -4,7 +4,7 @@
 **Đơn vị áp dụng:** Nội bộ doanh nghiệp (Z176)
 **Người thực hiện:** Dương — Đồ án tốt nghiệp IT, VNUA
 **Vai trò tài liệu:** Cơ sở cho Use Case → Activity Diagram → ERD → API → UI → Prototype
-**Trạng thái:** Bản nháp v1.0 — nhiều mục còn TBD, cần BA/đơn vị nghiệp vụ xác nhận
+**Trạng thái:** Bản nháp v1.1 — bổ sung FR-008 (tài liệu ôn tập); nhiều mục còn TBD, cần BA/đơn vị nghiệp vụ xác nhận
 
 ---
 
@@ -28,6 +28,7 @@ Ba điểm sau **chưa phải là xác nhận chính thức từ BA công ty**, 
 7. **Số lần được thi:** Đã xác nhận — **Thi thử: không giới hạn số lần**; **Thi chính thức: chỉ được làm 1 lần duy nhất**.
 8. **Gán độ khó và cấu trúc câu hỏi:** Đã xác nhận — **người ra đề tự nhập độ khó ngay khi tạo câu hỏi** (không có bước duyệt riêng), gồm 3 mức: **Dễ / Trung bình / Khó**. Về đáp án, câu hỏi hỗ trợ **2 dạng: chọn 1 đáp án duy nhất (single choice) và chọn nhiều đáp án (multiple choice)**.
 9. **Vai trò "người ra đề" / "người tổ chức thi":** Đã xác nhận là **1 role gộp duy nhất** (không tách nhỏ) — người này: tạo/sửa/xóa câu hỏi thuộc chủ đề (phần lớn **import từ file Excel có sẵn**, không nhập tay từng câu), sau đó khi phát đề thì **hệ thống tự động nhặt câu hỏi phù hợp cho từng nhân viên** dựa theo bộ phận của nhân viên đó (nhân viên bộ phận nào thì tự động nhận câu hỏi liên quan tới bộ phận đó, kết hợp với câu hỏi chung của chủ đề). → Import câu hỏi từ Excel được nâng từ "Proposed" lên **Confirmed** (là cách nhập liệu chính, không phải tính năng phụ).
+10. **Tài liệu ôn tập:** Đã có định hướng — tài liệu ôn tập là **file văn bản (Word/PDF)** do người ra đề soạn/tải lên, gắn theo chủ đề (và có thể theo bộ phận), phục vụ thí sinh đọc để ôn. Tài liệu này **hoàn toàn tách biệt với ngân hàng câu hỏi** (`Question`) — không chứa sẵn câu hỏi trắc nghiệm kèm đáp án đúng, và đề thi/mã đề **không được trích xuất trực tiếp** từ nội dung file. Mục đích: vừa đảm bảo công bằng (không ai học tủ trúng câu), vừa không lộ đề (file ôn tập không có đáp án trắc nghiệm). Xem chi tiết ở FR-008.
 
 ---
 
@@ -110,7 +111,7 @@ Bộ câu hỏi (import từ Excel là chính)
 
 **1. Quản lý câu hỏi:** Thêm/Sửa/Xóa câu hỏi, Phân loại câu hỏi, Quản lý đáp án, Tìm kiếm/lọc câu hỏi, Import câu hỏi từ Excel *(Proposed)*.
 
-**2. Quản lý tài liệu:** Tạo/quản lý tài liệu, Phân loại tài liệu, Xem/tải tài liệu *(TBD chi tiết quyền)*.
+**2. Quản lý tài liệu:** Tải lên/quản lý tài liệu ôn tập (file Word/PDF, gắn theo chủ đề và có thể theo bộ phận), Xem/tải tài liệu. Tài liệu tách biệt hoàn toàn với ngân hàng câu hỏi, không dùng để sinh đề *(xem FR-008; TBD chi tiết quyền)*.
 
 **3. Quản lý đề:** Sinh đề tự động, Sinh mã đề (nhiều bộ, không trùng), Cấu hình quy tắc sinh đề, Xem/quản lý danh sách mã đề.
 
@@ -194,7 +195,21 @@ Bộ câu hỏi (import từ Excel là chính)
 - **Acceptance Criteria:** Thí sinh đã nộp bài thi chính thức không thể bắt đầu lượt thi chính thức thứ 2 cho cùng kỳ thi đó
 - **Trạng thái:** Confirmed (TBD: có ngoại lệ nào cho phép thi lại chính thức không — vd do lỗi kỹ thuật, mất kết nối giữa chừng — cần hỏi thêm nếu muốn xử lý trường hợp này)
 
-*(Các FR còn lại — quản lý tài liệu, quản lý lịch/thông báo, báo cáo thống kê, quản trị chi tiết — sẽ được viết chi tiết ở phiên bản sau khi các mục TBD tương ứng được làm rõ, để tránh thiết kế sai sớm.)*
+### FR-008: Quản lý và xem tài liệu ôn tập
+- **Actor:** Người ra đề (quản lý), Người dự thi (xem/tải)
+- **Input:** File tài liệu (Word/PDF), chủ đề lớn (`Topic`) mà tài liệu thuộc về, phạm vi áp dụng (Chung cho cả chủ đề / Riêng theo bộ phận — tùy chọn)
+- **Process:**
+  - Người ra đề tải lên file Word/PDF, gán vào 1 `Topic`, có thể gán thêm `Department` nếu là tài liệu riêng cho bộ phận.
+  - Người dự thi xem danh sách tài liệu theo chủ đề (và theo bộ phận của mình, nếu có), xem/tải file để ôn tập.
+- **Output:** Tài liệu được lưu và hiển thị cho đúng đối tượng thí sinh liên quan.
+- **Business Rule:**
+  - Tài liệu ôn tập là **nội dung lý thuyết/quy trình dạng văn bản**, hoàn toàn **tách biệt với ngân hàng câu hỏi** (`Question`) — không chứa sẵn câu hỏi trắc nghiệm kèm đáp án đúng.
+  - Đề thi (sinh mã đề — FR-002) **không được trích xuất trực tiếp** từ nội dung file tài liệu; câu hỏi thi vẫn lấy từ `Question` do người ra đề nhập/import riêng.
+  - Mục đích: đảm bảo công bằng (không ai học tủ trúng câu) và không lộ đề (file ôn tập không có đáp án trắc nghiệm).
+- **Acceptance Criteria:** Thí sinh chỉ xem được tài liệu thuộc chủ đề mình sắp thi (và đúng bộ phận nếu tài liệu là riêng); không có đường dẫn nào để xem trước câu hỏi/đáp án của mã đề từ màn hình tài liệu ôn tập.
+- **Trạng thái:** Assumption của nhóm nghiên cứu (dựa trên quyết định thiết kế của người thực hiện đồ án, chưa xác nhận chính thức từ BA) — cần đối chiếu lại khi khảo sát thực tế.
+
+*(Các FR còn lại — quản lý lịch/thông báo, báo cáo thống kê, quản trị chi tiết — sẽ được viết chi tiết ở phiên bản sau khi các mục TBD tương ứng được làm rõ, để tránh thiết kế sai sớm.)*
 
 ---
 
@@ -272,7 +287,7 @@ Bộ câu hỏi (import từ Excel là chính)
 - `ExamAttempt` (lượt làm bài thực tế của thí sinh)
 - `CandidateAnswer` (câu trả lời của thí sinh trong 1 lượt làm bài)
 - `Result` (điểm số, đạt/không đạt — có thể tính toán từ ExamAttempt thay vì lưu riêng)
-- `Document` *(cho module tài liệu ôn tập — Should/Could Have)*
+- `Document` — tài liệu ôn tập dạng file Word/PDF, gắn với 1 `Topic`, có thể gắn thêm `Department` nếu là tài liệu riêng; **tách biệt hoàn toàn với `Question`**, không dùng để sinh đề *(cho module tài liệu ôn tập — Should/Could Have, xem FR-008)*
 - `Schedule` *(cho module lịch thi — Should Have)*
 
 **Lưu ý:** Chưa thiết kế khóa, ràng buộc, kiểu dữ liệu chi tiết — sẽ thực hiện ở bước ERD sau khi các FR còn TBD (đặc biệt FR-002, FR-005) được chốt.
