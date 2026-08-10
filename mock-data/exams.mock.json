@@ -1,0 +1,24 @@
+[
+  {
+    "_id": "e_001",
+    "title": "Đề thi định kỳ — Demo Q3",
+    "configId": "cfg_001",
+    "questionIds": ["q_001", "q_002", "q_003", "q_004", "q_005"],
+    "status": "published",
+    "openAt": "2026-07-10T01:00:00.000Z",
+    "closeAt": "2026-07-10T09:00:00.000Z",
+    "createdBy": "u_002",
+    "createdAt": "2026-06-20T08:00:00.000Z"
+  },
+  {
+    "_id": "e_002",
+    "title": "Đề thi thử — Demo",
+    "configId": "cfg_002",
+    "questionIds": ["q_001", "q_003", "q_004"],
+    "status": "draft",
+    "openAt": null,
+    "closeAt": null,
+    "createdBy": "u_003",
+    "createdAt": "2026-06-21T08:00:00.000Z"
+  }
+]

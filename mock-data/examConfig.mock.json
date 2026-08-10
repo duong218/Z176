@@ -1,0 +1,34 @@
+[
+  {
+    "_id": "cfg_001",
+    "name": "Cấu hình mặc định — Thi định kỳ",
+    "totalQuestions": 30,
+    "durationMinutes": 45,
+    "passScore": 70,
+    "failThreshold": 50,
+    "shuffleQuestions": true,
+    "shuffleAnswers": true,
+    "allowReviewBeforeSubmit": true,
+    "maxTabSwitchWarnings": 3,
+    "autoSubmitOnDisconnectMinutes": 5,
+    "isActive": true,
+    "createdBy": "u_001",
+    "createdAt": "2026-06-05T08:00:00.000Z"
+  },
+  {
+    "_id": "cfg_002",
+    "name": "Cấu hình — Thi thử (demo)",
+    "totalQuestions": 10,
+    "durationMinutes": 15,
+    "passScore": 60,
+    "failThreshold": 40,
+    "shuffleQuestions": true,
+    "shuffleAnswers": true,
+    "allowReviewBeforeSubmit": true,
+    "maxTabSwitchWarnings": 3,
+    "autoSubmitOnDisconnectMinutes": 5,
+    "isActive": true,
+    "createdBy": "u_001",
+    "createdAt": "2026-06-05T08:10:00.000Z"
+  }
+]

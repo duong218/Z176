@@ -1,0 +1,85 @@
+[
+  {
+    "_id": "q_001",
+    "type": "single_choice",
+    "content": "Thủ đô của Việt Nam là thành phố nào?",
+    "options": [
+      { "id": "a", "text": "Hà Nội" },
+      { "id": "b", "text": "Đà Nẵng" },
+      { "id": "c", "text": "TP. Hồ Chí Minh" },
+      { "id": "d", "text": "Huế" }
+    ],
+    "correctAnswer": ["a"],
+    "difficulty": "easy",
+    "topic": "Kiến thức chung (demo)",
+    "createdBy": "u_002",
+    "isActive": true,
+    "createdAt": "2026-06-06T08:00:00.000Z"
+  },
+  {
+    "_id": "q_002",
+    "type": "multiple_choice",
+    "content": "Những số nào dưới đây là số nguyên tố? (chọn nhiều đáp án)",
+    "options": [
+      { "id": "a", "text": "2" },
+      { "id": "b", "text": "4" },
+      { "id": "c", "text": "7" },
+      { "id": "d", "text": "9" }
+    ],
+    "correctAnswer": ["a", "c"],
+    "difficulty": "medium",
+    "topic": "Toán học (demo)",
+    "createdBy": "u_002",
+    "isActive": true,
+    "createdAt": "2026-06-06T08:05:00.000Z"
+  },
+  {
+    "_id": "q_003",
+    "type": "true_false",
+    "content": "Trái Đất quay quanh Mặt Trời.",
+    "options": [
+      { "id": "true", "text": "Đúng" },
+      { "id": "false", "text": "Sai" }
+    ],
+    "correctAnswer": ["true"],
+    "difficulty": "easy",
+    "topic": "Kiến thức chung (demo)",
+    "createdBy": "u_003",
+    "isActive": true,
+    "createdAt": "2026-06-06T08:10:00.000Z"
+  },
+  {
+    "_id": "q_004",
+    "type": "single_choice",
+    "content": "1 giờ có bao nhiêu phút?",
+    "options": [
+      { "id": "a", "text": "100" },
+      { "id": "b", "text": "60" },
+      { "id": "c", "text": "24" },
+      { "id": "d", "text": "30" }
+    ],
+    "correctAnswer": ["b"],
+    "difficulty": "easy",
+    "topic": "Toán học (demo)",
+    "createdBy": "u_003",
+    "isActive": true,
+    "createdAt": "2026-06-06T08:15:00.000Z"
+  },
+  {
+    "_id": "q_005",
+    "type": "single_choice",
+    "content": "Ngôn ngữ lập trình nào dưới đây chạy trực tiếp trên trình duyệt?",
+    "options": [
+      { "id": "a", "text": "Python" },
+      { "id": "b", "text": "JavaScript" },
+      { "id": "c", "text": "C++" },
+      { "id": "d", "text": "Java" }
+    ],
+    "correctAnswer": ["b"],
+    "difficulty": "medium",
+    "topic": "Công nghệ thông tin (demo)",
+    "createdBy": "u_002",
+    "isActive": true,
+    "createdAt": "2026-06-06T08:20:00.000Z"
+  }
+]

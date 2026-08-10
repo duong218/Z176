@@ -1,0 +1,42 @@
+[
+  {
+    "_id": "log_001",
+    "actorId": "u_002",
+    "action": "question.create",
+    "targetId": "q_001",
+    "at": "2026-06-06T08:00:00.000Z",
+    "meta": { "topic": "Kiến thức chung (demo)" }
+  },
+  {
+    "_id": "log_002",
+    "actorId": "u_001",
+    "action": "exam.publish",
+    "targetId": "e_001",
+    "at": "2026-06-25T09:00:00.000Z",
+    "meta": {}
+  },
+  {
+    "_id": "log_003",
+    "actorId": "u_004",
+    "action": "session.submit",
+    "targetId": "s_001",
+    "at": "2026-07-10T02:44:10.000Z",
+    "meta": { "answeredCount": 5 }
+  },
+  {
+    "_id": "log_004",
+    "actorId": "system",
+    "action": "session.auto_submit",
+    "targetId": "s_003",
+    "at": "2026-07-10T02:15:00.000Z",
+    "meta": { "reason": "logged_out", "candidateId": "u_006" }
+  },
+  {
+    "_id": "log_005",
+    "actorId": "u_001",
+    "action": "user.role_change",
+    "targetId": "u_003",
+    "at": "2026-06-15T10:00:00.000Z",
+    "meta": { "from": "candidate", "to": "exam_writer" }
+  }
+]

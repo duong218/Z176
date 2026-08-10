@@ -1,0 +1,68 @@
+[
+  {
+    "_id": "u_001",
+    "username": "admin.demo",
+    "fullName": "Nguyễn Văn A (demo)",
+    "email": "admin.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "admin",
+    "unit": "Đơn vị demo 1",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:00:00.000Z"
+  },
+  {
+    "_id": "u_002",
+    "username": "examwriter.demo1",
+    "fullName": "Trần Thị B (demo)",
+    "email": "examwriter1.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "exam_writer",
+    "unit": "Đơn vị demo 2",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:05:00.000Z"
+  },
+  {
+    "_id": "u_003",
+    "username": "examwriter.demo2",
+    "fullName": "Lê Văn C (demo)",
+    "email": "examwriter2.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "exam_writer",
+    "unit": "Đơn vị demo 1",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:10:00.000Z"
+  },
+  {
+    "_id": "u_004",
+    "username": "candidate.demo1",
+    "fullName": "Phạm Thị D (demo)",
+    "email": "candidate1.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "candidate",
+    "unit": "Đơn vị demo 3",
+    "isActive": true,
+    "createdAt": "2026-06-02T09:00:00.000Z"
+  },
+  {
+    "_id": "u_005",
+    "username": "candidate.demo2",
+    "fullName": "Hoàng Văn E (demo)",
+    "email": "candidate2.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "candidate",
+    "unit": "Đơn vị demo 3",
+    "isActive": true,
+    "createdAt": "2026-06-02T09:05:00.000Z"
+  },
+  {
+    "_id": "u_006",
+    "username": "candidate.demo3",
+    "fullName": "Vũ Thị F (demo)",
+    "email": "candidate3.demo@example-mock.local",
+    "passwordHash": "$2b$10$MOCKHASHVALUEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "role": "candidate",
+    "unit": "Đơn vị demo 4",
+    "isActive": false,
+    "createdAt": "2026-06-02T09:10:00.000Z"
+  }
+]

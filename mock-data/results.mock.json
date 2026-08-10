@@ -1,0 +1,25 @@
+[
+  {
+    "_id": "r_001",
+    "sessionId": "s_001",
+    "examId": "e_001",
+    "candidateId": "u_004",
+    "score": 80,
+    "correctCount": 4,
+    "totalQuestions": 5,
+    "passed": true,
+    "gradedAt": "2026-07-10T02:44:15.000Z"
+  },
+  {
+    "_id": "r_002",
+    "sessionId": "s_003",
+    "examId": "e_001",
+    "candidateId": "u_006",
+    "score": 0,
+    "correctCount": 0,
+    "totalQuestions": 5,
+    "passed": false,
+    "gradedAt": "2026-07-10T02:15:05.000Z",
+    "note": "Demo: tự nộp bài do đăng xuất giữa chừng, chưa kịp trả lời"
+  }
+]
