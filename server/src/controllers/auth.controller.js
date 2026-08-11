@@ -9,6 +9,7 @@ import {
 } from '../services/auth.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
 import { ApiError } from '../utils/api-error.js';
+import { writeAudit } from '../services/audit.service.js';
 
 export const login = asyncHandler(async (req, res) => {
   const { username, password } = req.body ?? {};
@@ -72,6 +73,15 @@ export const changePasswordHandler = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Thiếu mật khẩu', 'AUTH_VALIDATION');
   }
   await changePassword(req.auth.userId, currentPassword, newPassword);
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'CHANGE_PASSWORD',
+    resourceType: 'User',
+    resourceId: req.auth.userId,
+    metadata: { detail: 'Người dùng tự đổi mật khẩu cá nhân' },
+    ipAddress: req.ip,
+  });
   res.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
   res.json({
     success: true,

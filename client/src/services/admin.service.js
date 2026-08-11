@@ -1,4 +1,4 @@
-import { MOCK_AUDIT_LOGS, MOCK_OVERVIEW_STATS } from '../mock-data/admin.mock';
+import { MOCK_OVERVIEW_STATS } from '../mock-data/admin.mock';
 import { apiRequest } from './api';
 import { getAuthHeaders } from './auth.service';
 
@@ -64,9 +64,15 @@ export async function resetUserPassword(userId) {
   return res.tempPassword;
 }
 
-export async function fetchAuditLogs() {
-  await delay(1200);
-  return MOCK_AUDIT_LOGS;
+export async function fetchAuditLogs(params = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.append('page', params.page);
+  if (params.limit) query.append('limit', params.limit);
+  
+  const res = await apiRequest(`/audit-logs?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  });
+  return res.data;
 }
 
 export async function triggerBackup() {

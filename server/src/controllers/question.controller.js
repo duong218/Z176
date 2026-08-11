@@ -78,10 +78,10 @@ export const create = asyncHandler(async (req, res) => {
 
   await writeAudit({
     actorUserId: req.auth.userId,
-    action: 'question.create',
+    action: 'CREATE_QUESTION',
     resourceType: 'Question',
     resourceId: data.id,
-    metadata: { questionId: data.id },
+    metadata: { detail: `Tạo câu hỏi mới (ID: ${data.id})` },
     ipAddress: clientIp(req),
   });
 
@@ -114,6 +114,15 @@ export const update = asyncHandler(async (req, res) => {
     req.auth.userId,
     clientIp(req),
   );
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'UPDATE_QUESTION',
+    resourceType: 'Question',
+    resourceId: req.params.id,
+    metadata: { detail: `Cập nhật câu hỏi (ID: ${req.params.id})` },
+    ipAddress: clientIp(req),
+  });
   res.json({
     success: true,
     message: 'Cập nhật câu hỏi thành công',
@@ -128,6 +137,15 @@ export const remove = asyncHandler(async (req, res) => {
     req.auth.userId,
     clientIp(req),
   );
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'DELETE_QUESTION',
+    resourceType: 'Question',
+    resourceId: req.params.id,
+    metadata: { detail: `Xóa / Ngừng sử dụng câu hỏi (ID: ${req.params.id})` },
+    ipAddress: clientIp(req),
+  });
   res.json({
     success: true,
     message: 'Đã ngừng sử dụng câu hỏi',
@@ -146,6 +164,14 @@ export const importExcel = asyncHandler(async (req, res) => {
     req.auth.userId,
     clientIp(req),
   );
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'IMPORT_QUESTIONS',
+    resourceType: 'Question',
+    metadata: { detail: `Import câu hỏi từ Excel (Thành công: ${data.imported}, Lỗi: ${data.failed})` },
+    ipAddress: clientIp(req),
+  });
   res.json({
     success: true,
     message: `Import xong: ${data.imported} thành công, ${data.failed} lỗi`,
