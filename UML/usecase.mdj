@@ -1574,7 +1574,7 @@
 											"top": 398,
 											"width": 54.447265625,
 											"height": 13,
-											"text": "lãnh đạo"
+											"text": "Người duyệt đề"
 										},
 										{
 											"_type": "LabelView",
@@ -10726,7 +10726,7 @@
 					"_parent": {
 						"$ref": "AAAAAAGf6X8TPMhCEX4="
 					},
-					"name": "lãnh đạo",
+					"name": "Người duyệt đề",
 					"ownedElements": [
 						{
 							"_type": "UMLAssociation",

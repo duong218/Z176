@@ -24,7 +24,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AlertCircle } from 'lucide-react';
 
 // Khoảng thời gian tự động làm mới kỳ thi đang active trên trang chủ (ms).
-// Giúp Hero Section tự cập nhật khi Lãnh đạo vừa "Đăng chính thức" mà không cần F5.
+// Giúp Hero Section tự cập nhật khi Người duyệt đề vừa "Đăng chính thức" mà không cần F5.
 const ACTIVE_EXAM_POLL_INTERVAL_MS = 60_000;
 
 export default function App() {

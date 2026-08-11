@@ -65,7 +65,7 @@ client/
 | `src/components/` | Các section trang chủ, modal và thành phần dùng chung. |
 | `src/components/admin/` | Tab tổng quan, tài khoản và audit log cho quản trị viên. |
 | `src/components/examiner/` | Tab ngân hàng câu hỏi, chủ đề, phòng ban và đề xuất kỳ thi cho người ra đề. |
-| `src/components/leader/` | Tab báo cáo, duyệt/phát hành đề xuất kỳ thi và lịch sử xử lý kỳ thi cho lãnh đạo. |
+| `src/components/leader/` | Tab báo cáo, duyệt/phát hành đề xuất kỳ thi và lịch sử xử lý kỳ thi cho Người duyệt đề. |
 | `src/pages/` | Ba dashboard riêng cho `admin`, `examiner` và `leader`. |
 | `src/services/api.js` | Wrapper gọi API theo `VITE_API_URL`. |
 | `src/services/auth.service.js` | Đăng nhập, refresh token, lấy hồ sơ và đăng xuất. |

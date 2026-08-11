@@ -6,7 +6,7 @@ const ROLE_LABELS = {
   admin: 'Quản trị viên',
   examiner: 'Người ra đề',
   candidate: 'Thí sinh',
-  leader: 'Lãnh đạo',
+  leader: 'Người duyệt đề',
 };
 
 export const Header = ({
@@ -84,11 +84,10 @@ export const Header = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 lg:px-5 rounded-lg font-medium text-sm lg:text-base transition-all duration-200 whitespace-nowrap min-touch-target ${
-                  isActive
+                className={`flex items-center gap-1.5 px-3 py-2 lg:px-5 rounded-lg font-medium text-sm lg:text-base transition-all duration-200 whitespace-nowrap min-touch-target ${isActive
                     ? 'bg-[#008BC5]/15 text-[#38BDF8] border border-[#008BC5]/30 font-semibold shadow-[0_0_12px_rgba(56,189,248,0.15)]'
                     : 'text-slate-300 hover:text-white hover:bg-[#334155]/40 border border-transparent'
-                }`}
+                  }`}
               >
                 <span className="hidden lg:inline-block">{item.icon}</span>
                 <span>{item.label}</span>
@@ -191,11 +190,10 @@ export const Header = ({
                   <button
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left text-base font-medium transition-colors min-touch-target ${
-                      isActive
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left text-base font-medium transition-colors min-touch-target ${isActive
                         ? 'bg-[#008BC5] text-white font-bold'
                         : 'text-gray-100 hover:bg-[#334155] active:bg-[#334155]'
-                    }`}
+                      }`}
                   >
                     {item.icon}
                     <span>{item.label}</span>

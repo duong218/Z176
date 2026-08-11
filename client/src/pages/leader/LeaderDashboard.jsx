@@ -20,7 +20,7 @@ export const LeaderDashboard = () => {
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-[#0F172A] mb-2 flex items-center gap-3">
           <LayoutDashboard className="w-8 h-8 text-[#008BC5]" />
-          DASHBOARD LÃNH ĐẠO
+          DASHBOARD Người duyệt đề
         </h1>
         <p className="text-slate-500">Báo cáo & Thống kê kết quả thi chuyên môn Z176.</p>
       </div>

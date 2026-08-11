@@ -7,7 +7,7 @@ export const ExamProposalTab = () => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     title: '',
     topicId: '',
@@ -57,7 +57,7 @@ export const ExamProposalTab = () => {
   };
 
   const handleSubmitReview = async (id) => {
-    if (!confirm('Bạn có chắc chắn muốn gửi đề xuất này cho Lãnh đạo duyệt?')) return;
+    if (!confirm('Bạn có chắc chắn muốn gửi đề xuất này cho Người duyệt đề duyệt?')) return;
     try {
       await submitForReview(id);
       loadData();
@@ -67,12 +67,12 @@ export const ExamProposalTab = () => {
   };
 
   const getStatusBadge = (status) => {
-    switch(status) {
-      case 'draft': return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium border border-slate-200 flex items-center gap-1"><FilePlus className="w-3 h-3"/> Nháp</span>;
-      case 'pending_review': return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-medium border border-amber-200 flex items-center gap-1"><Clock className="w-3 h-3"/> Chờ duyệt</span>;
-      case 'rejected': return <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium border border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3"/> Bị từ chối</span>;
-      case 'approved': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-200 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Đã duyệt</span>;
-      case 'published': return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-medium border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Đã đăng</span>;
+    switch (status) {
+      case 'draft': return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium border border-slate-200 flex items-center gap-1"><FilePlus className="w-3 h-3" /> Nháp</span>;
+      case 'pending_review': return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-medium border border-amber-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Chờ duyệt</span>;
+      case 'rejected': return <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium border border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" /> Bị từ chối</span>;
+      case 'approved': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã duyệt</span>;
+      case 'published': return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-medium border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã đăng</span>;
       case 'archived': return <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-200">Đã lưu trữ</span>;
       default: return <span>{status}</span>;
     }
@@ -83,7 +83,7 @@ export const ExamProposalTab = () => {
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h2 className="text-lg font-bold text-[#0F172A]">Danh sách đề xuất kỳ thi</h2>
-          <p className="text-sm text-slate-500">Tạo cấu trúc đề thi và trình Lãnh đạo phê duyệt</p>
+          <p className="text-sm text-slate-500">Tạo cấu trúc đề thi và trình Người duyệt đề phê duyệt</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -164,36 +164,36 @@ export const ExamProposalTab = () => {
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
-            
+
             <div className="p-4 md:p-6 overflow-y-auto">
               <form id="createExamForm" onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên kỳ thi</label>
-                  <input required type="text" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none" 
-                    value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
+                  <input required type="text" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                    value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                     placeholder="VD: Hội thi chuyên môn tháng 10" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Chủ đề liên kết</label>
                   <select required className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                    value={formData.topicId} onChange={e => setFormData({...formData, topicId: e.target.value})}>
+                    value={formData.topicId} onChange={e => setFormData({ ...formData, topicId: e.target.value })}>
                     <option value="">-- Chọn chủ đề --</option>
                     {topics.map(t => (
                       <option key={t._id} value={t._id}>{t.name}</option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian (phút)</label>
                     <input required type="number" min="1" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                      value={formData.durationMinutes} onChange={e => setFormData({...formData, durationMinutes: e.target.value})} />
+                      value={formData.durationMinutes} onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tổng số câu hỏi</label>
                     <input required type="number" min="1" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                      value={formData.totalQuestions} onChange={e => setFormData({...formData, totalQuestions: e.target.value})} />
+                      value={formData.totalQuestions} onChange={e => setFormData({ ...formData, totalQuestions: e.target.value })} />
                   </div>
                 </div>
 
@@ -201,23 +201,23 @@ export const ExamProposalTab = () => {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số câu hỏi chung</label>
                     <input required type="number" min="0" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                      value={formData.commonQuestionCount} onChange={e => setFormData({...formData, commonQuestionCount: e.target.value})} />
+                      value={formData.commonQuestionCount} onChange={e => setFormData({ ...formData, commonQuestionCount: e.target.value })} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số câu bộ phận</label>
                     <input required type="number" min="0" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                      value={formData.departmentQuestionCount} onChange={e => setFormData({...formData, departmentQuestionCount: e.target.value})} />
+                      value={formData.departmentQuestionCount} onChange={e => setFormData({ ...formData, departmentQuestionCount: e.target.value })} />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Điểm đạt tối thiểu (%)</label>
                   <input required type="number" min="0" max="100" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
-                    value={formData.passThresholdPercent} onChange={e => setFormData({...formData, passThresholdPercent: e.target.value})} />
+                    value={formData.passThresholdPercent} onChange={e => setFormData({ ...formData, passThresholdPercent: e.target.value })} />
                 </div>
               </form>
             </div>
-            
+
             <div className="p-4 md:p-6 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
               <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
                 Hủy

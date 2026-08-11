@@ -4,7 +4,7 @@ import { authenticate, requireRoleCodes } from '../middlewares/auth.middleware.j
 
 const router = Router();
 
-// Lãnh đạo và Admin có quyền xem báo cáo
+// Người duyệt đề và Admin có quyền xem báo cáo
 router.use(authenticate, requireRoleCodes('leader', 'admin'));
 
 router.get('/overview', reportController.getOverviewStats);

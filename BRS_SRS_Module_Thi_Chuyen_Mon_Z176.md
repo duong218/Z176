@@ -24,7 +24,7 @@ Ba điểm sau **chưa phải là xác nhận chính thức từ BA công ty**, 
    - **Đã làm rõ (1):** Câu hỏi riêng chỉ chia đến **cấp bộ phận** (không tách sâu hơn theo từng chức vụ trong bộ phận) — mỗi bộ phận có bộ câu hỏi riêng phản ánh đúng công việc bộ phận đó đang làm (vd bộ phận Dệt hỏi về quy trình/an toàn khi dệt, bộ phận Vá may mặc hỏi về quy trình/an toàn khi may).
    - **Đã làm rõ (2):** Tỷ lệ số câu chung : số câu riêng **không cố định theo rule hệ thống, mà do người ra đề quyết định tại thời điểm tạo đề** cho từng kỳ thi. Ví dụ minh họa: 1 mã đề 30 câu thì người ra đề có thể chọn 3–6 câu chung, còn lại là câu riêng theo bộ phận — nhưng đây chỉ là ví dụ, con số thực tế do người ra đề nhập mỗi lần tạo đề, không hard-code. → Hệ thống cần có **input riêng cho "số câu chung" và "số câu riêng"** khi cấu hình sinh đề (ngoài tổng số câu/mã đề), thay vì để cố định trong business rule.
 5. **Độ khó câu hỏi:** Được khuyến khích thêm (có người phụ trách nghiệp vụ xác nhận "càng tốt"), nên độ khó **Dễ/Khó** được nâng từ mức "chỉ là ví dụ" lên mức **nên có trong ngân hàng câu hỏi**, dù mức "Trung bình" và cơ chế gán độ khó vẫn còn TBD.
-6. **Phê duyệt trước khi công bố:** Đã xác nhận — đề thi/kỳ thi **cần lãnh đạo/cấp trên phê duyệt** trước khi công bố cho thí sinh. → Lãnh đạo chính thức là actor có thao tác trên hệ thống (không chỉ nhận báo cáo ngoài hệ thống), và luồng nghiệp vụ cần trạng thái `Draft → Chờ duyệt → Đã duyệt → Đã công bố`.
+6. **Phê duyệt trước khi công bố:** Đã xác nhận — đề thi/kỳ thi **cần Người duyệt đề/cấp trên phê duyệt** trước khi công bố cho thí sinh. → Người duyệt đề chính thức là actor có thao tác trên hệ thống (không chỉ nhận báo cáo ngoài hệ thống), và luồng nghiệp vụ cần trạng thái `Draft → Chờ duyệt → Đã duyệt → Đã công bố`.
 7. **Số lần được thi:** Đã xác nhận — **Thi thử: không giới hạn số lần**; **Thi chính thức: chỉ được làm 1 lần duy nhất**.
 8. **Gán độ khó và cấu trúc câu hỏi:** Đã xác nhận — **người ra đề tự nhập độ khó ngay khi tạo câu hỏi** (không có bước duyệt riêng), gồm 3 mức: **Dễ / Trung bình / Khó**. Về đáp án, câu hỏi hỗ trợ **2 dạng: chọn 1 đáp án duy nhất (single choice) và chọn nhiều đáp án (multiple choice)**.
 9. **Vai trò "người ra đề" / "người tổ chức thi":** Đã xác nhận là **1 role gộp duy nhất** (không tách nhỏ) — người này: tạo/sửa/xóa câu hỏi thuộc chủ đề (phần lớn **import từ file Excel có sẵn**, không nhập tay từng câu), sau đó khi phát đề thì **hệ thống tự động nhặt câu hỏi phù hợp cho từng nhân viên** dựa theo bộ phận của nhân viên đó (nhân viên bộ phận nào thì tự động nhận câu hỏi liên quan tới bộ phận đó, kết hợp với câu hỏi chung của chủ đề). → Import câu hỏi từ Excel được nâng từ "Proposed" lên **Confirmed** (là cách nhập liệu chính, không phải tính năng phụ).
@@ -74,7 +74,7 @@ Xây dựng thử nghiệm một module hỗ trợ:
 |---|---|---|---|
 | **Người dự thi** (Nhân viên/Công nhân) | Actor nghiệp vụ + Role hệ thống | Xem tài liệu ôn tập, xem lịch thi, làm đề thử, thi chính thức, nộp bài, xem kết quả | Không — đã xác nhận rõ |
 | **Người ra đề** (gộp chung, không tách nhỏ — theo xác nhận nghiệp vụ) | Actor nghiệp vụ + Role hệ thống | Import/quản lý câu hỏi (chủ yếu từ Excel), tạo/sửa/xóa câu hỏi và đề, cấu hình sinh mã đề (số câu chung/riêng), tạo kỳ thi, quản lý danh sách thí sinh | Không — đã xác nhận là 1 role gộp |
-| **Lãnh đạo** (Giám đốc & cấp liên quan) | Actor nghiệp vụ + Role hệ thống | Quyết định tổ chức kỳ thi, **phê duyệt đề/kỳ thi trước khi công bố** (thao tác trực tiếp trên hệ thống), theo dõi kết quả | Không — đã xác nhận có phê duyệt trên hệ thống |
+| **Người duyệt đề** (Giám đốc & cấp liên quan) | Actor nghiệp vụ + Role hệ thống | Quyết định tổ chức kỳ thi, **phê duyệt đề/kỳ thi trước khi công bố** (thao tác trực tiếp trên hệ thống), theo dõi kết quả | Không — đã xác nhận có phê duyệt trên hệ thống |
 | **BA / bộ phận nghiệp vụ** | Nguồn cung cấp thông tin nghiệp vụ | Không xác định là actor sử dụng hệ thống | **Có** — mặc định KHÔNG phải role hệ thống cho đến khi được xác nhận ngược lại |
 | **Quản trị hệ thống (Admin)** | Actor kỹ thuật | Quản lý tài khoản, phân quyền, cấu hình hệ thống | **Có** — chưa xác nhận là requirement chính thức, hiện đề xuất ở mức tối thiểu cho MVP |
 
@@ -90,8 +90,8 @@ Bộ câu hỏi (import từ Excel là chính)
    → Ngân hàng câu hỏi
    → Tạo đề (người ra đề cấu hình: tổng số câu, số câu chung, số câu riêng)
    → Sinh mã đề (hệ thống tự động, nhiều mã đề không trùng nhau, đủ cho số thí sinh, tự "nhặt" câu riêng theo đúng bộ phận từng thí sinh)
-   → Trình lãnh đạo phê duyệt
-   → Lãnh đạo phê duyệt đề/kỳ thi
+   → Trình Người duyệt đề phê duyệt
+   → Người duyệt đề phê duyệt đề/kỳ thi
    → Tạo kỳ thi (nếu chưa tạo trước đó)
    → Lên lịch
    → Thông báo [TBD: hình thức thông báo]
@@ -178,11 +178,11 @@ Bộ câu hỏi (import từ Excel là chính)
 - **Trạng thái:** TBD (thiếu ngưỡng đạt — đây là thông tin bắt buộc phải hỏi BA trước khi code phần chấm điểm)
 
 ### FR-006: Phê duyệt đề/kỳ thi trước khi công bố
-- **Actor:** Lãnh đạo
+- **Actor:** Người duyệt đề
 - **Input:** Đề/kỳ thi ở trạng thái "Chờ duyệt" do Người ra đề gửi lên
-- **Process:** Lãnh đạo xem lại nội dung đề/kỳ thi, phê duyệt hoặc từ chối (yêu cầu chỉnh sửa)
+- **Process:** Người duyệt đề xem lại nội dung đề/kỳ thi, phê duyệt hoặc từ chối (yêu cầu chỉnh sửa)
 - **Output:** Trạng thái đề/kỳ thi chuyển thành "Đã duyệt" (sẵn sàng công bố) hoặc quay lại "Nháp" nếu bị từ chối
-- **Business Rule:** Đề/kỳ thi **không được công bố cho thí sinh nếu chưa được lãnh đạo phê duyệt**
+- **Business Rule:** Đề/kỳ thi **không được công bố cho thí sinh nếu chưa được Người duyệt đề phê duyệt**
 - **Acceptance Criteria:** Thí sinh không thể nhìn thấy/thi 1 kỳ thi chưa ở trạng thái "Đã duyệt và công bố"
 - **Trạng thái:** Confirmed
 
@@ -219,7 +219,7 @@ Bộ câu hỏi (import từ Excel là chính)
 |---|---|---|
 | Ngân hàng câu hỏi | Tổ chức theo **chủ đề lớn** (vd "Vệ sinh an toàn lao động"), gồm **câu hỏi dùng chung** cho cả chủ đề và **câu hỏi riêng theo bộ phận** (cả lý thuyết lẫn bài tập, phản ánh đúng công việc bộ phận đó làm); phân chia riêng dừng ở **cấp bộ phận**; độ khó **3 mức (Dễ/Trung bình/Khó)**, người ra đề tự nhập; đáp án có 2 dạng (chọn 1 / chọn nhiều); nhập liệu chủ yếu qua **import Excel** | Không còn TBD lớn ở mục này |
 | Số câu/mã đề | Có thể cấu hình 30/40/50 câu mỗi mã đề; **số câu chung và số câu riêng do người ra đề tự nhập** khi tạo đề (không cố định) | Có cần validate giới hạn hợp lý khi người ra đề nhập số câu chung/riêng không? |
-| Phê duyệt | Đề/kỳ thi **bắt buộc lãnh đạo phê duyệt** trước khi công bố | Quy trình từ chối/yêu cầu sửa lại cụ thể như thế nào? |
+| Phê duyệt | Đề/kỳ thi **bắt buộc Người duyệt đề phê duyệt** trước khi công bố | Quy trình từ chối/yêu cầu sửa lại cụ thể như thế nào? |
 | Số lần thi | Thi thử: không giới hạn; Thi chính thức: chỉ 1 lần | Có ngoại lệ cho thi lại chính thức khi có sự cố kỹ thuật không? |
 | Sinh mã đề | Sinh trước nhiều mã đề, số lượng ≥ số thí sinh, không mã đề nào trùng 100% | Có giới hạn tỷ lệ trùng một phần không? Có ràng buộc tỷ lệ theo nhóm/loại/độ khó không? |
 | Công bằng | Mỗi thí sinh 1 mã đề riêng, không trùng nhau hoàn toàn | Có đảo thứ tự câu/đáp án giữa các mã đề không? |
@@ -237,7 +237,7 @@ Bộ câu hỏi (import từ Excel là chính)
 | 2 | Hình thức thông báo lịch thi cho thí sinh | Ảnh hưởng phạm vi tích hợp (email/nội bộ/chỉ hiển thị trong hệ thống) | "Thí sinh nhận thông báo lịch thi qua đâu — email, hệ thống nội bộ, hay chỉ xem trực tiếp khi đăng nhập?" |
 | 3 | Khi hết thời gian làm bài, hệ thống có bắt buộc tự nộp không | Ảnh hưởng UX và logic xử lý khi mất kết nối | "Khi hết thời gian làm bài, hệ thống có bắt buộc tự nộp không, hay chỉ cảnh báo và chờ thí sinh tự nộp?" |
 | 4 | Có cần đặt giới hạn tối thiểu/tối đa cho số câu chung khi người ra đề tự nhập không | Tránh trường hợp bất hợp lý (vd 0 câu riêng) làm mất ý nghĩa đề thi | "Khi người ra đề tự chọn số câu chung/riêng, hệ thống có cần chặn các trường hợp bất hợp lý không, hay để người ra đề tự chịu trách nhiệm?" |
-| 5 | Quy trình khi lãnh đạo từ chối phê duyệt | Ảnh hưởng thiết kế trạng thái đề/kỳ thi và use case "Yêu cầu chỉnh sửa" | "Khi lãnh đạo từ chối phê duyệt, đề/kỳ thi có quay lại trạng thái nháp để sửa không, và người ra đề có nhận thông báo lý do từ chối không?" |
+| 5 | Quy trình khi Người duyệt đề từ chối phê duyệt | Ảnh hưởng thiết kế trạng thái đề/kỳ thi và use case "Yêu cầu chỉnh sửa" | "Khi Người duyệt đề từ chối phê duyệt, đề/kỳ thi có quay lại trạng thái nháp để sửa không, và người ra đề có nhận thông báo lý do từ chối không?" |
 | 6 | Ngoại lệ cho thi lại thi chính thức (do lỗi kỹ thuật, mất kết nối) | Ảnh hưởng độ phức tạp của FR-007 và có cần cơ chế "reset lượt thi" hay không | "Nếu thí sinh gặp sự cố kỹ thuật giữa lúc thi chính thức, có cơ chế nào cho thi lại không, và ai có quyền cấp phép việc đó?" |
 | 7 | Danh sách người được thi lấy từ đâu | Ảnh hưởng thiết kế module quản lý danh sách thí sinh — tích hợp danh sách nhân sự có sẵn hay nhập thủ công | "Danh sách nhân viên/công nhân được thi có lấy từ hệ thống nhân sự có sẵn không, hay người ra đề tự nhập/chọn thủ công?" |
 
@@ -274,7 +274,7 @@ Bộ câu hỏi (import từ Excel là chính)
 **Entity chính (điều chỉnh theo định hướng đã chọn):**
 
 - `User` (tài khoản đăng nhập)
-- `Role` (Người dự thi / Người ra đề / Lãnh đạo / Admin — tạm thời, có thể tách thêm)
+- `Role` (Người dự thi / Người ra đề / Người duyệt đề / Admin — tạm thời, có thể tách thêm)
 - `Employee` (nhân viên/công nhân — liên kết với User)
 - `Department` (bộ phận, vd Dệt, Vá may mặc — gắn với câu hỏi "riêng"; đây là cấp phân chia sâu nhất, không tách theo chức vụ)
 - `Topic` (chủ đề lớn cấp kỳ thi, vd "Vệ sinh an toàn lao động")
@@ -297,7 +297,7 @@ Bộ câu hỏi (import từ Excel là chính)
 ## BƯỚC 10 — ĐỀ XUẤT KIẾN TRÚC CHỨC NĂNG (mức tổng thể)
 
 ```
-Người dùng (Người dự thi / Người ra đề / Lãnh đạo / Admin)
+Người dùng (Người dự thi / Người ra đề / Người duyệt đề / Admin)
         │
         ▼
 Authentication / Authorization

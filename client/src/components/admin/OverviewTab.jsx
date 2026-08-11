@@ -46,7 +46,7 @@ export const OverviewTab = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h3 className="text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
-        
+
         {/* Backup Area */}
         <div className="flex flex-col items-end">
           <button
@@ -91,7 +91,7 @@ export const OverviewTab = () => {
             <Shield className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-slate-500 font-medium">Role: Admin / Lãnh đạo</p>
+            <p className="text-sm text-slate-500 font-medium">Role: Admin / Người duyệt đề</p>
             <p className="text-2xl font-bold text-[#0F172A]">{stats.usersByRole?.admin || 0} / {stats.usersByRole?.leader || 0}</p>
           </div>
         </div>

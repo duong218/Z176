@@ -24,7 +24,7 @@ export async function fetchExamsByStatus(status) {
   return res.data;
 }
 
-// Lịch sử các đề xuất đã được Lãnh đạo xử lý xong: bị từ chối, đã đăng chính thức,
+// Lịch sử các đề xuất đã được Người duyệt đề xử lý xong: bị từ chối, đã đăng chính thức,
 // hoặc đã bị lưu trữ (khi có kỳ thi khác được đăng đè lên). Gộp cả 3 trạng thái này
 // lại thành 1 danh sách "Lịch sử duyệt kỳ thi", sắp xếp theo thời gian xử lý gần nhất.
 // Route GET /api/exams hiện chỉ lọc theo đúng 1 status/lần gọi, nên gọi song song rồi

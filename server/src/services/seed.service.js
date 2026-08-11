@@ -21,7 +21,7 @@ const DEFAULT_ROLES = [
   },
   {
     code: 'leader',
-    name: 'Lãnh đạo',
+    name: 'Người duyệt đề',
     description: 'Phê duyệt đề/kỳ thi (Should Have FR-006)',
   },
 ];
