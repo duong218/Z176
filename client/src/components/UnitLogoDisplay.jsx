@@ -43,7 +43,9 @@ export const UnitLogoDisplay = ({
   sizeClassName = 'w-10 h-10',
   iconSizeClassName = 'w-6 h-6',
 }) => {
-  if (config.type === 'custom' && config.customUrl) {
+  if (!config) return null;
+
+  if (config?.type === 'custom' && config?.customUrl) {
     return (
       <div className={`${sizeClassName} rounded-lg overflow-hidden border border-slate-300 shadow-z176 bg-white flex items-center justify-center shrink-0`}>
         <img

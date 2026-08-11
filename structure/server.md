@@ -1,24 +1,24 @@
 # Cấu trúc server
 
-## Phạm vi và trạng thái
+## Phạm vi
 
-`server/` là API Express dùng MongoDB/Mongoose. Dự án dùng Node `>=22 <25` (xem `.nvmrc` ở thư mục gốc). Tài liệu này chỉ mô tả cấu trúc mã nguồn hiện có; không thay thế yêu cầu rà soát bảo mật, phân quyền và schema trước khi triển khai dữ liệu thật.
+`server/` là API Express dùng MongoDB/Mongoose, Node `>=22 <25`. Tài liệu phản ánh mã nguồn hiện có; mọi thay đổi schema, xác thực và phân quyền vẫn cần được rà soát theo quy ước dự án trước khi triển khai dữ liệu thật.
 
 ```text
 server/
 ├── .env.example
 ├── package.json
 ├── package-lock.json
+├── test_rate_limit.js
 └── src/
-    ├── index.js
     ├── app.js
-    ├── config/
-    │   ├── db.js
-    │   └── env.js
+    ├── index.js
+    ├── config/{db,env}.js
     ├── controllers/
     │   ├── auth.controller.js
     │   ├── department.controller.js
     │   ├── question.controller.js
+    │   ├── report.controller.js
     │   ├── role.controller.js
     │   ├── topic.controller.js
     │   └── user.controller.js
@@ -52,56 +52,43 @@ server/
     │   ├── auth.routes.js
     │   ├── department.routes.js
     │   ├── question.routes.js
+    │   ├── report.routes.js
     │   ├── role.routes.js
     │   ├── topic.routes.js
     │   └── user.routes.js
-    ├── scripts/
-    │   ├── backup-cli.js
-    │   └── seed-cli.js
+    ├── scripts/{backup-cli,seed-cli}.js
     ├── services/
     │   ├── audit.service.js
     │   ├── auth.service.js
     │   ├── department.service.js
     │   ├── question.service.js
+    │   ├── report.service.js
     │   ├── role.service.js
     │   ├── seed.service.js
     │   ├── topic.service.js
     │   └── user.service.js
-    └── utils/
-        ├── api-error.js
-        └── async-handler.js
+    └── utils/{api-error,async-handler}.js
 ```
 
-## Thành phần chính
+## Thành phần và API
 
-| Đường dẫn | Chức năng |
+| Nhóm | Chức năng |
 |---|---|
-| `src/index.js` | Kiểm tra biến môi trường, kết nối MongoDB, chạy seed khởi tạo theo cấu hình và khởi động HTTP server. |
-| `src/app.js` | Cấu hình Express, Helmet, CORS, cookie parser, JSON body parser, `/api/health`, router API và xử lý lỗi chuẩn. |
-| `src/config/` | Đọc/kiểm tra biến môi trường và tạo kết nối MongoDB. |
-| `src/routes/` | Khai báo route theo miền nghiệp vụ và gắn middleware trước controller. |
-| `src/controllers/` | Nhận request, gọi service và trả response HTTP. |
-| `src/services/` | Chứa logic nghiệp vụ: xác thực, audit, phòng ban, chủ đề, câu hỏi và seed. |
-| `src/models/` | Các schema Mongoose và hằng số miền nghiệp vụ. |
-| `src/middlewares/` | Xác thực, kiểm tra role, giới hạn tần suất đăng nhập, yêu cầu đổi mật khẩu và nhận tệp Excel. |
-| `src/scripts/` | Các lệnh CLI seed và sao lưu. |
-| `src/utils/` | `ApiError` và helper bọc hàm bất đồng bộ. |
+| `app.js`, `index.js`, `config/` | Khởi tạo Express, middleware cơ sở, kiểm tra môi trường, kết nối MongoDB và khởi động dịch vụ. |
+| `controllers/`, `services/`, `models/` | Tách lớp HTTP, nghiệp vụ và persistence cho auth, người dùng, role, chủ đề, phòng ban, câu hỏi và báo cáo. |
+| `middlewares/` | Xác thực, kiểm tra role, giới hạn đăng nhập, đổi mật khẩu và nhận Excel. |
+| `scripts/` | Lệnh seed và sao lưu. |
+| `test_rate_limit.js` | Kiểm tra thủ công hành vi giới hạn tần suất. |
 
-## API hiện có
+| Tiền tố API | Endpoint hiện có |
+|---|---|
+| `/api` | `GET /health` |
+| `/api/auth` | `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`, `POST /change-password` |
+| `/api/topics` | `GET /`, `POST /` |
+| `/api/departments` | `GET /`, `POST /` |
+| `/api/questions` | `GET /`, `POST /import`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id` |
+| `/api/users` | `GET /`, `POST /`, `PATCH /:id/role`, `PATCH /:id/lock`, `POST /:id/reset-password` |
+| `/api/roles` | `GET /` |
+| `/api/reports` | `GET /overview`, `GET /by-department`, `GET /results`, `GET /export` |
 
-| Tiền tố | Route | Ghi chú |
-|---|---|---|
-| `/api` | `GET /health` | Kiểm tra trạng thái dịch vụ. |
-| `/api/auth` | `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`, `POST /change-password` | Nhóm endpoint xác thực. Đăng xuất, hồ sơ và đổi mật khẩu yêu cầu xác thực. |
-| `/api/topics` | `GET /`, `POST /` | Chủ đề; yêu cầu role `admin` hoặc `examiner` và mật khẩu đã được đổi. |
-| `/api/departments` | `GET /`, `POST /` | Phòng ban; cùng điều kiện bảo vệ như chủ đề. |
-| `/api/questions` | `GET /`, `POST /import`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id` | Ngân hàng câu hỏi; tất cả route đều qua xác thực, role và kiểm tra đổi mật khẩu. |
-| `/api/roles` | `GET /` | Danh sách role; chỉ `admin` sau khi đã đổi mật khẩu. |
-| `/api/users` | `GET /`, `POST /`, `PATCH /:id/role`, `PATCH /:id/lock`, `POST /:id/reset-password` | Quản lý tài khoản; chỉ `admin` sau khi đã đổi mật khẩu. |
-
-## Biến môi trường và tích hợp client
-
-- Mẫu biến môi trường: `env.example` ở root và `server/.env.example`.
-- Client gọi API qua `client/src/services/api.js`, lấy base URL từ `VITE_API_URL` (mặc định `http://localhost:5000/api`).
-- `client/src/services/auth.service.js` hiện đã cung cấp helper đăng nhập, refresh token, lấy hồ sơ và đăng xuất.
-- Chỉ dùng dữ liệu mock khi phát triển cùng AI; không seed hoặc ghi dữ liệu thật của Z176 qua workflow này.
+`/api/reports` yêu cầu role `leader` hoặc `admin`; các route quản lý ngân hàng câu hỏi yêu cầu xác thực, role phù hợp và mật khẩu đã được đổi. Client sử dụng `VITE_API_URL` để kết nối API.

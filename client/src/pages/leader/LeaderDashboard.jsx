@@ -1,0 +1,58 @@
+import { useState } from 'react';
+import { LayoutDashboard, Building2, FileBarChart, PieChart } from 'lucide-react';
+import { OverviewTab } from '../../components/leader/OverviewTab';
+import { DepartmentReportTab } from '../../components/leader/DepartmentReportTab';
+import { DetailedResultsTab } from '../../components/leader/DetailedResultsTab';
+
+export const LeaderDashboard = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const tabs = [
+    { id: 'overview', label: 'Tổng quan', icon: <PieChart className="w-5 h-5" /> },
+    { id: 'department', label: 'Theo phòng ban', icon: <Building2 className="w-5 h-5" /> },
+    { id: 'detailed', label: 'Kết quả chi tiết', icon: <FileBarChart className="w-5 h-5" /> },
+  ];
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8 mt-16 min-h-screen">
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-[#0F172A] mb-2 flex items-center gap-3">
+          <LayoutDashboard className="w-8 h-8 text-[#008BC5]" />
+          DASHBOARD LÃNH ĐẠO
+        </h1>
+        <p className="text-slate-500">Báo cáo & Thống kê kết quả thi chuyên môn Z176.</p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+        {/* Tab Navigation */}
+        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50 scrollbar-hide">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-2 px-6 py-4 font-semibold text-sm transition-colors whitespace-nowrap outline-none
+                ${
+                  activeTab === tab.id
+                    ? 'text-[#008BC5] border-b-2 border-[#008BC5] bg-white'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                }
+              `}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6 bg-slate-800 text-slate-300">
+          {activeTab === 'overview' && <OverviewTab />}
+          {activeTab === 'department' && <DepartmentReportTab />}
+          {activeTab === 'detailed' && <DetailedResultsTab />}
+        </div>
+      </div>
+    </div>
+  );
+};
+

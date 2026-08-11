@@ -13,7 +13,8 @@ export async function fetchUsers() {
   const res = await apiRequest('/users', {
     headers: getAuthHeaders(),
   });
-  return res.data.map(u => ({
+  const usersData = Array.isArray(res.data) ? res.data : [];
+  return usersData.map(u => ({
     ...u,
     roleCode: u.roleId?.code,
     roleName: u.roleId?.name,

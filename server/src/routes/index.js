@@ -5,6 +5,7 @@ import departmentRoutes from './department.routes.js';
 import questionRoutes from './question.routes.js';
 import userRoutes from './user.routes.js';
 import roleRoutes from './role.routes.js';
+import { reportRoutes } from './report.routes.js';
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.use('/departments', departmentRoutes);
 router.use('/questions', questionRoutes);
 router.use('/users', userRoutes);
 router.use('/roles', roleRoutes);
+router.use('/reports', reportRoutes);
 
 export default router;
