@@ -1,12 +1,36 @@
 import { useState, useEffect } from 'react';
-import { fetchPendingExams, fetchApprovedExams, approveExam, rejectExam, publishExam } from '../../services/exam-review.service';
-import { CheckCircle, XCircle, Clock, Globe, Calendar } from 'lucide-react';
+import {
+  fetchPendingExams,
+  fetchApprovedExams,
+  fetchExamHistory,
+  approveExam,
+  rejectExam,
+  publishExam,
+} from '../../services/exam-review.service';
+import { CheckCircle, XCircle, Clock, Globe, Calendar, History, Archive } from 'lucide-react';
+
+// Cấu hình hiển thị badge trạng thái cho bảng "Lịch sử duyệt kỳ thi"
+const STATUS_BADGE = {
+  rejected: { label: 'Đã từ chối', className: 'bg-red-100 text-red-700' },
+  published: { label: 'Đang phát hành', className: 'bg-[#008BC5]/10 text-[#008BC5]' },
+  archived: { label: 'Đã lưu trữ', className: 'bg-slate-200 text-slate-600' },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_BADGE[status] || { label: status, className: 'bg-slate-100 text-slate-600' };
+  return (
+    <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
 
 export const ExamReviewTab = () => {
   const [pendingExams, setPendingExams] = useState([]);
   const [approvedExams, setApprovedExams] = useState([]);
+  const [historyExams, setHistoryExams] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Reject Modal
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectId, setRejectId] = useState(null);
@@ -21,12 +45,14 @@ export const ExamReviewTab = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [pending, approved] = await Promise.all([
+      const [pending, approved, history] = await Promise.all([
         fetchPendingExams(),
-        fetchApprovedExams()
+        fetchApprovedExams(),
+        fetchExamHistory(),
       ]);
       setPendingExams(Array.isArray(pending) ? pending : []);
       setApprovedExams(Array.isArray(approved) ? approved : []);
+      setHistoryExams(Array.isArray(history) ? history : []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -85,7 +111,7 @@ export const ExamReviewTab = () => {
 
   return (
     <div className="space-y-8 bg-white p-6 rounded-xl text-slate-800">
-      
+
       {/* Pending Exams */}
       <div>
         <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
@@ -178,8 +204,63 @@ export const ExamReviewTab = () => {
         </div>
       </div>
 
+      {/* Lịch sử duyệt kỳ thi — không xóa dấu vết sau khi Duyệt/Từ chối/Đăng chính thức */}
+      <div>
+        <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
+          <History className="w-5 h-5 text-slate-500" />
+          Lịch sử duyệt kỳ thi
+        </h2>
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 text-slate-600 text-sm border-b border-slate-200">
+              <tr>
+                <th className="p-4 font-semibold">Kỳ thi</th>
+                <th className="p-4 font-semibold">Chủ đề</th>
+                <th className="p-4 font-semibold">Trạng thái</th>
+                <th className="p-4 font-semibold">Thời gian xử lý</th>
+                <th className="p-4 font-semibold">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Đang tải...</td></tr>
+              ) : historyExams.length === 0 ? (
+                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Chưa có kỳ thi nào được xử lý</td></tr>
+              ) : (
+                historyExams.map(exam => {
+                  const processedAt = exam.publishedAt || exam.approvedAt || exam.updatedAt || exam.createdAt;
+                  return (
+                    <tr key={exam._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 font-medium text-slate-800">{exam.title}</td>
+                      <td className="p-4 text-slate-600">{exam.topicId?.name}</td>
+                      <td className="p-4">
+                        <StatusBadge status={exam.status} />
+                      </td>
+                      <td className="p-4 text-slate-600 text-xs">
+                        {processedAt ? new Date(processedAt).toLocaleString('vi-VN') : '—'}
+                      </td>
+                      <td className="p-4 text-slate-600 text-xs max-w-xs">
+                        {exam.status === 'rejected' ? (
+                          <span className="text-red-600">{exam.rejectionReason || 'Không có lý do'}</span>
+                        ) : exam.status === 'archived' ? (
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <Archive className="w-3.5 h-3.5" /> Đã bị thay thế bởi kỳ thi khác
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Modals */}
-      
+
       {/* Approve Modal */}
       {isApproveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
