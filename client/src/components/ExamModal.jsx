@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Clock, AlertCircle, ArrowLeft, ArrowRight, Award, ShieldCheck, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, Clock, AlertCircle, ArrowLeft, ArrowRight, Award, ShieldCheck, RefreshCw, Loader2 } from 'lucide-react';
 import { SAMPLE_QUESTIONS, Z176_COMPANY_INFO } from '../data';
+import { fetchMyResults } from '../services/report.service';
 export const ExamModal = ({
   isOpen,
   onClose,
@@ -13,6 +14,37 @@ export const ExamModal = ({
   const [examSecondsLeft, setExamSecondsLeft] = useState(20 * 60); // 20 minutes
   const [score, setScore] = useState(0);
   const [passed, setPassed] = useState(false);
+
+  // Thông tin nhân viên thật (họ tên, mã NV, phòng ban) — currentUser chỉ có
+  // { id, username, roleCode, roleName, mustChangePassword }, không có các field
+  // này, nên phải lấy riêng qua cùng API mà CandidateDashboard đang dùng.
+  const [employee, setEmployee] = useState(null);
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employeeError, setEmployeeError] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen || !currentUser) {
+      return;
+    }
+    let cancelled = false;
+    setEmployeeLoading(true);
+    setEmployeeError(null);
+    fetchMyResults()
+      .then((data) => {
+        if (cancelled) return;
+        setEmployee(data?.employee ?? null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setEmployeeError(err?.message || 'Không thể tải thông tin nhân viên.');
+      })
+      .finally(() => {
+        if (!cancelled) setEmployeeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, currentUser]);
 
   const handleFinishExam = useCallback(() => {
     let correctCount = 0;
@@ -113,17 +145,33 @@ export const ExamModal = ({
               <h4 className="font-bold text-base text-[#0F172A]">Xác nhận thông tin cán bộ / công nhân thi:</h4>
 
               {currentUser ? (
-                <div className="space-y-1.5 text-base text-[#334155] bg-white p-3 rounded-lg border border-slate-200">
-                  <div>
-                    Họ và tên: <strong className="text-[#0F172A]">{currentUser.fullName}</strong>
+                employeeLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-slate-500 bg-white rounded-lg border border-slate-200">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Đang tải thông tin nhân viên...</span>
                   </div>
-                  <div>
-                    Mã nhân viên: <strong className="text-[#008BC5] font-mono">{currentUser.employeeId}</strong>
+                ) : employeeError ? (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{employeeError}</span>
                   </div>
-                  <div>
-                    Xưởng / Phòng: <strong className="text-[#0F172A]">{currentUser.department}</strong>
+                ) : employee ? (
+                  <div className="space-y-1.5 text-base text-[#334155] bg-white p-3 rounded-lg border border-slate-200">
+                    <div>
+                      Họ và tên: <strong className="text-[#0F172A]">{employee.fullname}</strong>
+                    </div>
+                    <div>
+                      Mã nhân viên: <strong className="text-[#008BC5] font-mono">{employee.employeeCode || '—'}</strong>
+                    </div>
+                    <div>
+                      Xưởng / Phòng: <strong className="text-[#0F172A]">{employee.departmentName || '—'}</strong>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm">
+                    Tài khoản của bạn chưa được liên kết với hồ sơ nhân viên. Vui lòng liên hệ quản trị viên để được hỗ trợ.
+                  </div>
+                )
               ) : (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm font-medium flex items-center justify-between gap-2">
                   <span>Bạn chưa đăng nhập thông tin nhân viên.</span>
@@ -143,7 +191,7 @@ export const ExamModal = ({
                 <li>Bài thi gồm {SAMPLE_QUESTIONS.length} câu hỏi làm trong tối đa theo thời gian quy định.</li>
                 <li>Mỗi câu hỏi chọn 1 đáp án đúng nhất.</li>
                 <li>Không thoát trình duyệt trong khi đang làm bài.</li>
-                <li>Bạn được thi tối đa 2 lần, hệ thống tự động lưu kết quả tốt nhất.</li>
+                <li>Mỗi thí sinh có 1 lượt thi chính thức. Muốn thi lại cần được Người duyệt đề cấp phép riêng.</li>
               </ul>
             </div>
 
@@ -151,7 +199,8 @@ export const ExamModal = ({
               {currentUser ? (
                 <button
                   onClick={handleStartExam}
-                  className="w-full min-h-[52px] bg-[#008BC5] text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
+                  disabled={employeeLoading || !employee}
+                  className="w-full min-h-[52px] bg-[#008BC5] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
                 >
                   <CheckCircle2 className="w-6 h-6" />
                   <span>XÁC NHẬN & BẮT ĐẦU BÀI THI</span>
@@ -283,22 +332,17 @@ export const ExamModal = ({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              {!passed && (
-                <button
-                  onClick={() => {
-                    setStep('testing');
-                    setSelectedAnswers({});
-                    setCurrentQuestionIndex(0);
-                    setExamSecondsLeft(20 * 60);
-                  }}
-                  className="w-full sm:w-auto px-5 py-3 bg-[#008BC5] text-white font-bold text-base rounded-lg hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 min-touch-target"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  <span>Thi lại lượt 2</span>
-                </button>
-              )}
+            {!passed && (
+              <div className="max-w-sm mx-auto p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 flex items-start gap-2.5 text-left">
+                <RefreshCw className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
+                <span>
+                  Kết quả đã được ghi nhận. Nếu cần thi lại, vui lòng liên hệ Người duyệt đề để được xem xét cấp phép
+                  cho lượt thi mới.
+                </span>
+              </div>
+            )}
 
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <button
                 onClick={onClose}
                 className="w-full sm:w-auto px-6 py-3 bg-[#334155] text-white font-bold text-base rounded-lg hover:bg-[#1e293b] transition-colors min-touch-target"
