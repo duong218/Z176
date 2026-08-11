@@ -22,9 +22,11 @@ export const DIFFICULTY = {
 
 export const EXAM_STATUS = {
   DRAFT: 'draft',
-  PENDING_APPROVAL: 'pending_approval',
+  PENDING_REVIEW: 'pending_review',
+  REJECTED: 'rejected',
   APPROVED: 'approved',
   PUBLISHED: 'published',
+  ARCHIVED: 'archived',
 };
 
 export const ATTEMPT_TYPE = {

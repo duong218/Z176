@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { QuestionBankTab } from '../../components/examiner/QuestionBankTab';
 import { TopicTab } from '../../components/examiner/TopicTab';
 import { DepartmentTab } from '../../components/examiner/DepartmentTab';
-import { BookOpen, FolderOpen, Building } from 'lucide-react';
+import { ExamProposalTab } from '../../components/examiner/ExamProposalTab';
+import { BookOpen, FolderOpen, Building, FileSignature } from 'lucide-react';
 
 export const ExaminerDashboard = () => {
   const [activeTab, setActiveTab] = useState('questions');
@@ -11,6 +12,7 @@ export const ExaminerDashboard = () => {
     { id: 'questions', label: 'Ngân hàng câu hỏi', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'topics', label: 'Chủ đề', icon: <FolderOpen className="w-5 h-5" /> },
     { id: 'departments', label: 'Bộ phận / Phòng ban', icon: <Building className="w-5 h-5" /> },
+    { id: 'proposals', label: 'Đề xuất kỳ thi', icon: <FileSignature className="w-5 h-5" /> },
   ];
 
   return (
@@ -44,6 +46,7 @@ export const ExaminerDashboard = () => {
           {activeTab === 'questions' && <QuestionBankTab />}
           {activeTab === 'topics' && <TopicTab />}
           {activeTab === 'departments' && <DepartmentTab />}
+          {activeTab === 'proposals' && <ExamProposalTab />}
         </div>
       </div>
     </div>

@@ -15,8 +15,10 @@ server/
     ├── index.js
     ├── config/{db,env}.js
     ├── controllers/
+    │   ├── audit.controller.js
     │   ├── auth.controller.js
     │   ├── department.controller.js
+    │   ├── exam.controller.js
     │   ├── question.controller.js
     │   ├── report.controller.js
     │   ├── role.controller.js
@@ -50,7 +52,9 @@ server/
     ├── routes/
     │   ├── index.js
     │   ├── auth.routes.js
+    │   ├── audit.routes.js
     │   ├── department.routes.js
+    │   ├── exam.routes.js
     │   ├── question.routes.js
     │   ├── report.routes.js
     │   ├── role.routes.js
@@ -61,6 +65,7 @@ server/
     │   ├── audit.service.js
     │   ├── auth.service.js
     │   ├── department.service.js
+    │   ├── exam.service.js
     │   ├── question.service.js
     │   ├── report.service.js
     │   ├── role.service.js
@@ -75,7 +80,7 @@ server/
 | Nhóm | Chức năng |
 |---|---|
 | `app.js`, `index.js`, `config/` | Khởi tạo Express, middleware cơ sở, kiểm tra môi trường, kết nối MongoDB và khởi động dịch vụ. |
-| `controllers/`, `services/`, `models/` | Tách lớp HTTP, nghiệp vụ và persistence cho auth, người dùng, role, chủ đề, phòng ban, câu hỏi và báo cáo. |
+| `controllers/`, `services/`, `models/` | Tách lớp HTTP, nghiệp vụ và persistence cho auth, người dùng, role, chủ đề, phòng ban, câu hỏi, kỳ thi, audit và báo cáo. |
 | `middlewares/` | Xác thực, kiểm tra role, giới hạn đăng nhập, đổi mật khẩu và nhận Excel. |
 | `scripts/` | Lệnh seed và sao lưu. |
 | `test_rate_limit.js` | Kiểm tra thủ công hành vi giới hạn tần suất. |
@@ -84,8 +89,10 @@ server/
 |---|---|
 | `/api` | `GET /health` |
 | `/api/auth` | `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`, `POST /change-password` |
+| `/api/audits` | `GET /` |
 | `/api/topics` | `GET /`, `POST /` |
 | `/api/departments` | `GET /`, `POST /` |
+| `/api/exams` | `GET /active`, `GET /`, `POST /`, `POST /:id/submit`, `POST /:id/approve`, `POST /:id/reject`, `POST /:id/publish` |
 | `/api/questions` | `GET /`, `POST /import`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id` |
 | `/api/users` | `GET /`, `POST /`, `PATCH /:id/role`, `PATCH /:id/lock`, `POST /:id/reset-password` |
 | `/api/roles` | `GET /` |

@@ -19,6 +19,7 @@ import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
 import { LeaderDashboard } from './pages/leader/LeaderDashboard';
+import { fetchActiveExam } from './services/exam-review.service';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AlertCircle } from 'lucide-react';
 
@@ -45,6 +46,12 @@ export default function App() {
         /* token hết hạn hoặc lỗi — bỏ qua, user sẽ thấy nút đăng nhập */
       })
       .finally(() => setAuthLoading(false));
+  }, []);
+
+  const [activeExam, setActiveExam] = useState(null);
+  
+  useEffect(() => {
+    fetchActiveExam().then(setActiveExam).catch(console.error);
   }, []);
 
   // Tự động mở modal đổi mật khẩu nếu bắt buộc
@@ -114,6 +121,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-[#0F172A] antialiased selection:bg-[#008BC5] selection:text-white">
       {/* 1. Header (Navbar) fixed top */}
       <Header
+        variant={activeTab.endsWith('-dashboard') ? 'dashboard' : 'public'}
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
         onOpenLogin={() => setIsLoginOpen(true)}
@@ -162,8 +170,8 @@ export default function App() {
             >
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(15,23,42,0.72)_0%,rgba(15,23,42,0.48)_52%,rgba(15,23,42,0.20)_100%)] pointer-events-none" />
               <div className="relative z-10">
-                <Banner unitLogo={unitLogo} />
-                <TimeAndCountdown />
+                <Banner unitLogo={unitLogo} activeExam={activeExam} />
+                <TimeAndCountdown activeExam={activeExam} />
                 <CTAButton onClick={handleOpenExam} />
               </div>
             </section>

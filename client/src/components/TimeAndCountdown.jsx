@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Info } from 'lucide-react';
 
-export const TimeAndCountdown = () => {
-  // Target date: September 15, 2026 23:59:59
-  const targetDate = new Date(2026, 8, 15, 23, 59, 59).getTime();
-
+export const TimeAndCountdown = ({ activeExam }) => {
   const [timeLeft, setTimeLeft] = useState({
-    days: 14,
-    hours: 8,
-    minutes: 42,
-    seconds: 15,
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
   });
 
   useEffect(() => {
+    if (!activeExam || !activeExam.endDate) return;
+
+    const targetDate = new Date(activeExam.endDate).getTime();
+
     const interval = setInterval(() => {
       const now = new Date().getTime();
       const difference = targetDate - now;
@@ -30,7 +31,7 @@ export const TimeAndCountdown = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate]);
+  }, [activeExam]);
 
   const padNumber = (num) => {
     return num < 10 ? `0${num}` : `${num}`;
@@ -43,13 +44,31 @@ export const TimeAndCountdown = () => {
     { value: padNumber(timeLeft.seconds), label: 'Giây' },
   ];
 
+  if (!activeExam) {
+    return (
+      <div className="py-2.5 sm:py-4 px-4">
+        <div className="max-w-xl mx-auto space-y-2">
+          <div className="flex items-center justify-center gap-2 p-4 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl text-slate-200">
+            <Info className="w-5 h-5 text-[#008BC5]" />
+            <span className="font-medium text-[15px]">Hiện tại chưa có kỳ thi nào đang diễn ra.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const formatLocalDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return `${padNumber(d.getDate())}/${padNumber(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
+
   return (
     <div className="py-2.5 sm:py-4 px-4">
       <div className="max-w-xl mx-auto space-y-2">
         {/* Section 3: Time Information - Exactly 16px, #334155, centered */}
         <div className="flex items-center justify-center gap-1.5 text-[16px] font-medium text-slate-100 text-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)] [&_strong]:text-white">
           <Calendar className="w-5 h-5 text-sky-300 shrink-0" />
-          <span>Từ ngày <strong className="text-[#0F172A] font-bold">01/09/2026</strong> đến hết <strong className="text-[#0F172A] font-bold">15/09/2026</strong></span>
+          <span>Từ ngày <strong className="text-[#0F172A] font-bold">{formatLocalDate(activeExam.startDate)}</strong> đến hết <strong className="text-[#0F172A] font-bold">{formatLocalDate(activeExam.endDate)}</strong></span>
         </div>
 
         {/* Section 4: Countdown Block (4 boxes) */}

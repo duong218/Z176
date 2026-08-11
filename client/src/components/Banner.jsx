@@ -2,7 +2,7 @@ import { Z176_COMPANY_INFO } from '../data';
 import { Award, ShieldCheck } from 'lucide-react';
 import { UnitLogoDisplay } from './UnitLogoDisplay';
 
-export const Banner = ({ unitLogo }) => {
+export const Banner = ({ unitLogo, activeExam }) => {
   return (
     <section className="pt-18 sm:pt-20 pb-3 sm:pb-6 px-4 flex flex-col justify-center">
       <div className="max-w-4xl mx-auto text-center flex flex-col items-center">
@@ -21,9 +21,9 @@ export const Banner = ({ unitLogo }) => {
           {Z176_COMPANY_INFO.contestTitle}
         </h1>
 
-        {/* Subtitle "Lần thứ ..., năm ..." */}
+        {/* Subtitle "Lần thứ ..., năm ..." or Topic Name */}
         <h3 className="text-base sm:text-xl font-semibold text-slate-100 mb-2 sm:mb-4 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-          {Z176_COMPANY_INFO.contestEdition}
+          {activeExam?.topicId?.name || Z176_COMPANY_INFO.contestEdition}
         </h3>
 
         {/* Chip/Tag description - hidden on mobile to fit above the fold */}

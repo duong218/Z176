@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, FileBarChart, PieChart } from 'lucide-react';
+import { LayoutDashboard, Building2, FileBarChart, PieChart, CheckCircle } from 'lucide-react';
 import { OverviewTab } from '../../components/leader/OverviewTab';
 import { DepartmentReportTab } from '../../components/leader/DepartmentReportTab';
 import { DetailedResultsTab } from '../../components/leader/DetailedResultsTab';
+import { ExamReviewTab } from '../../components/leader/ExamReviewTab';
 
 export const LeaderDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -11,6 +12,7 @@ export const LeaderDashboard = () => {
     { id: 'overview', label: 'Tổng quan', icon: <PieChart className="w-5 h-5" /> },
     { id: 'department', label: 'Theo phòng ban', icon: <Building2 className="w-5 h-5" /> },
     { id: 'detailed', label: 'Kết quả chi tiết', icon: <FileBarChart className="w-5 h-5" /> },
+    { id: 'review', label: 'Duyệt kỳ thi', icon: <CheckCircle className="w-5 h-5" /> },
   ];
 
   return (
@@ -50,6 +52,7 @@ export const LeaderDashboard = () => {
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'department' && <DepartmentReportTab />}
           {activeTab === 'detailed' && <DetailedResultsTab />}
+          {activeTab === 'review' && <ExamReviewTab />}
         </div>
       </div>
     </div>

@@ -1,0 +1,125 @@
+import { Exam, Topic } from '../models/index.js';
+import { EXAM_STATUS } from '../models/constants.js';
+import { ApiError } from '../utils/api-error.js';
+
+export const examService = {
+  async listExams(filters = {}) {
+    const { status, createdBy, topicId } = filters;
+    const query = {};
+    if (status) query.status = status;
+    if (createdBy) query.createdBy = createdBy;
+    if (topicId) query.topicId = topicId;
+
+    const exams = await Exam.find(query)
+      .populate('topicId', 'name')
+      .populate('createdBy', 'username fullName')
+      .populate('approvedBy', 'username fullName')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return exams;
+  },
+
+  async createExamProposal(payload, userId) {
+    const { title, topicId, durationMinutes, totalQuestions, commonQuestionCount, departmentQuestionCount, passThresholdPercent } = payload;
+    
+    const topic = await Topic.findById(topicId);
+    if (!topic) throw new ApiError(404, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
+
+    const exam = new Exam({
+      title,
+      topicId,
+      durationMinutes,
+      totalQuestions,
+      commonQuestionCount,
+      departmentQuestionCount,
+      passThresholdPercent,
+      createdBy: userId,
+      status: EXAM_STATUS.DRAFT,
+    });
+    await exam.save();
+    return exam;
+  },
+
+  async submitExamForReview(examId, userId) {
+    const exam = await Exam.findOne({ _id: examId, createdBy: userId });
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+
+    if (![EXAM_STATUS.DRAFT, EXAM_STATUS.REJECTED].includes(exam.status)) {
+      throw new ApiError(400, 'Kỳ thi không ở trạng thái hợp lệ để gửi duyệt', 'EXAM_INVALID_STATUS');
+    }
+
+    exam.status = EXAM_STATUS.PENDING_REVIEW;
+    await exam.save();
+    return exam;
+  },
+
+  async approveExam(examId, { startDate, endDate }, leaderId) {
+    if (!startDate || !endDate) {
+      throw new ApiError(400, 'Vui lòng cung cấp ngày bắt đầu và kết thúc', 'EXAM_DATES_REQUIRED');
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end <= start) {
+      throw new ApiError(400, 'Ngày kết thúc phải sau ngày bắt đầu', 'EXAM_DATES_INVALID');
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+    if (exam.status !== EXAM_STATUS.PENDING_REVIEW) {
+      throw new ApiError(400, 'Kỳ thi không ở trạng thái chờ duyệt', 'EXAM_INVALID_STATUS');
+    }
+
+    exam.status = EXAM_STATUS.APPROVED;
+    exam.startDate = start;
+    exam.endDate = end;
+    exam.approvedBy = leaderId;
+    exam.approvedAt = new Date();
+    await exam.save();
+    return exam;
+  },
+
+  async rejectExam(examId, rejectionReason, leaderId) {
+    if (!rejectionReason?.trim()) {
+      throw new ApiError(400, 'Vui lòng cung cấp lý do từ chối', 'REASON_REQUIRED');
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+    if (exam.status !== EXAM_STATUS.PENDING_REVIEW) {
+      throw new ApiError(400, 'Kỳ thi không ở trạng thái chờ duyệt', 'EXAM_INVALID_STATUS');
+    }
+
+    exam.status = EXAM_STATUS.REJECTED;
+    exam.rejectionReason = rejectionReason;
+    exam.approvedBy = leaderId; // record who rejected it
+    await exam.save();
+    return exam;
+  },
+
+  async publishExam(examId, leaderId) {
+    const exam = await Exam.findById(examId);
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+    if (exam.status !== EXAM_STATUS.APPROVED) {
+      throw new ApiError(400, 'Chỉ có thể phát hành kỳ thi đã được duyệt', 'EXAM_INVALID_STATUS');
+    }
+
+    // Archive any currently published exam
+    await Exam.updateMany(
+      { status: EXAM_STATUS.PUBLISHED },
+      { $set: { status: EXAM_STATUS.ARCHIVED } }
+    );
+
+    exam.status = EXAM_STATUS.PUBLISHED;
+    exam.publishedAt = new Date();
+    await exam.save();
+    return exam;
+  },
+
+  async getActiveExam() {
+    const exam = await Exam.findOne({ status: EXAM_STATUS.PUBLISHED })
+      .populate('topicId', 'name')
+      .lean();
+    return exam;
+  },
+};

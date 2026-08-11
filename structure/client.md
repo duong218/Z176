@@ -25,12 +25,13 @@ client/
 │   ├── mock-data/admin.mock.js
 │   ├── components/
 │   │   ├── admin/{AccountTab,AuditLogTab,OverviewTab}.jsx
-│   │   ├── examiner/{DepartmentTab,QuestionBankTab,TopicTab}.jsx
-│   │   ├── leader/{DepartmentReportTab,DetailedResultsTab,OverviewTab}.jsx
+│   │   ├── examiner/{DepartmentTab,ExamProposalTab,QuestionBankTab,TopicTab}.jsx
+│   │   ├── leader/{DepartmentReportTab,DetailedResultsTab,ExamReviewTab,OverviewTab}.jsx
 │   │   ├── Banner.jsx
 │   │   ├── ChangePasswordModal.jsx
 │   │   ├── ContactSection.jsx
 │   │   ├── CTAButton.jsx
+│   │   ├── ErrorBoundary.jsx
 │   │   ├── ExamModal.jsx
 │   │   ├── Footer.jsx
 │   │   ├── Header.jsx
@@ -50,6 +51,7 @@ client/
 │       ├── api.js
 │       ├── auth.service.js
 │       ├── examiner.service.js
+│       ├── exam-review.service.js
 │       └── report.service.js
 └── dist/
 ```
@@ -62,14 +64,17 @@ client/
 | `src/App.jsx` | Điều phối navigation, trạng thái xác thực, modal, hero và dashboard theo role. |
 | `src/components/` | Các section trang chủ, modal và thành phần dùng chung. |
 | `src/components/admin/` | Tab tổng quan, tài khoản và audit log cho quản trị viên. |
-| `src/components/examiner/` | Tab ngân hàng câu hỏi, chủ đề và phòng ban cho người ra đề. |
-| `src/components/leader/` | Tab báo cáo tổng quan, theo phòng ban và kết quả chi tiết cho lãnh đạo. |
+| `src/components/examiner/` | Tab ngân hàng câu hỏi, chủ đề, phòng ban và đề xuất kỳ thi cho người ra đề. |
+| `src/components/leader/` | Tab báo cáo và duyệt/phát hành đề xuất kỳ thi cho lãnh đạo. |
 | `src/pages/` | Ba dashboard riêng cho `admin`, `examiner` và `leader`. |
 | `src/services/api.js` | Wrapper gọi API theo `VITE_API_URL`. |
 | `src/services/auth.service.js` | Đăng nhập, refresh token, lấy hồ sơ và đăng xuất. |
 | `src/services/admin.service.js` | API quản trị tài khoản/role; một số phần dashboard vẫn dùng mock. |
 | `src/services/examiner.service.js` | API câu hỏi, chủ đề, phòng ban và import Excel. |
+| `src/services/exam-review.service.js` | API danh sách đề xuất, duyệt, từ chối, phát hành và truy vấn kỳ thi đang hoạt động. |
 | `src/services/report.service.js` | API báo cáo tổng quan, theo phòng ban, kết quả chi tiết và xuất Excel. |
+| `src/components/ErrorBoundary.jsx` | Bao lỗi render phía React để tránh làm hỏng toàn bộ giao diện. |
+| `src/components/ChangePasswordModal.jsx` | Modal đổi mật khẩu trong luồng xác thực. |
 | `src/mock-data/admin.mock.js` | Dữ liệu mock phục vụ dashboard quản trị. |
 | `public/images/HeroSection.jpg` | Ảnh nền hero. |
 | `public/logo/logo.svg` | Logo doanh nghiệp mặc định. |

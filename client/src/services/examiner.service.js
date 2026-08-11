@@ -92,3 +92,29 @@ export async function createDepartment(payload) {
   });
   return res.data;
 }
+
+// === EXAM PROPOSALS ===
+
+export async function createExamProposal(payload) {
+  const res = await apiRequest('/exams', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
+export async function submitForReview(examId) {
+  const res = await apiRequest(`/exams/${examId}/submit`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
+export async function fetchMyExamProposals() {
+  const res = await apiRequest('/exams', {
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}

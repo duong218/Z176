@@ -10,6 +10,7 @@ const ROLE_LABELS = {
 };
 
 export const Header = ({
+  variant = 'public',
   activeTab,
   onSelectTab,
   onOpenLogin,
@@ -22,7 +23,7 @@ export const Header = ({
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const menuItems = [
+  const menuItems = variant === 'dashboard' ? [] : [
     { id: 'home', label: 'Trang chủ', icon: <Home className="w-5 h-5 shrink-0" /> },
     { id: 'rules', label: 'Quy chế', icon: <FileText className="w-5 h-5 shrink-0" /> },
     { id: 'results', label: 'Kết quả', icon: <Award className="w-5 h-5 shrink-0" /> },
@@ -30,11 +31,16 @@ export const Header = ({
     { id: 'contact', label: 'Liên hệ', icon: <PhoneCall className="w-5 h-5 shrink-0" /> },
   ];
 
-  if (currentUser?.roleCode === 'admin') {
-    menuItems.push({ id: 'admin-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
-  }
-  if (currentUser?.roleCode === 'examiner') {
-    menuItems.push({ id: 'examiner-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+  if (variant !== 'dashboard') {
+    if (currentUser?.roleCode === 'admin') {
+      menuItems.push({ id: 'admin-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+    }
+    if (currentUser?.roleCode === 'examiner') {
+      menuItems.push({ id: 'examiner-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+    }
+    if (currentUser?.roleCode === 'leader') {
+      menuItems.push({ id: 'leader-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+    }
   }
 
   const handleNavClick = (tab) => {
