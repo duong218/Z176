@@ -8,9 +8,11 @@
   - **Auth:** login/refresh/logout/me/change-password; JWT access (Bearer) + refresh (httpOnly cookie); seed 4 role + admin từ env; khóa tài khoản + rate limit login.
   - Tích hợp FE Login form với API backend thành công.
   - **Dashboard Admin (Tài khoản - Kết nối API thật):** Đã hoàn thành API thực tế (`GET /api/users`, `POST /api/users`, `PATCH /users/:id/role`, `PATCH /users/:id/lock`, `POST /users/:id/reset-password`). Kết nối UI Tab tài khoản để thực hiện CRUD, reset pass (sinh mật khẩu tạm 6 chữ số), đổi role, khóa/mở khóa thực tế có ghi Audit Log. 
+  - **Dashboard Examiner (Kết nối API thật):** Đã hoàn thành Dashboard cho Người ra đề (`examiner`). Tích hợp đầy đủ các chức năng quản lý Ngân hàng câu hỏi (CRUD, Tìm kiếm, Lọc, Phân trang, Import Excel từ file thật), quản lý Chủ đề (Topic) và Bộ phận/Phòng ban (Department) kết nối API thật.
   - **Dashboard Admin (Overview, Audit Log, Backup - UI MVP):** Giữ dữ liệu Mock (admin.service.js) chờ API Backend thật.
   - **FR-001 (BE):** CRUD câu hỏi + đáp án, lọc/tìm kiếm; CRUD tối thiểu chủ đề & bộ phận; import Excel `POST /api/questions/import`; audit log (không lưu nội dung Q/A trong metadata).
-- **Đang làm:** Chờ bạn duyệt thiết kế / code Dashboard Admin & review module FR-001.
+  - **Luồng Đổi mật khẩu (FE):** ChangePasswordModal dùng chung cho mọi role, tự động bật lên (không thể tắt) khi `mustChangePassword=true`. Có nút "Đổi mật khẩu" trên Header (desktop icon + mobile drawer). Sau khi đổi thành công, tự động đăng nhập lại bằng mật khẩu mới, cập nhật state `mustChangePassword` mà không cần reload.
+- **Đang làm:** Chờ bạn duyệt thiết kế / code Dashboard Examiner & review module FR-001.
 - **Còn lại (Must Have):**
   1. Xây dựng API Backend thực tế cho Admin Dashboard (CRUD Users, Lấy Roles, Lấy Audit Logs, Tính Stats, Backup export).
   2. FR-002 sinh mã đề → FR-003 gán → FR-004 làm bài → FR-005 chấm điểm.

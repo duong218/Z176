@@ -17,6 +17,9 @@ import { LoginModal } from './components/LoginModal';
 import { ExamModal } from './components/ExamModal';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -26,6 +29,7 @@ export default function App() {
   // ── Auth state ─────────────────────────────────────────────
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // Auto-login: kiểm tra accessToken khi mount
   useEffect(() => {
@@ -42,12 +46,22 @@ export default function App() {
       .finally(() => setAuthLoading(false));
   }, []);
 
+  // Tự động mở modal đổi mật khẩu nếu bắt buộc
+  useEffect(() => {
+    if (currentUser?.mustChangePassword && (activeTab === 'admin-dashboard' || activeTab === 'examiner-dashboard')) {
+      setIsChangePasswordOpen(true);
+    }
+  }, [currentUser, activeTab]);
+
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     // Admin đăng nhập thành công -> tự động chuyển sang Dashboard,
     // không cần bấm thêm vào nút "Dashboard" trên Header.
     if (user?.roleCode === 'admin') {
       setActiveTab('admin-dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (user?.roleCode === 'examiner') {
+      setActiveTab('examiner-dashboard');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -56,7 +70,7 @@ export default function App() {
     await logoutUser();
     setCurrentUser(null);
     // Đăng xuất khỏi dashboard thì về lại trang chủ, tránh màn hình trắng
-    // do activeTab vẫn là 'admin-dashboard' nhưng currentUser đã null.
+    // do activeTab vẫn là 'admin-dashboard'/'examiner-dashboard' nhưng currentUser đã null.
     setActiveTab('home');
   };
 
@@ -100,6 +114,7 @@ export default function App() {
         onSelectTab={handleSelectTab}
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenExam={handleOpenExam}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         unitLogo={unitLogo}
         currentUser={currentUser}
         authLoading={authLoading}
@@ -108,8 +123,30 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1">
+        {currentUser?.mustChangePassword && (
+          <div className="max-w-6xl mx-auto px-4 mt-20 -mb-12">
+            <div className="p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-base">Yêu cầu đổi mật khẩu!</p>
+                  <p className="text-sm text-orange-700 font-medium">Tài khoản của bạn đang dùng mật khẩu tạm thời. Vui lòng đổi mật khẩu mới để bảo mật và mở khóa đầy đủ chức năng hệ thống.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="px-4 py-2 bg-[#F6AD37] hover:bg-orange-500 text-white rounded-lg text-sm font-semibold shrink-0 transition-colors shadow-sm"
+              >
+                Đổi mật khẩu ngay
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'admin-dashboard' && currentUser?.roleCode === 'admin' ? (
           <AdminDashboard currentUser={currentUser} />
+        ) : activeTab === 'examiner-dashboard' && currentUser?.roleCode === 'examiner' ? (
+          <ExaminerDashboard />
         ) : (
           <>
             {/* 2. Banner giới thiệu cuộc thi */}
@@ -158,6 +195,14 @@ export default function App() {
           setIsExamOpen(false);
           setIsLoginOpen(true);
         }}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        username={currentUser?.username}
+        onPasswordChanged={(updatedUser) => setCurrentUser(updatedUser)}
+        preventClose={currentUser?.mustChangePassword === true}
       />
     </div>
   );

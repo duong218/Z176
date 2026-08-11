@@ -24,6 +24,8 @@ async function main() {
   app.listen(env.port, () => {
     // eslint-disable-next-line no-console -- startup banner only
     console.info(`[server] listening on port ${env.port} (${env.nodeEnv})`);
+    // eslint-disable-next-line no-console
+    console.info(`[server] login rate limit is ${env.isProduction ? 'ENABLED' : 'DISABLED (dev mode)'}`);
   });
 }
 

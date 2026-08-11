@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X, LogOut, Shield, LayoutDashboard } from 'lucide-react';
+import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X, LogOut, Shield, LayoutDashboard, KeyRound } from 'lucide-react';
 import { UnitLogoDisplay } from './UnitLogoDisplay';
 
 const ROLE_LABELS = {
@@ -14,6 +14,7 @@ export const Header = ({
   onSelectTab,
   onOpenLogin,
   onOpenExam,
+  onOpenChangePassword,
   unitLogo,
   currentUser,
   authLoading,
@@ -31,6 +32,9 @@ export const Header = ({
 
   if (currentUser?.roleCode === 'admin') {
     menuItems.push({ id: 'admin-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+  }
+  if (currentUser?.roleCode === 'examiner') {
+    menuItems.push({ id: 'examiner-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
   }
 
   const handleNavClick = (tab) => {
@@ -103,6 +107,14 @@ export const Header = ({
                   <span className="text-xs text-[#64748B]">{roleLabel}</span>
                 </div>
               </div>
+              {/* Change password button */}
+              <button
+                onClick={onOpenChangePassword}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-[#F6AD37] hover:bg-orange-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-orange-500/20 whitespace-nowrap"
+                title="Đổi mật khẩu"
+              >
+                <KeyRound className="w-4 h-4" />
+              </button>
               {/* Logout button */}
               <button
                 onClick={onLogout}
@@ -198,6 +210,17 @@ export const Header = ({
                         <span className="text-xs text-[#64748B]">{roleLabel}</span>
                       </div>
                     </div>
+                    {/* Change password in drawer */}
+                    <button
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        onOpenChangePassword();
+                      }}
+                      className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-[#F6AD37] hover:bg-orange-500/10 font-semibold text-base rounded-lg transition-colors min-touch-target border border-orange-500/20"
+                    >
+                      <KeyRound className="w-5 h-5" />
+                      <span>Đổi mật khẩu</span>
+                    </button>
                     {/* Logout in drawer */}
                     <button
                       onClick={() => {

@@ -48,13 +48,20 @@ client/
 │   │   ├── RegulationsSection.jsx
 │   │   ├── ResultsLookupSection.jsx
 │   │   ├── TimeAndCountdown.jsx
-│   │   └── UnitLogoDisplay.jsx
+│   │   ├── UnitLogoDisplay.jsx
+│   │   └── examiner/
+│   │   │   ├── DepartmentTab.jsx
+│   │   │   ├── QuestionBankTab.jsx
+│   │   │   └── TopicTab.jsx
 │   ├── pages/admin/
 │   │   └── AdminDashboard.jsx
+│   ├── pages/examiner/
+│   │   └── ExaminerDashboard.jsx
 │   └── services/
 │       ├── admin.service.js
 │       ├── api.js
-│       └── auth.service.js
+│       ├── auth.service.js
+│       └── examiner.service.js
 └── dist/                         # đầu ra sau npm run build
 ```
 
@@ -63,17 +70,19 @@ client/
 | Đường dẫn | Chức năng |
 |---|---|
 | `src/main.jsx` | Điểm khởi động React; render `App` và nạp CSS dùng chung. |
-| `src/App.jsx` | Điều phối navigation, trạng thái xác thực, modal và logo đơn vị. Tạo cụm hero gồm banner, thời gian thi và CTA; hiển thị dashboard khi người dùng quản trị chọn đúng mục. |
+| `src/App.jsx` | Điều phối navigation, trạng thái xác thực, modal và logo đơn vị. Tạo cụm hero gồm banner, thời gian thi và CTA; điều hướng theo role đến dashboard quản trị hoặc dashboard người ra đề. |
 | `src/index.css` | Nạp Tailwind, đặt nền/chữ mặc định và các utility nội bộ. |
 | `src/data.js` | Cấu hình nội dung hiển thị và dữ liệu mẫu của giao diện. |
 | `src/services/api.js` | Đọc `VITE_API_URL`, thực hiện request JSON và chuẩn hóa phản hồi API. |
 | `src/services/auth.service.js` | Helper đăng nhập, refresh token, lấy hồ sơ, đăng xuất và quản lý access token phía client. |
 | `src/services/admin.service.js` | Lớp gọi API quản trị tài khoản/role; phần số liệu tổng quan, audit log và backup hiện còn dùng phản hồi mock. |
+| `src/services/examiner.service.js` | Lớp gọi API có Bearer token cho câu hỏi, chủ đề, phòng ban và import Excel. |
 | `src/mock-data/admin.mock.js` | Dữ liệu mock dành riêng cho giao diện dashboard quản trị. |
 | `public/images/HeroSection.jpg` | Ảnh nền cho toàn bộ cụm hero trên trang chủ. |
 | `public/logo/logo.svg` | Logo doanh nghiệp mặc định; `UnitLogoDisplay` dùng file này cho cấu hình logo mặc định. |
 | `src/assets/images/military_banner_bg_1786353296945.jpg` | Tài nguyên ảnh cũ trong source; không phải ảnh hero đang sử dụng. |
 | `src/pages/admin/AdminDashboard.jsx` | Trang dashboard cho quản trị viên đã xác thực. |
+| `src/pages/examiner/ExaminerDashboard.jsx` | Trang dashboard cho người ra đề, gồm các tab ngân hàng câu hỏi, chủ đề và phòng ban. |
 
 ## Thành phần giao diện
 
@@ -90,10 +99,12 @@ client/
 | `LoginModal.jsx`, `ExamModal.jsx` | Modal đăng nhập và luồng thi phía client. |
 | `LogoSelectorModal.jsx`, `UnitLogoDisplay.jsx` | Chọn/hiển thị logo đơn vị. |
 | `components/admin/` | Các tab tài khoản, nhật ký audit và tổng quan trong dashboard quản trị. |
+| `components/examiner/` | Các tab quản lý câu hỏi, chủ đề và phòng ban của dashboard người ra đề. |
 
 ## Luồng giao diện và tài nguyên
 
 1. `index.html` tải `src/main.jsx`, sau đó render `App.jsx`.
 2. `App.jsx` hiển thị hero dùng `/images/HeroSection.jpg`, căn ảnh ở tâm thấp hơn và phủ vignette để giữ độ tương phản chữ.
 3. Logo mặc định được `UnitLogoDisplay` tải từ `/logo/logo.svg`; cấu hình logo tùy chọn của người dùng được lưu ở `localStorage` với khóa `z176_unit_logo_v2`.
-4. Các lời gọi API đi qua `services/api.js`; helper xác thực nằm tại `services/auth.service.js`.
+4. Các lời gọi API đi qua `services/api.js`; helper xác thực nằm tại `services/auth.service.js`. Sau đăng nhập, `App.jsx` điều hướng `admin` hoặc `examiner` đến dashboard tương ứng.
+5. Dashboard người ra đề gọi API qua `services/examiner.service.js` để quản lý ngân hàng câu hỏi, chủ đề và phòng ban.

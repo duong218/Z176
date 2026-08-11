@@ -75,3 +75,15 @@ export async function logoutUser() {
   }
   clearAccessToken();
 }
+
+/**
+ * Đổi mật khẩu tài khoản hiện tại.
+ */
+export async function changePassword(currentPassword, newPassword) {
+  const result = await apiRequest('/auth/change-password', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  return result;
+}
