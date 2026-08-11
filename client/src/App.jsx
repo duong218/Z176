@@ -19,6 +19,7 @@ import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
 import { LeaderDashboard } from './pages/leader/LeaderDashboard';
+import { CandidateDashboard } from './pages/candidate/CandidateDashboard';
 import { fetchActiveExam } from './services/exam-review.service';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AlertCircle } from 'lucide-react';
@@ -85,7 +86,7 @@ export default function App() {
 
   // Tự động mở modal đổi mật khẩu nếu bắt buộc
   useEffect(() => {
-    if (currentUser?.mustChangePassword && (activeTab === 'admin-dashboard' || activeTab === 'examiner-dashboard' || activeTab === 'leader-dashboard')) {
+    if (currentUser?.mustChangePassword && (activeTab === 'admin-dashboard' || activeTab === 'examiner-dashboard' || activeTab === 'leader-dashboard' || activeTab === 'candidate-dashboard')) {
       setIsChangePasswordOpen(true);
     }
   }, [currentUser, activeTab]);
@@ -102,6 +103,9 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (user?.roleCode === 'leader') {
       setActiveTab('leader-dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (user?.roleCode === 'candidate') {
+      setActiveTab('candidate-dashboard');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -190,6 +194,8 @@ export default function App() {
           <ExaminerDashboard />
         ) : activeTab === 'leader-dashboard' && currentUser?.roleCode === 'leader' ? (
           <LeaderDashboard onLogout={handleLogout} />
+        ) : activeTab === 'candidate-dashboard' && currentUser?.roleCode === 'candidate' ? (
+          <CandidateDashboard currentUser={currentUser} />
         ) : (
           <>
             {/* 2. Banner giới thiệu cuộc thi */}

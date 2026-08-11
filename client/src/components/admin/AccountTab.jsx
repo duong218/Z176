@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check } from 'lucide-react';
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword } from '../../services/admin.service';
+import { apiRequest } from '../../services/api';
+import { getAuthHeaders } from '../../services/auth.service';
+
+// TODO: nếu dự án đã có department.service.js riêng, thay hàm tạm này bằng
+// import fetchDepartments từ đó để đồng nhất convention thay vì gọi apiRequest trực tiếp ở đây.
+async function fetchDepartments() {
+  const res = await apiRequest('/departments', { headers: getAuthHeaders() });
+  return res.data;
+}
 
 export const AccountTab = ({ currentUser }) => {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +23,10 @@ export const AccountTab = ({ currentUser }) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newRoleId, setNewRoleId] = useState('');
+  // Chỉ dùng khi role được chọn là 'candidate' (thí sinh) — Employee đi kèm User.
+  const [newFullname, setNewFullname] = useState('');
+  const [newDepartmentId, setNewDepartmentId] = useState('');
+  const [newEmployeeCode, setNewEmployeeCode] = useState('');
 
   const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -30,12 +44,14 @@ export const AccountTab = ({ currentUser }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersData, rolesData] = await Promise.all([
+      const [usersData, rolesData, departmentsData] = await Promise.all([
         fetchUsers(),
-        fetchRoles()
+        fetchRoles(),
+        fetchDepartments().catch(() => []), // không chặn cả trang nếu API department lỗi
       ]);
       setUsers(usersData);
       setRoles(rolesData);
+      setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
     } catch (err) {
       alert(err.message || 'Lỗi khi tải danh sách dữ liệu');
     } finally {
@@ -47,15 +63,40 @@ export const AccountTab = ({ currentUser }) => {
     loadData();
   }, []);
 
+  // Xác định role đang chọn trong form tạo tài khoản có phải 'candidate' (thí sinh) không —
+  // dùng để hiện/ẩn nhóm field Họ tên/Mã NV/Phòng ban.
+  const isCandidateRoleSelected = roles.some(
+    (r) => r._id === newRoleId && r.code === 'candidate',
+  );
+
+  const resetCreateForm = () => {
+    setNewUsername('');
+    setNewRoleId('');
+    setNewFullname('');
+    setNewDepartmentId('');
+    setNewEmployeeCode('');
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!newUsername.trim() || !newRoleId) return;
+    if (isCandidateRoleSelected && (!newFullname.trim() || !newDepartmentId)) {
+      alert('Tài khoản thí sinh bắt buộc phải có Họ tên và Phòng ban.');
+      return;
+    }
     setActionLoading(true);
     try {
-      const res = await createUser(newUsername, newRoleId);
+      const employeeInfo = isCandidateRoleSelected
+        ? {
+            fullname: newFullname.trim(),
+            departmentId: newDepartmentId,
+            employeeCode: newEmployeeCode.trim() || undefined,
+          }
+        : undefined;
+
+      const res = await createUser(newUsername, newRoleId, employeeInfo);
       setIsCreateOpen(false);
-      setNewUsername('');
-      setNewRoleId('');
+      resetCreateForm();
       // Reload table
       await loadData();
       // Show temporary password
@@ -321,7 +362,7 @@ export const AccountTab = ({ currentUser }) => {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
             <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-lg text-[#0F172A]">Thêm tài khoản mới</h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setIsCreateOpen(false); resetCreateForm(); }} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -351,10 +392,60 @@ export const AccountTab = ({ currentUser }) => {
                   ))}
                 </select>
               </div>
+
+              {/* Chỉ hiện khi role được chọn là Thí sinh (candidate) — bắt buộc kèm hồ sơ nhân viên */}
+              {isCandidateRoleSelected && (
+                <div className="space-y-4 p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Hồ sơ nhân viên (bắt buộc cho tài khoản Thí sinh)</p>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Họ và tên</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nguyễn Văn A"
+                      value={newFullname}
+                      onChange={(e) => setNewFullname(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Phòng ban</label>
+                    <select
+                      required
+                      value={newDepartmentId}
+                      onChange={(e) => setNewDepartmentId(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    >
+                      <option value="">-- Chọn phòng ban --</option>
+                      {departments.map(dept => (
+                        <option key={dept._id} value={dept._id}>{dept.name}</option>
+                      ))}
+                    </select>
+                    {departments.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Chưa có phòng ban nào trong hệ thống — tạo phòng ban trước ở Dashboard Người ra đề.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      Mã nhân viên <span className="text-slate-400 font-normal">(không bắt buộc)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="NV-001"
+                      value={newEmployeeCode}
+                      onChange={(e) => setNewEmployeeCode(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreateOpen(false)}
+                  onClick={() => { setIsCreateOpen(false); resetCreateForm(); }}
                   className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   Hủy

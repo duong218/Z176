@@ -29,11 +29,25 @@ export async function fetchRoles() {
   return res.data;
 }
 
-export async function createUser(username, roleId) {
+/**
+ * @param {string} username
+ * @param {string} roleId
+ * @param {{ fullname: string, departmentId: string, employeeCode?: string }} [employeeInfo]
+ *   Chỉ cần truyền khi roleId ứng với role 'candidate' (thí sinh) — backend sẽ tự
+ *   tạo Employee gắn với User mới tạo. Với các role khác, để undefined/bỏ qua.
+ */
+export async function createUser(username, roleId, employeeInfo) {
+  const body = { username, roleId };
+  if (employeeInfo) {
+    body.fullname = employeeInfo.fullname;
+    body.departmentId = employeeInfo.departmentId;
+    body.employeeCode = employeeInfo.employeeCode;
+  }
+
   const res = await apiRequest('/users', {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ username, roleId })
+    body: JSON.stringify(body)
   });
   return res; // contains data (user) and tempPassword
 }

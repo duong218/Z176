@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import xlsx from 'xlsx';
 import { Result } from '../models/result.model.js';
+import { Employee } from '../models/employee.model.js';
 
 /**
  * Common aggregation pipeline to join Result -> ExamAttempt -> ExamCandidate -> Employee -> Department & Exam
@@ -240,7 +241,7 @@ export const reportService = {
     }));
 
     const worksheet = xlsx.utils.json_to_sheet(worksheetData);
-    
+
     // Auto-size columns
     const maxWidths = [5, 25, 20, 30, 10, 15, 20];
     worksheet['!cols'] = maxWidths.map(w => ({ wch: w }));
@@ -249,5 +250,49 @@ export const reportService = {
     xlsx.utils.book_append_sheet(workbook, worksheet, 'Ket_qua_thi');
 
     return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  },
+
+  /**
+   * MỚI — Lịch sử kết quả thi của chính thí sinh đang đăng nhập (role 'candidate').
+   * Khác các hàm trên (dành cho leader/admin xem toàn hệ thống), hàm này chỉ trả
+   * dữ liệu của đúng 1 employee gắn với userId hiện tại — match theo employee._id
+   * ngay từ đầu pipeline để không lộ dữ liệu người khác.
+   */
+  async getMyResults(userId) {
+    const employee = await Employee.findOne({ userId }).populate('departmentId').lean();
+
+    if (!employee) {
+      // Tài khoản chưa được gắn với hồ sơ nhân viên nào (vd tài khoản admin/examiner/leader
+      // không có Employee tương ứng) — trả rỗng thay vì lỗi để FE tự xử lý hiển thị.
+      return { employee: null, results: [] };
+    }
+
+    const pipeline = [
+      ...getBasePipeline(),
+      { $match: { 'employee._id': employee._id } },
+      { $sort: { createdAt: -1 } },
+    ];
+
+    const data = await Result.aggregate(pipeline);
+
+    const results = data.map((item) => ({
+      _id: item._id,
+      examTitle: item.exam.title,
+      score: item.score,
+      correctCount: item.correctCount,
+      totalQuestions: item.totalQuestions,
+      passed: item.passed,
+      submittedAt: item.attempt.submittedAt,
+      startedAt: item.attempt.startedAt,
+    }));
+
+    return {
+      employee: {
+        fullname: employee.fullname,
+        employeeCode: employee.employeeCode || null,
+        departmentName: employee.departmentId?.name || null,
+      },
+      results,
+    };
   },
 };

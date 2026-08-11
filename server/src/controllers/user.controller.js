@@ -9,16 +9,20 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 export const create = asyncHandler(async (req, res) => {
-  const { username, roleId } = req.body ?? {};
+  const { username, roleId, fullname, departmentId, employeeCode } = req.body ?? {};
   if (!username || !roleId) {
     throw new ApiError(400, 'Thiếu thông tin bắt buộc (username, roleId)', 'MISSING_FIELDS');
   }
 
-  const { user, tempPassword } = await userService.createUser({
+  const { user, tempPassword, employee } = await userService.createUser({
     adminId: req.auth.userId,
     username,
     roleId,
     ipAddress: req.ip,
+    // Chỉ có ý nghĩa khi roleId ứng với role 'candidate' — service sẽ tự kiểm tra
+    // và báo lỗi nếu thiếu trong trường hợp đó. Với các role khác, các field này
+    // bị bỏ qua nếu có gửi lên.
+    employeeInfo: { fullname, departmentId, employeeCode },
   });
 
   await writeAudit({
@@ -34,7 +38,7 @@ export const create = asyncHandler(async (req, res) => {
     success: true,
     message: 'Tạo tài khoản thành công',
     code: 'USER_CREATED',
-    data: user,
+    data: { ...user, employee },
     tempPassword, // Chỉ trả về 1 lần
   });
 });

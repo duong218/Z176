@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { User } from '../models/index.js';
+import { User, Role, Employee } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import * as auditService from './audit.service.js';
 
@@ -9,12 +9,35 @@ export async function listUsers() {
   return User.find().populate('roleId', 'code name').sort({ createdAt: -1 }).lean();
 }
 
-/** Tạo user mới, sinh pass ngẫu nhiên (6 chữ số) */
-export async function createUser({ adminId, username, roleId, ipAddress }) {
+/**
+ * Tạo user mới, sinh pass ngẫu nhiên (6 chữ số).
+ *
+ * MỚI: nếu role được chọn có code = 'candidate' (thí sinh), bắt buộc phải kèm
+ * employeeInfo (fullname, departmentId, employeeCode tuỳ chọn) — hệ thống sẽ tự
+ * tạo Employee gắn với user này ngay trong cùng lượt tạo, tránh trường hợp tài
+ * khoản thí sinh "mồ côi" không có hồ sơ nhân viên (Employee.userId) đi kèm.
+ */
+export async function createUser({ adminId, username, roleId, ipAddress, employeeInfo }) {
   // Check duplicate
   const existing = await User.findOne({ username: username.toLowerCase() });
   if (existing) {
     throw new ApiError(400, 'Tên đăng nhập đã tồn tại', 'USERNAME_EXISTS');
+  }
+
+  const role = await Role.findById(roleId);
+  if (!role) {
+    throw new ApiError(400, 'Vai trò không hợp lệ', 'ROLE_NOT_FOUND');
+  }
+
+  const isCandidate = role.code === 'candidate';
+  if (isCandidate) {
+    if (!employeeInfo?.fullname || !employeeInfo?.departmentId) {
+      throw new ApiError(
+        400,
+        'Tài khoản thí sinh bắt buộc phải có họ tên và phòng ban',
+        'MISSING_EMPLOYEE_FIELDS',
+      );
+    }
   }
 
   // Sinh mật khẩu tạm (6 chữ số)
@@ -28,20 +51,45 @@ export async function createUser({ adminId, username, roleId, ipAddress }) {
     mustChangePassword: true,
   });
 
+  let employee = null;
+  if (isCandidate) {
+    try {
+      employee = await Employee.create({
+        fullname: employeeInfo.fullname,
+        departmentId: employeeInfo.departmentId,
+        userId: newUser._id,
+        employeeCode: employeeInfo.employeeCode || undefined,
+        isActive: true,
+      });
+    } catch (err) {
+      // Tạo Employee thất bại (vd departmentId sai, trùng employeeCode...) —
+      // rollback User vừa tạo để không để lại tài khoản không có hồ sơ nhân viên.
+      await User.deleteOne({ _id: newUser._id });
+      throw new ApiError(
+        400,
+        `Không thể tạo hồ sơ nhân viên: ${err.message}`,
+        'EMPLOYEE_CREATE_FAILED',
+      );
+    }
+  }
+
   // Audit
   await auditService.writeAudit({
     actorUserId: adminId,
     action: 'Tạo tài khoản',
     resourceType: 'User',
     resourceId: newUser._id,
-    metadata: { username: newUser.username },
+    metadata: {
+      username: newUser.username,
+      ...(employee ? { employeeId: employee._id, fullname: employee.fullname } : {}),
+    },
     ipAddress,
   });
 
   // Trả về kèm mật khẩu tạm để hiển thị 1 lần
   const userObj = newUser.toObject();
   delete userObj.passwordHash;
-  return { user: userObj, tempPassword };
+  return { user: userObj, tempPassword, employee };
 }
 
 /** Đổi role */

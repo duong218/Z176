@@ -63,3 +63,12 @@ export const exportReport = async (filters = {}) => {
   a.remove();
   window.URL.revokeObjectURL(url);
 };
+
+// MỚI — Lịch sử kết quả thi của chính thí sinh đang đăng nhập (role 'candidate').
+// Trả về { employee: { fullname, employeeCode, departmentName } | null, results: [...] }
+export const fetchMyResults = async () => {
+  const res = await apiRequest('/reports/my-results', {
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+};

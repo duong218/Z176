@@ -55,4 +55,13 @@ export const reportController = {
     );
     res.send(buffer);
   }),
+
+  // MỚI — Lịch sử kết quả thi của chính thí sinh đang đăng nhập (role 'candidate').
+  getMyResults: asyncHandler(async (req, res) => {
+    const data = await reportService.getMyResults(req.auth.userId);
+    res.json({
+      success: true,
+      data,
+    });
+  }),
 };
