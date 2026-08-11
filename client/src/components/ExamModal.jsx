@@ -140,7 +140,7 @@ export const ExamModal = ({
             <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-[10px] p-4 text-sm text-[#334155]">
               <h5 className="font-bold text-base text-[#0F172A]">Lưu ý quan trọng khi làm bài:</h5>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Bài thi gồm {SAMPLE_QUESTIONS.length} câu hỏi làm trong tối đa 20 phút.</li>
+                <li>Bài thi gồm {SAMPLE_QUESTIONS.length} câu hỏi làm trong tối đa theo thời gian quy định.</li>
                 <li>Mỗi câu hỏi chọn 1 đáp án đúng nhất.</li>
                 <li>Không thoát trình duyệt trong khi đang làm bài.</li>
                 <li>Bạn được thi tối đa 2 lần, hệ thống tự động lưu kết quả tốt nhất.</li>
@@ -199,18 +199,16 @@ export const ExamModal = ({
                     <button
                       key={optIdx}
                       onClick={() => handleSelectOption(currentQ.id, optIdx)}
-                      className={`w-full min-h-[52px] p-3 rounded-lg text-left text-base font-medium transition-all flex items-start gap-3 border min-touch-target ${
-                        isSelected
+                      className={`w-full min-h-[52px] p-3 rounded-lg text-left text-base font-medium transition-all flex items-start gap-3 border min-touch-target ${isSelected
                           ? 'bg-[#EAF6FF] border-[#008BC5] text-[#0F172A] font-semibold ring-2 ring-[#008BC5]/30'
                           : 'bg-slate-50 border-slate-200 text-[#334155] hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${
-                          isSelected
+                        className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${isSelected
                             ? 'bg-[#008BC5] text-white'
                             : 'bg-slate-200 text-slate-700'
-                        }`}
+                          }`}
                       >
                         {String.fromCharCode(65 + optIdx)}
                       </span>

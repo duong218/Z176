@@ -89,7 +89,7 @@ server/
 |---|---|
 | `/api` | `GET /health` |
 | `/api/auth` | `POST /login`, `POST /refresh`, `POST /logout`, `GET /me`, `POST /change-password` |
-| `/api/audits` | `GET /` |
+| `/api/audit-logs` | `GET /` |
 | `/api/topics` | `GET /`, `POST /` |
 | `/api/departments` | `GET /`, `POST /` |
 | `/api/exams` | `GET /active`, `GET /`, `POST /`, `POST /:id/submit`, `POST /:id/approve`, `POST /:id/reject`, `POST /:id/publish` |
@@ -98,4 +98,4 @@ server/
 | `/api/roles` | `GET /` |
 | `/api/reports` | `GET /overview`, `GET /by-department`, `GET /results`, `GET /export` |
 
-`/api/reports` yêu cầu role `leader` hoặc `admin`; các route quản lý ngân hàng câu hỏi yêu cầu xác thực, role phù hợp và mật khẩu đã được đổi. Client sử dụng `VITE_API_URL` để kết nối API.
+`/api/audit-logs` yêu cầu `admin`. `/api/reports` yêu cầu `leader` hoặc `admin`. Với `/api/exams`, `GET /active` là route công khai; các thao tác tạo/đệ trình, duyệt/từ chối/phát hành được giới hạn theo role `examiner` hoặc `leader`. Các route quản lý ngân hàng câu hỏi yêu cầu xác thực, role phù hợp và mật khẩu đã được đổi. Client sử dụng `VITE_API_URL` để kết nối API.

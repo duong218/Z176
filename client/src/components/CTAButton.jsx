@@ -21,7 +21,7 @@ export const CTAButton = ({ onClick }) => {
           <ArrowRight className="w-5 h-5 shrink-0" />
         </button>
         <p className="text-center text-xs text-slate-100 mt-1.5 font-medium drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)]">
-          Dành cho cán bộ, công nhân viên Công ty Z176 • Làm bài trong 20 phút
+          Dành cho cán bộ, công nhân viên Công ty Z176 
         </p>
       </div>
     </div>

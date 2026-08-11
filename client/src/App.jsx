@@ -23,6 +23,10 @@ import { fetchActiveExam } from './services/exam-review.service';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AlertCircle } from 'lucide-react';
 
+// Khoảng thời gian tự động làm mới kỳ thi đang active trên trang chủ (ms).
+// Giúp Hero Section tự cập nhật khi Lãnh đạo vừa "Đăng chính thức" mà không cần F5.
+const ACTIVE_EXAM_POLL_INTERVAL_MS = 60_000;
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -49,10 +53,35 @@ export default function App() {
   }, []);
 
   const [activeExam, setActiveExam] = useState(null);
-  
+
+  // Lấy kỳ thi đang published:
+  // 1) Gọi ngay khi app khởi động (giữ hành vi cũ).
+  // 2) Gọi lại mỗi khi người dùng quay về tab "home" (ví dụ sau khi đăng xuất khỏi Dashboard,
+  //    hoặc bấm "Trang chủ" trên Header) — tránh phải F5 mới thấy kỳ thi vừa được publish.
+  // 3) Polling định kỳ trong lúc đang ở trang chủ, để các tab đang mở sẵn cũng tự cập nhật.
   useEffect(() => {
-    fetchActiveExam().then(setActiveExam).catch(console.error);
-  }, []);
+    let cancelled = false;
+
+    const loadActiveExam = () => {
+      fetchActiveExam().then((data) => {
+        if (!cancelled) setActiveExam(data);
+      });
+    };
+
+    loadActiveExam();
+
+    if (activeTab !== 'home') {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const intervalId = setInterval(loadActiveExam, ACTIVE_EXAM_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeTab]);
 
   // Tự động mở modal đổi mật khẩu nếu bắt buộc
   useEffect(() => {
