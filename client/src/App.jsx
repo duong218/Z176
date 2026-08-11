@@ -201,7 +201,7 @@ export default function App() {
               <div className="relative z-10">
                 <Banner unitLogo={unitLogo} activeExam={activeExam} />
                 <TimeAndCountdown activeExam={activeExam} />
-                <CTAButton onClick={handleOpenExam} />
+                <CTAButton onClick={handleOpenExam} activeExam={activeExam} />
               </div>
             </section>
 
