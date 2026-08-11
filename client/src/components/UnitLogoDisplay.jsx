@@ -1,4 +1,4 @@
-import { ShieldCheck, Scissors, Factory, Award, Shield } from 'lucide-react';
+import { Scissors, Factory, Award, Shield } from 'lucide-react';
 
 export const PRESET_LOGOS = [
   {

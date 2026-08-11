@@ -1,15 +1,12 @@
 # Cấu trúc client
 
-## Phạm vi tài liệu
+## Phạm vi và trạng thái
 
-- Cập nhật theo trạng thái repository hiện tại.
-- Không liệt kê `client/node_modules/` vì là thư viện được cài đặt.
-- Không phân tích dữ liệu trong `mock-data/`; xem `server.md` để biết phạm vi backend và dữ liệu mock bị bỏ qua.
-- `client/dist/` là đầu ra build, không phải mã nguồn chỉnh sửa trực tiếp.
+`client/` là ứng dụng giao diện một trang, sử dụng React 19, Vite và Tailwind CSS. Hiện có landing page, modal đăng nhập/vào thi, tra cứu kết quả và phần hiển thị logo; dữ liệu nghiệp vụ trong giao diện vẫn là dữ liệu mẫu cho đến khi backend được tích hợp hoàn chỉnh.
 
-## Tổng quan
-
-`client/` là ứng dụng giao diện một trang dùng React 19, Vite và Tailwind CSS. Ứng dụng hiện triển khai trang chủ cho hệ thống thi nội bộ Z176, các luồng giao diện đăng nhập, vào thi, tra cứu kết quả và thay đổi logo. Chưa có kết nối nghiệp vụ đến backend thực tế; các phần dữ liệu/luồng đang dùng dữ liệu mẫu tại mã nguồn giao diện.
+- Không liệt kê `node_modules/` vì là dependency cài đặt.
+- `dist/` là đầu ra build, không chỉnh sửa trực tiếp.
+- Không đưa dữ liệu thật của Z176 vào mã nguồn hoặc workflow AI.
 
 ```text
 client/
@@ -21,71 +18,82 @@ client/
 ├── package-lock.json
 ├── vite.config.js
 ├── public/
-│   ├── images/HeroSection.jpg
-│   └── logo/logo.svg
+│   ├── images/
+│   │   └── HeroSection.jpg
+│   └── logo/
+│       └── logo.svg
 ├── src/
 │   ├── App.jsx
 │   ├── data.js
 │   ├── index.css
 │   ├── main.jsx
-│   ├── assets/images/military_banner_bg_1786353296945.jpg
+│   ├── mock-data/
+│   │   └── admin.mock.js
+│   ├── assets/images/
+│   │   └── military_banner_bg_1786353296945.jpg
 │   ├── components/
-│   └── services/api.js
-└── dist/                         # đầu ra sau khi chạy build
+│   │   ├── admin/
+│   │   │   ├── AccountTab.jsx
+│   │   │   ├── AuditLogTab.jsx
+│   │   │   └── OverviewTab.jsx
+│   │   ├── Banner.jsx
+│   │   ├── CTAButton.jsx
+│   │   ├── ContactSection.jsx
+│   │   ├── ExamModal.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Header.jsx
+│   │   ├── LoginModal.jsx
+│   │   ├── LogoSelectorModal.jsx
+│   │   ├── QuickGuideSection.jsx
+│   │   ├── RegulationsSection.jsx
+│   │   ├── ResultsLookupSection.jsx
+│   │   ├── TimeAndCountdown.jsx
+│   │   └── UnitLogoDisplay.jsx
+│   ├── pages/admin/
+│   │   └── AdminDashboard.jsx
+│   └── services/
+│       ├── admin.service.js
+│       ├── api.js
+│       └── auth.service.js
+└── dist/                         # đầu ra sau npm run build
 ```
 
-## Tệp và thư mục gốc
+## Tệp và thư mục chính
 
 | Đường dẫn | Chức năng |
 |---|---|
-| `client/.env.example` | Mẫu biến `VITE_API_URL` cho URL API Express dự kiến; không chứa cấu hình thật. |
-| `client/package.json` | Khai báo metadata, thư viện React/Vite/Tailwind và các lệnh `dev`, `build`, `preview`, `clean`, `lint`. |
-| `client/package-lock.json` | Khóa chính xác phiên bản dependency để cài đặt nhất quán. |
-| `client/vite.config.js` | Cấu hình Vite: React plugin, Tailwind plugin, alias `@` trỏ tới `client/`, và hành vi HMR/watch theo biến `DISABLE_HMR`. |
-| `client/eslint.config.js` | Cấu hình ESLint cho JSX/React Hooks; bỏ qua `dist/` và `node_modules/`. |
-| `client/index.html` | HTML shell, điểm gắn React `#root`, favicon và metadata cơ bản của trang. |
-| `client/metadata.json` | Metadata mô tả sản phẩm và capability phía server dự kiến cho môi trường tạo mẫu. |
-| `client/public/` | Tài nguyên tĩnh được Vite phục vụ nguyên trạng qua URL gốc. |
-| `client/public/logo/logo.svg` | Logo mặc định được `UnitLogoDisplay` hiển thị khi chọn preset quốc phòng. |
-| `client/public/images/HeroSection.jpg` | Ảnh nền phần hero/banner của trang chủ. |
-| `client/dist/` | Tệp HTML, CSS/JS đã đóng gói và ảnh sao chép sau build; chỉ tái tạo bằng `npm run build`, không chỉnh sửa trực tiếp. |
-| `client/assets/` | Thư mục dành cho tài nguyên cục bộ ở cấp client; hiện không có tệp đáng kể. |
-
-## Mã nguồn `src/`
-
-| Đường dẫn | Chức năng |
-|---|---|
-| `client/src/main.jsx` | Điểm khởi động React: tạo root, bật `StrictMode`, render `App` và nạp stylesheet chung. |
-| `client/src/App.jsx` | Thành phần điều phối chính: quản lý tab điều hướng, trạng thái ba modal, người dùng hiện tại và logo đơn vị lưu trong `localStorage`; ghép các section của trang. |
-| `client/src/index.css` | Nạp Tailwind, đặt kiểu nền/chữ cơ bản và utility nội bộ cho bóng đổ cùng kích thước vùng chạm. |
-| `client/src/data.js` | Tập trung cấu hình hiển thị Z176, danh sách phòng ban và dữ liệu mẫu phục vụ giao diện thi/tra cứu hiện tại; cần thay thế bằng API an toàn khi có backend. |
-| `client/src/services/` | Lớp tích hợp dịch vụ bên ngoài giao diện. |
-| `client/src/services/api.js` | Đọc `VITE_API_URL`, gửi request JSON qua `fetch`, chuẩn hóa xử lý phản hồi lỗi và trả JSON hoặc `null` cho phản hồi 204. |
-| `client/src/assets/` | Tài nguyên được import từ mã nguồn để Vite xử lý khi build. |
-| `client/src/assets/images/military_banner_bg_1786353296945.jpg` | Ảnh nền quân đội có sẵn trong source; hiện `App.jsx` đang dùng ảnh hero trong `public/images/`. |
-| `client/src/components/` | Các React component theo từng khối UI và modal. |
+| `src/main.jsx` | Điểm khởi động React; render `App` và nạp CSS dùng chung. |
+| `src/App.jsx` | Điều phối navigation, trạng thái xác thực, modal và logo đơn vị. Tạo cụm hero gồm banner, thời gian thi và CTA; hiển thị dashboard khi người dùng quản trị chọn đúng mục. |
+| `src/index.css` | Nạp Tailwind, đặt nền/chữ mặc định và các utility nội bộ. |
+| `src/data.js` | Cấu hình nội dung hiển thị và dữ liệu mẫu của giao diện. |
+| `src/services/api.js` | Đọc `VITE_API_URL`, thực hiện request JSON và chuẩn hóa phản hồi API. |
+| `src/services/auth.service.js` | Helper đăng nhập, refresh token, lấy hồ sơ, đăng xuất và quản lý access token phía client. |
+| `src/services/admin.service.js` | Lớp gọi API quản trị tài khoản/role; phần số liệu tổng quan, audit log và backup hiện còn dùng phản hồi mock. |
+| `src/mock-data/admin.mock.js` | Dữ liệu mock dành riêng cho giao diện dashboard quản trị. |
+| `public/images/HeroSection.jpg` | Ảnh nền cho toàn bộ cụm hero trên trang chủ. |
+| `public/logo/logo.svg` | Logo doanh nghiệp mặc định; `UnitLogoDisplay` dùng file này cho cấu hình logo mặc định. |
+| `src/assets/images/military_banner_bg_1786353296945.jpg` | Tài nguyên ảnh cũ trong source; không phải ảnh hero đang sử dụng. |
+| `src/pages/admin/AdminDashboard.jsx` | Trang dashboard cho quản trị viên đã xác thực. |
 
 ## Thành phần giao diện
 
-| Đường dẫn | Chức năng |
+| Component | Vai trò |
 |---|---|
-| `client/src/components/Header.jsx` | Thanh điều hướng cố định; hỗ trợ menu desktop/mobile, cuộn tới section, mở modal đăng nhập/vào thi/chọn logo. |
-| `client/src/components/Banner.jsx` | Hero giới thiệu đơn vị, tiêu đề cuộc thi và nút mở chọn logo. |
-| `client/src/components/TimeAndCountdown.jsx` | Hiển thị thời gian diễn ra cuộc thi và bộ đếm ngược từng giây đến thời điểm cấu hình. |
-| `client/src/components/CTAButton.jsx` | Nút hành động chính để mở luồng vào thi. |
-| `client/src/components/RegulationsSection.jsx` | Section quy chế, cấu trúc bài thi, điều kiện đạt và hướng dẫn trước khi thi. |
-| `client/src/components/QuickGuideSection.jsx` | Section mô tả bốn bước thao tác và nút bắt đầu bài thi. |
-| `client/src/components/ResultsLookupSection.jsx` | Giao diện lọc/tra cứu kết quả theo mã, tên hoặc phòng ban bằng danh sách mẫu đang có ở client. |
-| `client/src/components/ContactSection.jsx` | Section liên hệ hỗ trợ kỹ thuật và tổ chức; tạo liên kết gọi điện/email từ cấu hình chung. |
-| `client/src/components/Footer.jsx` | Chân trang hiển thị thông tin đơn vị và liên hệ rút gọn. |
-| `client/src/components/LoginModal.jsx` | Modal thu thập và kiểm tra tối thiểu thông tin đăng nhập ở phía client, rồi trả đối tượng người dùng lên `App`. Chưa xác thực qua server. |
-| `client/src/components/ExamModal.jsx` | Modal luồng thi: xác nhận người dùng, trả lời câu hỏi, đếm thời gian, chấm điểm và hiển thị kết quả/thi lại. Hiện chạy hoàn toàn trên dữ liệu mẫu phía client. |
-| `client/src/components/LogoSelectorModal.jsx` | Modal chọn preset hoặc tải logo cục bộ, kiểm tra định dạng/kích thước, nén ảnh bằng canvas và lưu cấu hình qua `App`. |
-| `client/src/components/UnitLogoDisplay.jsx` | Khai báo danh sách logo preset và render logo preset hoặc ảnh tùy chỉnh theo cấu hình. |
+| `Header.jsx` | Thanh điều hướng cố định, menu desktop/mobile và nút đăng nhập. |
+| `Banner.jsx` | Nhãn đơn vị, tiêu đề và thông tin cuộc thi trong hero. |
+| `TimeAndCountdown.jsx` | Thời gian diễn ra và bộ đếm ngược. |
+| `CTAButton.jsx` | Nút hành động chính để mở luồng vào thi. |
+| `RegulationsSection.jsx` | Quy chế, cấu trúc bài thi và hướng dẫn trước khi thi. |
+| `QuickGuideSection.jsx` | Hướng dẫn thao tác nhanh. |
+| `ResultsLookupSection.jsx` | Giao diện tra cứu kết quả theo dữ liệu mẫu. |
+| `ContactSection.jsx` và `Footer.jsx` | Thông tin liên hệ và chân trang. |
+| `LoginModal.jsx`, `ExamModal.jsx` | Modal đăng nhập và luồng thi phía client. |
+| `LogoSelectorModal.jsx`, `UnitLogoDisplay.jsx` | Chọn/hiển thị logo đơn vị. |
+| `components/admin/` | Các tab tài khoản, nhật ký audit và tổng quan trong dashboard quản trị. |
 
-## Luồng phụ thuộc chính
+## Luồng giao diện và tài nguyên
 
-1. `index.html` tải `src/main.jsx`.
-2. `main.jsx` render `App.jsx`.
-3. `App.jsx` điều phối các section và modal trong `components/`.
-4. Các component dùng `data.js` cho thông tin hiển thị/dữ liệu mẫu; khi backend được triển khai, các lời gọi nên đi qua `services/api.js`.
+1. `index.html` tải `src/main.jsx`, sau đó render `App.jsx`.
+2. `App.jsx` hiển thị hero dùng `/images/HeroSection.jpg`, căn ảnh ở tâm thấp hơn và phủ vignette để giữ độ tương phản chữ.
+3. Logo mặc định được `UnitLogoDisplay` tải từ `/logo/logo.svg`; cấu hình logo tùy chọn của người dùng được lưu ở `localStorage` với khóa `z176_unit_logo_v2`.
+4. Các lời gọi API đi qua `services/api.js`; helper xác thực nằm tại `services/auth.service.js`.

@@ -54,3 +54,9 @@ desktop.ini
 
 # ---------- Generated files ----------
 *.generated.*
+
+# ---------- App runtime (server) ----------
+uploads/
+tmp/
+server/uploads/
+server/tmp/

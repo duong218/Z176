@@ -1,36 +1,42 @@
 import { useState } from 'react';
-import { X, User, Lock, Building, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Z176_COMPANY_INFO } from '../data';
+import { X, User, Lock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { loginUser } from '../services/auth.service';
+
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
-  const [employeeId, setEmployeeId] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [department, setDepartment] = useState(Z176_COMPANY_INFO.departments[0]);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!employeeId.trim()) {
-      setErrorMessage('Vui lòng nhập Mã nhân viên (ví dụ: NV17601)');
+
+    if (!username.trim()) {
+      setErrorMessage('Vui lòng nhập tên đăng nhập');
       return;
     }
-    if (!fullName.trim()) {
-      setErrorMessage('Vui lòng nhập đầy đủ Họ và tên');
+    if (!password) {
+      setErrorMessage('Vui lòng nhập mật khẩu');
       return;
     }
 
     setErrorMessage('');
-    const user = {
-      employeeId: employeeId.trim().toUpperCase(),
-      fullName: fullName.trim(),
-      department,
-      role: 'Công nhân / Cán bộ',
-    };
+    setIsLoading(true);
 
-    onLoginSuccess(user);
-    onClose();
+    try {
+      const data = await loginUser(username.trim(), password);
+      onLoginSuccess(data.user);
+      onClose();
+      // Reset form
+      setUsername('');
+      setPassword('');
+    } catch (err) {
+      setErrorMessage(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -42,12 +48,13 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             <div className="w-8 h-8 rounded-lg bg-[#008BC5] text-white flex items-center justify-center font-bold">
               <User className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-base text-white">Đăng nhập / Đăng ký thi Z176</h3>
+            <h3 className="font-bold text-base text-white">Đăng nhập hệ thống Z176</h3>
           </div>
           <button
             onClick={onClose}
             className="p-2 text-slate-300 hover:text-white rounded-lg min-touch-target flex items-center justify-center"
             aria-label="Đóng bảng đăng nhập"
+            disabled={isLoading}
           >
             <X className="w-6 h-6" />
           </button>
@@ -64,16 +71,18 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
           <div>
             <label className="block text-sm font-bold text-[#0F172A] mb-1">
-              Mã nhân viên (in trên Thẻ công nhân) <span className="text-[#E53E3E]">*</span>
+              Tên đăng nhập <span className="text-[#E53E3E]">*</span>
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Nhập mã NV, VD: NV17601"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="Nhập tên đăng nhập"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full min-h-[48px] pl-10 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
                 required
+                disabled={isLoading}
+                autoComplete="username"
               />
               <User className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
             </div>
@@ -81,64 +90,40 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
           <div>
             <label className="block text-sm font-bold text-[#0F172A] mb-1">
-              Họ và tên công nhân / cán bộ <span className="text-[#E53E3E]">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Nhập đầy đủ Họ và tên"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full min-h-[48px] px-3 bg-slate-50 border border-slate-300 rounded-lg text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-[#0F172A] mb-1">
-              Xưởng / Phòng ban trực thuộc <span className="text-[#E53E3E]">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="w-full min-h-[48px] pl-10 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
-              >
-                {Z176_COMPANY_INFO.departments.map((dept, i) => (
-                  <option key={i} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
-              <Building className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-[#0F172A] mb-1">
-              Mật khẩu (hoặc 4 số cuối CMND/CCCD)
+              Mật khẩu <span className="text-[#E53E3E]">*</span>
             </label>
             <div className="relative">
               <input
                 type="password"
-                placeholder="Mật khẩu tài khoản"
+                placeholder="Nhập mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full min-h-[48px] pl-10 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                required
+                disabled={isLoading}
+                autoComplete="current-password"
               />
               <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
             </div>
-            <span className="text-xs text-slate-500 mt-1 block">
-              Mặc định là 4 số cuối CCCD nếu bạn chưa đổi mật khẩu.
-            </span>
           </div>
 
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full min-h-[48px] bg-[#008BC5] text-white font-bold text-base rounded-[10px] hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 min-touch-target"
+              disabled={isLoading}
+              className="w-full min-h-[48px] bg-[#008BC5] text-white font-bold text-base rounded-[10px] hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 min-touch-target disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>XÁC NHẬN ĐĂNG NHẬP</span>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Đang xác thực...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>ĐĂNG NHẬP</span>
+                </>
+              )}
             </button>
           </div>
         </form>

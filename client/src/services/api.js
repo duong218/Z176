@@ -3,6 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 export async function apiRequest(path, options = {}) {
   const { headers, ...requestOptions } = options;
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...headers,
@@ -11,7 +12,16 @@ export async function apiRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    let serverMessage;
+    try {
+      const body = await response.json();
+      serverMessage = body.message;
+    } catch {
+      /* response không phải JSON */
+    }
+    const err = new Error(serverMessage || `Lỗi máy chủ (${response.status})`);
+    err.status = response.status;
+    throw err;
   }
 
   return response.status === 204 ? null : response.json();

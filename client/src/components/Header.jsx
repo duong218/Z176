@@ -1,6 +1,13 @@
 import { useState } from 'react';
-import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X } from 'lucide-react';
+import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X, LogOut, Shield, LayoutDashboard } from 'lucide-react';
 import { UnitLogoDisplay } from './UnitLogoDisplay';
+
+const ROLE_LABELS = {
+  admin: 'Quản trị viên',
+  examiner: 'Người ra đề',
+  candidate: 'Thí sinh',
+  leader: 'Lãnh đạo',
+};
 
 export const Header = ({
   activeTab,
@@ -8,6 +15,9 @@ export const Header = ({
   onOpenLogin,
   onOpenExam,
   unitLogo,
+  currentUser,
+  authLoading,
+  onLogout,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -19,6 +29,10 @@ export const Header = ({
     { id: 'contact', label: 'Liên hệ', icon: <PhoneCall className="w-5 h-5 shrink-0" /> },
   ];
 
+  if (currentUser?.roleCode === 'admin') {
+    menuItems.push({ id: 'admin-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5 shrink-0" /> });
+  }
+
   const handleNavClick = (tab) => {
     if (tab === 'exam') {
       onOpenExam();
@@ -27,6 +41,10 @@ export const Header = ({
     }
     setDrawerOpen(false);
   };
+
+  const roleLabel = currentUser?.roleCode
+    ? ROLE_LABELS[currentUser.roleCode] || currentUser.roleName || currentUser.roleCode
+    : '';
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0F172A] text-white shadow-z176 border-b border-[#334155]/40">
@@ -69,15 +87,41 @@ export const Header = ({
           })}
         </nav>
 
-        {/* Desktop Login Button */}
+        {/* Desktop Auth Area */}
         <div className="hidden md:flex items-center gap-2">
-          <button
-            onClick={onOpenLogin}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-medium text-base rounded-lg transition-all duration-200 border border-slate-700 hover:border-slate-600 whitespace-nowrap shadow-sm hover:shadow-md min-touch-target"
-          >
-            <User className="w-5 h-5 text-[#008BC5]" />
-            <span>Đăng nhập / Đăng ký</span>
-          </button>
+          {authLoading ? (
+            <div className="w-6 h-6 border-2 border-slate-600 border-t-[#008BC5] rounded-full animate-spin" />
+          ) : currentUser ? (
+            <div className="flex items-center gap-3">
+              {/* User info pill */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
+                <div className="w-7 h-7 rounded-full bg-[#008BC5]/20 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-[#38BDF8]" />
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-sm font-semibold text-white">{currentUser.username}</span>
+                  <span className="text-xs text-[#64748B]">{roleLabel}</span>
+                </div>
+              </div>
+              {/* Logout button */}
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-red-500/20 whitespace-nowrap"
+                title="Đăng xuất"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Thoát</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenLogin}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-medium text-base rounded-lg transition-all duration-200 border border-slate-700 hover:border-slate-600 whitespace-nowrap shadow-sm hover:shadow-md min-touch-target"
+            >
+              <User className="w-5 h-5 text-[#008BC5]" />
+              <span>Đăng nhập</span>
+            </button>
+          )}
         </div>
 
         {/* Mobile Hamburger Toggle Button (<640px) */}
@@ -142,16 +186,42 @@ export const Header = ({
               })}
 
               <div className="pt-4 border-t border-[#334155] space-y-2">
-                <button
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    onOpenLogin();
-                  }}
-                  className="w-full flex items-center justify-center gap-2.5 px-4 py-3 bg-[#334155] hover:bg-[#334155]/80 text-white font-semibold text-base rounded-lg transition-colors min-touch-target border border-gray-600/40"
-                >
-                  <User className="w-5 h-5 text-[#008BC5]" />
-                  <span>Đăng nhập / Đăng ký</span>
-                </button>
+                {currentUser ? (
+                  <>
+                    {/* User info in drawer */}
+                    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-800/60 rounded-lg border border-slate-700/50">
+                      <div className="w-8 h-8 rounded-full bg-[#008BC5]/20 flex items-center justify-center">
+                        <Shield className="w-4.5 h-4.5 text-[#38BDF8]" />
+                      </div>
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-sm font-semibold text-white">{currentUser.username}</span>
+                        <span className="text-xs text-[#64748B]">{roleLabel}</span>
+                      </div>
+                    </div>
+                    {/* Logout in drawer */}
+                    <button
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center justify-center gap-2.5 px-4 py-3 text-red-400 hover:bg-red-500/10 font-semibold text-base rounded-lg transition-colors min-touch-target border border-red-500/20"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      onOpenLogin();
+                    }}
+                    className="w-full flex items-center justify-center gap-2.5 px-4 py-3 bg-[#334155] hover:bg-[#334155]/80 text-white font-semibold text-base rounded-lg transition-colors min-touch-target border border-gray-600/40"
+                  >
+                    <User className="w-5 h-5 text-[#008BC5]" />
+                    <span>Đăng nhập</span>
+                  </button>
+                )}
               </div>
             </div>
 
