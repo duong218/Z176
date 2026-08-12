@@ -9,8 +9,8 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 export const create = asyncHandler(async (req, res) => {
-  const { name, code } = req.body ?? {};
-  const data = await departmentService.createDepartment({ name, code });
+  const { name, code, description } = req.body ?? {};
+  const data = await departmentService.createDepartment({ name, code, description });
 
   await writeAudit({
     actorUserId: req.auth.userId,

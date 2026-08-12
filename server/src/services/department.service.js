@@ -6,7 +6,7 @@ export async function listDepartments({ activeOnly = true } = {}) {
   return Department.find(filter).sort({ name: 1 }).lean();
 }
 
-export async function createDepartment({ name, code }) {
+export async function createDepartment({ name, code, description }) {
   const trimmed = name?.trim();
   if (!trimmed) {
     throw new ApiError(400, 'Tên bộ phận là bắt buộc', 'DEPARTMENT_VALIDATION');
@@ -15,6 +15,7 @@ export async function createDepartment({ name, code }) {
     const doc = await Department.create({
       name: trimmed,
       code: code?.trim() || undefined,
+      description: description?.trim() || '',
     });
     return doc.toObject();
   } catch (err) {
