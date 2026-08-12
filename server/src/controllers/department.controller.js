@@ -27,3 +27,44 @@ export const create = asyncHandler(async (req, res) => {
     data,
   });
 });
+
+export const update = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, code, description, isActive } = req.body ?? {};
+  const data = await departmentService.updateDepartment(id, { name, code, description, isActive });
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'UPDATE_DEPARTMENT',
+    resourceType: 'Department',
+    resourceId: data._id ?? id,
+    metadata: { detail: `Cập nhật bộ phận: ${data.name}` },
+    ipAddress: req.ip,
+  });
+  res.json({
+    success: true,
+    message: 'Cập nhật bộ phận thành công',
+    code: 'DEPARTMENT_UPDATED',
+    data,
+  });
+});
+
+export const remove = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const data = await departmentService.deactivateDepartment(id);
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'DEACTIVATE_DEPARTMENT',
+    resourceType: 'Department',
+    resourceId: id,
+    metadata: { detail: `Ngừng sử dụng bộ phận: ${id}` },
+    ipAddress: req.ip,
+  });
+  res.json({
+    success: true,
+    message: 'Đã ngừng sử dụng bộ phận',
+    code: 'DEPARTMENT_DEACTIVATED',
+    data,
+  });
+});

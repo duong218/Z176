@@ -45,6 +45,43 @@ export async function findDepartmentByName(name) {
   });
 }
 
+export async function updateDepartment(id, { name, code, description, isActive } = {}) {
+  const dept = await Department.findById(id);
+  assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
+
+  if (name !== undefined) {
+    const trimmed = name?.trim();
+    if (!trimmed) {
+      throw new ApiError(400, 'Tên bộ phận là bắt buộc', 'DEPARTMENT_VALIDATION');
+    }
+    dept.name = trimmed;
+  }
+  if (code !== undefined) dept.code = code?.trim() || undefined;
+  if (description !== undefined) dept.description = description?.trim() || '';
+  if (isActive !== undefined) dept.isActive = Boolean(isActive);
+
+  try {
+    await dept.save();
+  } catch (err) {
+    if (err.code === 11000) {
+      throw new ApiError(409, 'Bộ phận đã tồn tại', 'DEPARTMENT_DUPLICATE');
+    }
+    throw err;
+  }
+  return dept.toObject();
+}
+
+// Xóa mềm: chỉ tắt isActive, KHÔNG xóa hẳn khỏi DB, vì Question/Employee/
+// ExamCandidate... có thể đang tham chiếu departmentId tới bộ phận này. Xóa
+// cứng sẽ để lại dữ liệu mồ côi hoặc gãy tham chiếu.
+export async function deactivateDepartment(id) {
+  const dept = await Department.findById(id);
+  assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
+  dept.isActive = false;
+  await dept.save();
+  return { id: dept._id.toString(), isActive: false };
+}
+
 export async function getDepartmentById(id) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');

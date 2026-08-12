@@ -10,5 +10,7 @@ router.use(authenticate, bankRoles, requirePasswordChanged);
 
 router.get('/', departmentController.list);
 router.post('/', departmentController.create);
+router.patch('/:id', departmentController.update);
+router.delete('/:id', departmentController.remove);
 
 export default router;

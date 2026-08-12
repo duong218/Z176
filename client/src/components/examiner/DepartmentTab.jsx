@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, X, AlertCircle } from 'lucide-react';
-import { fetchDepartments, createDepartment } from '../../services/examiner.service';
+import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../services/examiner.service';
 
 export const DepartmentTab = () => {
   const [departments, setDepartments] = useState([]);
@@ -10,6 +10,7 @@ export const DepartmentTab = () => {
 
   // Modal State
   const [isOpen, setIsOpen] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState(null);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
@@ -31,20 +32,55 @@ export const DepartmentTab = () => {
     loadDepartments();
   }, []);
 
+  const handleOpenAdd = () => {
+    setEditingDepartment(null);
+    setName('');
+    setCode('');
+    setDescription('');
+    setIsOpen(true);
+  };
+
+  const handleOpenEdit = (dept) => {
+    setEditingDepartment(dept);
+    setName(dept.name || '');
+    setCode(dept.code || '');
+    setDescription(dept.description || '');
+    setIsOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !code.trim()) return;
     setActionLoading(true);
     setError('');
     try {
-      await createDepartment({ name, code: code.toUpperCase(), description });
+      if (editingDepartment) {
+        await updateDepartment(editingDepartment._id, { name, code: code.toUpperCase(), description });
+      } else {
+        await createDepartment({ name, code: code.toUpperCase(), description });
+      }
       setIsOpen(false);
+      setEditingDepartment(null);
       setName('');
       setCode('');
       setDescription('');
       await loadDepartments();
     } catch (err) {
-      setError(err.message || 'Lỗi khi tạo phòng ban');
+      setError(err.message || (editingDepartment ? 'Lỗi khi cập nhật bộ phận' : 'Lỗi khi tạo phòng ban'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async (dept) => {
+    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng bộ phận "${dept.name}"? Các câu hỏi/nhân viên đang gắn với bộ phận này sẽ không bị xóa, nhưng bộ phận sẽ không còn hiển thị để chọn nữa.`)) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      await deleteDepartment(dept._id);
+      await loadDepartments();
+    } catch (err) {
+      setError(err.message || 'Lỗi khi ngừng sử dụng bộ phận');
     } finally {
       setActionLoading(false);
     }
@@ -79,7 +115,7 @@ export const DepartmentTab = () => {
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-[#0F172A]">Danh sách bộ phận / phòng ban</h3>
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpenAdd}
           className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors"
         >
           <Plus className="w-5 h-5" />
@@ -99,6 +135,24 @@ export const DepartmentTab = () => {
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
               <span>Trạng thái: {dept.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(dept)}
+                  className="p-1.5 text-slate-400 hover:text-[#008BC5] hover:bg-blue-50 rounded transition-colors"
+                  title="Sửa bộ phận"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(dept)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  title="Ngừng sử dụng bộ phận"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -115,8 +169,8 @@ export const DepartmentTab = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
             <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-lg text-[#0F172A]">Thêm bộ phận mới</h3>
-              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="font-bold text-lg text-[#0F172A]">{editingDepartment ? 'Sửa bộ phận' : 'Thêm bộ phận mới'}</h3>
+              <button onClick={() => { setIsOpen(false); setEditingDepartment(null); }} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -156,7 +210,7 @@ export const DepartmentTab = () => {
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => { setIsOpen(false); setEditingDepartment(null); }}
                   className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   Hủy
@@ -167,7 +221,7 @@ export const DepartmentTab = () => {
                   className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Lưu
+                  {editingDepartment ? 'Cập nhật' : 'Lưu'}
                 </button>
               </div>
             </form>

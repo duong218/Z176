@@ -93,6 +93,23 @@ export async function createDepartment(payload) {
   return res.data;
 }
 
+export async function updateDepartment(id, payload) {
+  const res = await apiRequest(`/departments/${id}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
+export async function deleteDepartment(id) {
+  const res = await apiRequest(`/departments/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
 // === EXAM PROPOSALS ===
 
 export async function createExamProposal(payload) {
