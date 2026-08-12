@@ -1,18 +1,43 @@
 import { useState, useEffect } from 'react';
-import { Users, Shield, ServerCrash, Cloud, Loader2, CheckCircle } from 'lucide-react';
+import { Users, Shield, FileCheck, ClipboardList, GraduationCap, Cloud, Loader2, CheckCircle, ServerCrash } from 'lucide-react';
 import { fetchOverviewStats, triggerBackup } from '../../services/admin.service';
+
+const ROLE_META = {
+  admin: { label: 'Quản trị viên', icon: Shield, color: 'purple' },
+  leader: { label: 'Người duyệt đề', icon: FileCheck, color: 'blue' },
+  examiner: { label: 'Người ra đề', icon: ClipboardList, color: 'amber' },
+  candidate: { label: 'Người dự thi', icon: GraduationCap, color: 'green' },
+};
+
+const COLOR_CLASSES = {
+  purple: 'bg-purple-100 text-purple-600',
+  blue: 'bg-[#008BC5]/10 text-[#008BC5]',
+  amber: 'bg-amber-100 text-amber-600',
+  green: 'bg-[#22C55E]/10 text-[#22C55E]',
+};
 
 export const OverviewTab = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupResult, setBackupResult] = useState(null);
 
   useEffect(() => {
-    fetchOverviewStats().then(data => {
-      setStats(data);
-      setLoading(false);
-    });
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    fetchOverviewStats()
+      .then(data => {
+        if (!cancelled) setStats(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const handleBackup = async () => {
@@ -30,24 +55,43 @@ export const OverviewTab = () => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm animate-pulse">
-            <div className="h-10 w-10 bg-slate-200 rounded-lg mb-3"></div>
-            <div className="h-4 w-24 bg-slate-200 rounded mb-2"></div>
-            <div className="h-8 w-16 bg-slate-200 rounded"></div>
-          </div>
-        ))}
+      <div className="space-y-6">
+        <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map(i => (
+            <div key={i} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm animate-pulse">
+              <div className="h-10 w-10 bg-slate-200 rounded-lg mb-3" />
+              <div className="h-4 w-24 bg-slate-200 rounded mb-2" />
+              <div className="h-8 w-16 bg-slate-200 rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 flex items-center gap-3">
+        <ServerCrash className="w-5 h-5 shrink-0" />
+        <p className="font-medium">Không tải được dữ liệu tổng quan. Vui lòng thử lại.</p>
+      </div>
+    );
+  }
+
+  const roleEntries = Object.entries(ROLE_META).map(([code, meta]) => ({
+    code,
+    ...meta,
+    count: stats.usersByRole?.[code] || 0,
+  }));
+
+  const activeExam = stats.activeExam;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h3 className="text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
 
-        {/* Backup Area */}
         <div className="flex flex-col items-end">
           <button
             onClick={handleBackup}
@@ -75,9 +119,10 @@ export const OverviewTab = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#008BC5]/10 text-[#008BC5] rounded-xl flex items-center justify-center">
+      {/* Tổng số tài khoản + kỳ thi đang diễn ra */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors">
+          <div className="w-12 h-12 bg-[#008BC5]/10 text-[#008BC5] rounded-xl flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
           </div>
           <div>
@@ -86,24 +131,36 @@ export const OverviewTab = () => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
-            <Shield className="w-6 h-6" />
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${activeExam ? 'bg-[#22C55E]/10 text-[#22C55E]' : 'bg-slate-100 text-slate-400'}`}>
+            <FileCheck className="w-6 h-6" />
           </div>
-          <div>
-            <p className="text-sm text-slate-500 font-medium">Role: Admin / Người duyệt đề</p>
-            <p className="text-2xl font-bold text-[#0F172A]">{stats.usersByRole?.admin || 0} / {stats.usersByRole?.leader || 0}</p>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500 font-medium">Kỳ thi đang diễn ra</p>
+            {activeExam ? (
+              <p className="text-base font-bold text-[#0F172A] truncate" title={activeExam.title}>
+                {activeExam.title}
+              </p>
+            ) : (
+              <p className="text-base font-medium text-slate-400">Không có kỳ thi nào</p>
+            )}
           </div>
         </div>
+      </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#22C55E]/10 text-[#22C55E] rounded-xl flex items-center justify-center">
-            <ServerCrash className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm text-slate-500 font-medium">Kỳ thi đang diễn ra</p>
-            <p className="text-lg font-bold text-[#0F172A]">{stats.activeExams !== null ? stats.activeExams : 'Chưa có dữ liệu'}</p>
-          </div>
+      {/* Phân bổ tài khoản theo vai trò */}
+      <div>
+        <p className="text-sm font-medium text-slate-500 mb-3">Tài khoản theo vai trò</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {roleEntries.map(({ code, label, icon: Icon, color, count }) => (
+            <div key={code} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${COLOR_CLASSES[color]}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <p className="text-xs text-slate-500 font-medium truncate">{label}</p>
+              <p className="text-xl font-bold text-[#0F172A]">{count}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

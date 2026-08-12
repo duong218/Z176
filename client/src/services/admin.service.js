@@ -1,12 +1,25 @@
-import { MOCK_OVERVIEW_STATS } from '../mock-data/admin.mock';
 import { apiRequest } from './api';
 import { getAuthHeaders } from './auth.service';
+import { fetchActiveExam } from './exam-review.service';
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function fetchOverviewStats() {
-  await delay(800);
-  return MOCK_OVERVIEW_STATS;
+  const [users, activeExam] = await Promise.all([
+    fetchUsers(),
+    fetchActiveExam(),
+  ]);
+
+  const usersByRole = users.reduce((acc, u) => {
+    if (u.roleCode) acc[u.roleCode] = (acc[u.roleCode] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    totalUsers: users.length,
+    usersByRole, // { admin, examiner, leader, candidate }
+    activeExam,  // exam object hoặc null
+  };
 }
 
 export async function fetchUsers() {
@@ -82,7 +95,7 @@ export async function fetchAuditLogs(params = {}) {
   const query = new URLSearchParams();
   if (params.page) query.append('page', params.page);
   if (params.limit) query.append('limit', params.limit);
-  
+
   const res = await apiRequest(`/audit-logs?${query.toString()}`, {
     headers: getAuthHeaders(),
   });
