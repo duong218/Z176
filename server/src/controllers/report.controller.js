@@ -18,6 +18,24 @@ export const reportController = {
     });
   }),
 
+  // PUBLIC — trang chủ, không đăng nhập. Chỉ tên phòng ban + tỷ lệ đạt.
+  getPublicResultsByDepartment: asyncHandler(async (req, res) => {
+    const data = await reportService.getPublicResultsByDepartment();
+    res.json({
+      success: true,
+      data,
+    });
+  }),
+
+  // PUBLIC — tra cứu kết quả cá nhân theo mã NV hoặc họ tên.
+  lookupPublicResult: asyncHandler(async (req, res) => {
+    const data = await reportService.lookupPublicResult(req.query.q);
+    res.json({
+      success: true,
+      data,
+    });
+  }),
+
   getDetailedResults: asyncHandler(async (req, res) => {
     const filters = {
       page: req.query.page,

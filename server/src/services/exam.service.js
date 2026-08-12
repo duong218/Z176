@@ -23,7 +23,7 @@ export const examService = {
 
   async createExamProposal(payload, userId) {
     const { title, topicId, durationMinutes, totalQuestions, commonQuestionCount, departmentQuestionCount, passThresholdPercent } = payload;
-    
+
     const topic = await Topic.findById(topicId);
     if (!topic) throw new ApiError(404, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
 
@@ -118,6 +118,25 @@ export const examService = {
 
     exam.status = EXAM_STATUS.PUBLISHED;
     exam.publishedAt = new Date();
+    await exam.save();
+    return exam;
+  },
+
+  /**
+   * "Bỏ qua" một kỳ thi đã duyệt (approved) đang chờ phát hành: lưu trữ nó
+   * mà không đăng chính thức. Khác với reject (chỉ áp dụng cho kỳ thi đang
+   * pending_review) — đây là kỳ thi ĐÃ được duyệt nhưng Leader quyết định
+   * không phát hành nữa.
+   */
+  async archiveExam(examId, leaderId) {
+    const exam = await Exam.findById(examId);
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+    if (exam.status !== EXAM_STATUS.APPROVED) {
+      throw new ApiError(400, 'Chỉ có thể bỏ qua kỳ thi đang ở trạng thái chờ phát hành', 'EXAM_INVALID_STATUS');
+    }
+
+    exam.status = EXAM_STATUS.ARCHIVED;
+    exam.approvedBy = leaderId;
     await exam.save();
     return exam;
   },

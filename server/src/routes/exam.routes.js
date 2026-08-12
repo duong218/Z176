@@ -23,5 +23,6 @@ router.post('/:id/submit', requireRoleCodes('examiner'), examController.submit);
 router.post('/:id/approve', requireRoleCodes('leader'), examController.approve);
 router.post('/:id/reject', requireRoleCodes('leader'), examController.reject);
 router.post('/:id/publish', requireRoleCodes('leader'), examController.publish);
+router.post('/:id/archive', requireRoleCodes('leader'), examController.archive);
 
 export default router;

@@ -6,6 +6,7 @@ import {
   approveExam,
   rejectExam,
   publishExam,
+  archiveExam,
 } from '../../services/exam-review.service';
 import { CheckCircle, XCircle, Clock, Globe, Calendar, History, Archive } from 'lucide-react';
 
@@ -30,6 +31,7 @@ export const ExamReviewTab = () => {
   const [approvedExams, setApprovedExams] = useState([]);
   const [historyExams, setHistoryExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [archivingId, setArchivingId] = useState(null);
 
   // Reject Modal
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -96,6 +98,19 @@ export const ExamReviewTab = () => {
       loadData();
     } catch (error) {
       alert(error.message || 'Lỗi khi đăng chính thức');
+    }
+  };
+
+  const handleArchive = async (id) => {
+    if (!confirm('Bỏ qua kỳ thi này? Kỳ thi sẽ được lưu trữ và không thể phát hành nữa.')) return;
+    setArchivingId(id);
+    try {
+      await archiveExam(id);
+      loadData();
+    } catch (error) {
+      alert(error.message || 'Lỗi khi bỏ qua kỳ thi');
+    } finally {
+      setArchivingId(null);
     }
   };
 
@@ -189,8 +204,12 @@ export const ExamReviewTab = () => {
                       <div>Kết thúc: {new Date(exam.endDate).toLocaleString('vi-VN')}</div>
                     </td>
                     <td className="p-4 flex gap-2 justify-end items-center">
-                      <button disabled className="px-3 py-1.5 bg-slate-100 text-slate-500 font-medium rounded text-xs">
-                        Bỏ qua
+                      <button
+                        onClick={() => handleArchive(exam._id)}
+                        disabled={archivingId === exam._id}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded transition-colors text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {archivingId === exam._id ? 'Đang xử lý...' : 'Bỏ qua'}
                       </button>
                       <button onClick={() => handlePublish(exam._id)} className="px-3 py-1.5 bg-[#008BC5] hover:bg-sky-600 text-white font-medium rounded transition-colors flex items-center gap-1 text-xs shadow-sm">
                         <Globe className="w-3.5 h-3.5" /> Đăng chính thức
@@ -204,7 +223,7 @@ export const ExamReviewTab = () => {
         </div>
       </div>
 
-      {/* Lịch sử duyệt kỳ thi — không xóa dấu vết sau khi Duyệt/Từ chối/Đăng chính thức */}
+      {/* Lịch sử duyệt kỳ thi — không xóa dấu vết sau khi Duyệt/Từ chối/Đăng chính thức/Bỏ qua */}
       <div>
         <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
           <History className="w-5 h-5 text-slate-500" />
@@ -244,7 +263,7 @@ export const ExamReviewTab = () => {
                           <span className="text-red-600">{exam.rejectionReason || 'Không có lý do'}</span>
                         ) : exam.status === 'archived' ? (
                           <span className="flex items-center gap-1 text-slate-500">
-                            <Archive className="w-3.5 h-3.5" /> Đã bị thay thế bởi kỳ thi khác
+                            <Archive className="w-3.5 h-3.5" /> Đã bị thay thế bởi kỳ thi khác hoặc bị bỏ qua
                           </span>
                         ) : (
                           '—'

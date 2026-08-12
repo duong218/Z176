@@ -13,7 +13,7 @@ export const examController = {
       status: req.query.status,
       topicId: req.query.topicId,
     };
-    
+
     // Nếu là examiner thì chỉ thấy bài của mình
     if (req.auth?.roleCode === 'examiner') {
       filters.createdBy = req.auth.userId;
@@ -25,7 +25,7 @@ export const examController = {
 
   create: asyncHandler(async (req, res) => {
     const data = await examService.createExamProposal(req.body, req.auth.userId);
-    
+
     await writeAudit({
       actorUserId: req.auth.userId,
       action: 'CREATE_EXAM',
@@ -98,6 +98,21 @@ export const examController = {
     });
 
     res.json({ success: true, message: 'Đã đăng chính thức kỳ thi', data });
+  }),
+
+  archive: asyncHandler(async (req, res) => {
+    const data = await examService.archiveExam(req.params.id, req.auth.userId);
+
+    await writeAudit({
+      actorUserId: req.auth.userId,
+      action: 'ARCHIVE_EXAM',
+      resourceType: 'Exam',
+      resourceId: data._id,
+      metadata: { detail: `Bỏ qua (lưu trữ) kỳ thi: ${data.title}` },
+      ipAddress: clientIp(req),
+    });
+
+    res.json({ success: true, message: 'Đã bỏ qua kỳ thi', data });
   }),
 
   getActive: asyncHandler(async (req, res) => {

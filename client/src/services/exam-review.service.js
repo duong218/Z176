@@ -25,10 +25,10 @@ export async function fetchExamsByStatus(status) {
 }
 
 // Lịch sử các đề xuất đã được Người duyệt đề xử lý xong: bị từ chối, đã đăng chính thức,
-// hoặc đã bị lưu trữ (khi có kỳ thi khác được đăng đè lên). Gộp cả 3 trạng thái này
-// lại thành 1 danh sách "Lịch sử duyệt kỳ thi", sắp xếp theo thời gian xử lý gần nhất.
-// Route GET /api/exams hiện chỉ lọc theo đúng 1 status/lần gọi, nên gọi song song rồi
-// merge ở phía client thay vì sửa API.
+// hoặc đã bị lưu trữ (khi có kỳ thi khác được đăng đè lên, hoặc bị "bỏ qua"). Gộp cả 3
+// trạng thái này lại thành 1 danh sách "Lịch sử duyệt kỳ thi", sắp xếp theo thời gian xử
+// lý gần nhất. Route GET /api/exams hiện chỉ lọc theo đúng 1 status/lần gọi, nên gọi song
+// song rồi merge ở phía client thay vì sửa API.
 export async function fetchExamHistory() {
   const [rejected, published, archived] = await Promise.all([
     fetchExamsByStatus('rejected').catch(() => []),
@@ -68,6 +68,16 @@ export async function rejectExam(id, reason) {
 
 export async function publishExam(id) {
   const res = await apiRequest(`/exams/${id}/publish`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
+// "Bỏ qua" một kỳ thi đã duyệt (approved) đang chờ phát hành — lưu trữ nó
+// mà không đăng chính thức.
+export async function archiveExam(id) {
+  const res = await apiRequest(`/exams/${id}/archive`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });

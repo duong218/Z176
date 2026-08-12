@@ -4,6 +4,12 @@ import { authenticate, requireRoleCodes } from '../middlewares/auth.middleware.j
 
 const router = Router();
 
+// PUBLIC — trang chủ "Tra cứu kết quả thi", không yêu cầu đăng nhập.
+// Đặt TRƯỚC router.use(authenticate, ...) bên dưới, giống route /my-results,
+// nếu không middleware sẽ chặn luôn các route này.
+router.get('/public/by-department', reportController.getPublicResultsByDepartment);
+router.get('/public/lookup', reportController.lookupPublicResult);
+
 // Thí sinh xem lịch sử kết quả thi CỦA CHÍNH MÌNH.
 // Đặt route này TRƯỚC router.use(...) bên dưới — nếu để sau, middleware
 // requireRoleCodes('leader', 'admin') sẽ áp dụng luôn cho route này và

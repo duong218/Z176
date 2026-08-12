@@ -54,6 +54,12 @@ const getBasePipeline = () => [
   { $unwind: '$exam' },
 ];
 
+// Escape ký tự đặc biệt regex trước khi đưa vào $regex — tránh regex injection
+// từ input người dùng nhập ở ô tra cứu public.
+function escapeRegex(str) {
+  return String(str ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export const reportService = {
   async getOverviewStats() {
     const pipeline = [
@@ -137,6 +143,83 @@ export const reportService = {
       ...r,
       passRate: Number(r.passRate.toFixed(2)),
       avgScore: Number(r.avgScore.toFixed(2)),
+    }));
+  },
+
+  /**
+   * PUBLIC — dùng cho trang chủ (không đăng nhập). Chỉ trả về tên phòng ban +
+   * tỷ lệ đạt (%) + tổng số lượt thi. KHÔNG trả passedCount/failedCount/avgScore
+   * hay bất kỳ thông tin cá nhân nào — tuyệt đối không dùng lại nguyên hàm
+   * getResultsByDepartment() ở trên cho route public vì nó lộ nhiều field hơn
+   * mức cần thiết.
+   */
+  async getPublicResultsByDepartment() {
+    const pipeline = [
+      ...getBasePipeline(),
+      {
+        $group: {
+          _id: '$department._id',
+          departmentName: { $first: '$department.name' },
+          totalSubmissions: { $sum: 1 },
+          passedCount: { $sum: { $cond: ['$passed', 1, 0] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          departmentName: 1,
+          totalSubmissions: 1,
+          passRate: {
+            $cond: [
+              { $gt: ['$totalSubmissions', 0] },
+              { $multiply: [{ $divide: ['$passedCount', '$totalSubmissions'] }, 100] },
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { passRate: -1 } },
+    ];
+
+    const results = await Result.aggregate(pipeline);
+    return results.map(r => ({ ...r, passRate: Number(r.passRate.toFixed(2)) }));
+  },
+
+  /**
+   * PUBLIC — tra cứu kết quả CÁ NHÂN theo mã nhân viên (khớp chính xác) hoặc họ
+   * tên (khớp gần đúng, có thể trùng tên nhiều người → giới hạn 20 kết quả).
+   * Chỉ trả về đúng các field cần hiển thị: tên, mã NV, phòng ban, điểm, kết
+   * quả, thời gian nộp bài — KHÔNG trả examAttemptId, employee._id hay bất kỳ
+   * field nội bộ nào khác.
+   */
+  async lookupPublicResult(term) {
+    const q = String(term ?? '').trim();
+    if (!q) return [];
+
+    const escaped = escapeRegex(q);
+    const pipeline = [
+      ...getBasePipeline(),
+      {
+        $match: {
+          $or: [
+            { 'employee.employeeCode': { $regex: `^${escaped}$`, $options: 'i' } },
+            { 'employee.fullname': { $regex: escaped, $options: 'i' } },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      { $limit: 20 },
+    ];
+
+    const data = await Result.aggregate(pipeline);
+    return data.map(item => ({
+      fullname: item.employee.fullname,
+      employeeCode: item.employee.employeeCode || null,
+      departmentName: item.department.name,
+      score: item.score,
+      totalQuestions: item.totalQuestions,
+      passed: item.passed,
+      submittedAt: item.attempt.submittedAt,
     }));
   },
 

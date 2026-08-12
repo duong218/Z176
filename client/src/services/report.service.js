@@ -13,6 +13,18 @@ export const fetchResultsByDepartment = async () => {
   });
 };
 
+// PUBLIC — trang chủ, không đăng nhập. Trả về [{ departmentName, totalSubmissions, passRate }]
+export const fetchPublicResultsByDepartment = async () => {
+  const res = await apiRequest('/reports/public/by-department');
+  return res.data;
+};
+
+// PUBLIC — tra cứu theo mã NV hoặc họ tên. Trả về mảng (có thể trùng tên nhiều người).
+export const lookupPublicResult = async (query) => {
+  const res = await apiRequest(`/reports/public/lookup?q=${encodeURIComponent(query)}`);
+  return res.data;
+};
+
 export const fetchDetailedResults = async (filters = {}) => {
   const query = new URLSearchParams();
   if (filters.page) query.append('page', filters.page);
