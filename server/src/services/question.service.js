@@ -1,6 +1,6 @@
 import fs from 'fs';
 import mongoose from 'mongoose';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import {
   ANSWER_TYPE,
   DIFFICULTY,
@@ -14,56 +14,54 @@ import { findDepartmentByName } from './department.service.js';
 import { findOrCreateTopicByName } from './topic.service.js';
 import { writeAudit } from './audit.service.js';
 
-const DIFFICULTY_MAP = {
-  easy: DIFFICULTY.EASY,
-  dễ: DIFFICULTY.EASY,
-  de: DIFFICULTY.EASY,
-  medium: DIFFICULTY.MEDIUM,
-  'trung bình': DIFFICULTY.MEDIUM,
-  'trung binh': DIFFICULTY.MEDIUM,
-  tb: DIFFICULTY.MEDIUM,
-  hard: DIFFICULTY.HARD,
-  khó: DIFFICULTY.HARD,
-  kho: DIFFICULTY.HARD,
-};
-
-const KIND_MAP = {
-  theory: QUESTION_KIND.THEORY,
-  'lý thuyết': QUESTION_KIND.THEORY,
-  'ly thuyet': QUESTION_KIND.THEORY,
-  practice: QUESTION_KIND.PRACTICE,
-  'bài tập': QUESTION_KIND.PRACTICE,
-  'bai tap': QUESTION_KIND.PRACTICE,
-};
-
-const ANSWER_TYPE_MAP = {
-  single: ANSWER_TYPE.SINGLE,
-  'single choice': ANSWER_TYPE.SINGLE,
-  'chọn 1': ANSWER_TYPE.SINGLE,
-  'chon 1': ANSWER_TYPE.SINGLE,
-  multiple: ANSWER_TYPE.MULTIPLE,
-  'multiple choice': ANSWER_TYPE.MULTIPLE,
-  'chọn nhiều': ANSWER_TYPE.MULTIPLE,
-  'chon nhieu': ANSWER_TYPE.MULTIPLE,
-};
-
-const SCOPE_MAP = {
-  common: QUESTION_SCOPE.COMMON,
-  chung: QUESTION_SCOPE.COMMON,
-  departmentspecific: QUESTION_SCOPE.DEPARTMENT_SPECIFIC,
-  department: QUESTION_SCOPE.DEPARTMENT_SPECIFIC,
-  riêng: QUESTION_SCOPE.DEPARTMENT_SPECIFIC,
-  rieng: QUESTION_SCOPE.DEPARTMENT_SPECIFIC,
-};
-
 function normalizeKey(key) {
   return String(key ?? '')
     .trim()
     .toLowerCase()
+    // Chữ "đ" tiếng Việt là 1 ký tự Unicode riêng (không phải "d" + dấu), nên
+    // .normalize('NFD') bên dưới KHÔNG tự tách được nó — phải thay thủ công
+    // trước, nếu không các tiêu đề như "Chủ đề"/"Độ khó"/"Đáp án đúng" sẽ
+    // không khớp được các key ASCII hệ thống đang chờ (chude/dokho/dapandung).
+    .replace(/đ/g, 'd')
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/\s+/g, '');
 }
+
+// Dựng map "key đã chuẩn hoá -> value" để tra cứu qua resolveEnum() luôn khớp,
+// vì normalizeKey() sẽ được áp dụng CẢ khi đọc giá trị từ Excel LẪN khi build
+// map ở đây (trước đây map khai tay còn dấu/khoảng trắng nên không bao giờ
+// khớp được với kết quả normalizeKey(raw), khiến mọi dòng import đều lỗi).
+function buildNormalizedMap(pairs) {
+  const out = {};
+  for (const [rawKeys, value] of pairs) {
+    for (const k of rawKeys) {
+      out[normalizeKey(k)] = value;
+    }
+  }
+  return out;
+}
+
+const DIFFICULTY_MAP = buildNormalizedMap([
+  [['easy', 'dễ', 'de'], DIFFICULTY.EASY],
+  [['medium', 'trung bình', 'trung binh', 'tb'], DIFFICULTY.MEDIUM],
+  [['hard', 'khó', 'kho'], DIFFICULTY.HARD],
+]);
+
+const KIND_MAP = buildNormalizedMap([
+  [['theory', 'lý thuyết', 'ly thuyet'], QUESTION_KIND.THEORY],
+  [['practice', 'bài tập', 'bai tap'], QUESTION_KIND.PRACTICE],
+]);
+
+const ANSWER_TYPE_MAP = buildNormalizedMap([
+  [['single', 'single choice', 'chọn 1', 'chon 1'], ANSWER_TYPE.SINGLE],
+  [['multiple', 'multiple choice', 'chọn nhiều', 'chon nhieu'], ANSWER_TYPE.MULTIPLE],
+]);
+
+const SCOPE_MAP = buildNormalizedMap([
+  [['common', 'chung'], QUESTION_SCOPE.COMMON],
+  [['departmentspecific', 'department', 'riêng', 'rieng'], QUESTION_SCOPE.DEPARTMENT_SPECIFIC],
+]);
 
 function mapRowKeys(row) {
   const out = {};

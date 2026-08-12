@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions } from '../../services/examiner.service';
 
 export const QuestionBankTab = () => {
@@ -335,11 +335,10 @@ export const QuestionBankTab = () => {
               <div className="flex justify-between items-start gap-4">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                      q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                      q.difficulty === 'medium' ? 'bg-blue-100 text-blue-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                        q.difficulty === 'medium' ? 'bg-blue-100 text-blue-700' :
+                          'bg-red-100 text-red-700'
+                      }`}>
                       {q.difficulty === 'easy' ? 'Dễ' : q.difficulty === 'medium' ? 'Trung bình' : 'Khó'}
                     </span>
                     <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-semibold">
@@ -598,6 +597,15 @@ export const QuestionBankTab = () => {
               </button>
             </div>
             <form onSubmit={handleImportSubmit} className="p-5 space-y-4">
+              <a
+                href="/templates/Mau_Import_Cau_Hoi_Z176.xlsx"
+                download
+                className="flex items-center justify-center gap-2 w-full py-2.5 border border-[#008BC5]/30 bg-[#EAF6FF] text-[#008BC5] rounded-lg font-semibold text-sm hover:bg-[#008BC5]/10 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Tải file mẫu Excel (đúng định dạng cột)
+              </a>
+
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 cursor-pointer relative">
                 <input
                   type="file"
@@ -613,6 +621,10 @@ export const QuestionBankTab = () => {
                   <p className="mt-2 text-sm text-[#008BC5] font-semibold">Tệp đã chọn: {importFile.name}</p>
                 )}
               </div>
+
+              <p className="text-xs text-slate-500">
+                Xem sheet "HuongDan" trong file mẫu để biết chi tiết từng cột (Chủ đề, Nội dung, Loại, Độ khó, Đáp án, Phạm vi, Bộ phận, Lựa chọn 1–8, Đáp án đúng).
+              </p>
 
               <div className="pt-2 flex gap-3">
                 <button
