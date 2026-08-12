@@ -77,6 +77,23 @@ export async function createTopic(payload) {
   return res.data;
 }
 
+export async function updateTopic(id, payload) {
+  const res = await apiRequest(`/topics/${id}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
+export async function deleteTopic(id) {
+  const res = await apiRequest(`/topics/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
 export async function fetchDepartments() {
   const res = await apiRequest('/departments', {
     headers: getAuthHeaders(),

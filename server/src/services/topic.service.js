@@ -22,12 +22,60 @@ export async function createTopic({ name, description }) {
   }
 }
 
+export async function updateTopic(id, { name, description, isActive } = {}) {
+  const topic = await Topic.findById(id);
+  assertFound(topic, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
+
+  if (name !== undefined) {
+    const trimmed = name?.trim();
+    if (!trimmed) {
+      throw new ApiError(400, 'Tên chủ đề là bắt buộc', 'TOPIC_VALIDATION');
+    }
+    topic.name = trimmed;
+  }
+  if (description !== undefined) topic.description = description?.trim() || '';
+  if (isActive !== undefined) topic.isActive = Boolean(isActive);
+
+  try {
+    await topic.save();
+  } catch (err) {
+    if (err.code === 11000) {
+      throw new ApiError(409, 'Chủ đề đã tồn tại', 'TOPIC_DUPLICATE');
+    }
+    throw err;
+  }
+  return topic.toObject();
+}
+
+// Xóa mềm: chỉ tắt isActive, KHÔNG xóa hẳn khỏi DB, vì Question đang tham
+// chiếu topicId tới chủ đề này (giống lý do áp dụng cho Department).
+export async function deactivateTopic(id) {
+  const topic = await Topic.findById(id);
+  assertFound(topic, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
+  topic.isActive = false;
+  await topic.save();
+  return { id: topic._id.toString(), isActive: false };
+}
+
+// Escape ký tự đặc biệt trong regex để tránh lỗi hoặc khớp sai khi tên chủ
+// đề chứa các ký tự như . ( ) + * ? [ ] ^ $ | \
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export async function findOrCreateTopicByName(name) {
   const trimmed = name?.trim();
   if (!trimmed) {
     throw new ApiError(400, 'Tên chủ đề là bắt buộc', 'TOPIC_VALIDATION');
   }
-  let topic = await Topic.findOne({ name: trimmed });
+  // So khớp KHÔNG phân biệt hoa/thường khi tìm chủ đề đã có (giống cách đã
+  // sửa cho findDepartmentByName) — trước đây dùng exact match nên chỉ cần
+  // lệch hoa/thường lúc import Excel là tạo ra chủ đề trùng lặp (VD "An toan
+  // lao dong" và "An toàn lao động" bị coi là 2 chủ đề khác nhau), khiến số
+  // câu hỏi bị rải ra nhiều topicId thay vì gộp đúng 1 chủ đề.
+  let topic = await Topic.findOne({
+    name: { $regex: `^${escapeRegExp(trimmed)}$`, $options: 'i' },
+  });
   if (!topic) {
     topic = await Topic.create({ name: trimmed });
   }

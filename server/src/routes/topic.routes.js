@@ -10,5 +10,7 @@ router.use(authenticate, bankRoles, requirePasswordChanged);
 
 router.get('/', topicController.list);
 router.post('/', topicController.create);
+router.patch('/:id', topicController.update);
+router.delete('/:id', topicController.remove);
 
 export default router;

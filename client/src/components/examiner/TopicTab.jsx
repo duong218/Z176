@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, X, AlertCircle } from 'lucide-react';
-import { fetchTopics, createTopic } from '../../services/examiner.service';
+import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { fetchTopics, createTopic, updateTopic, deleteTopic } from '../../services/examiner.service';
 
 export const TopicTab = ({ onViewQuestions } = {}) => {
   const [topics, setTopics] = useState([]);
@@ -10,6 +10,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
 
   // Modal State
   const [isOpen, setIsOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -30,19 +31,52 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
     loadTopics();
   }, []);
 
+  const handleOpenAdd = () => {
+    setEditingTopic(null);
+    setName('');
+    setDescription('');
+    setIsOpen(true);
+  };
+
+  const handleOpenEdit = (topic) => {
+    setEditingTopic(topic);
+    setName(topic.name || '');
+    setDescription(topic.description || '');
+    setIsOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     setActionLoading(true);
     setError('');
     try {
-      await createTopic({ name, description });
+      if (editingTopic) {
+        await updateTopic(editingTopic._id, { name, description });
+      } else {
+        await createTopic({ name, description });
+      }
       setIsOpen(false);
+      setEditingTopic(null);
       setName('');
       setDescription('');
       await loadTopics();
     } catch (err) {
-      setError(err.message || 'Lỗi khi tạo chủ đề');
+      setError(err.message || (editingTopic ? 'Lỗi khi cập nhật chủ đề' : 'Lỗi khi tạo chủ đề'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async (topic) => {
+    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng chủ đề "${topic.name}"? Các câu hỏi đang gắn với chủ đề này sẽ không bị xóa, nhưng chủ đề sẽ không còn hiển thị để chọn nữa.`)) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      await deleteTopic(topic._id);
+      await loadTopics();
+    } catch (err) {
+      setError(err.message || 'Lỗi khi ngừng sử dụng chủ đề');
     } finally {
       setActionLoading(false);
     }
@@ -77,7 +111,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-[#0F172A]">Danh sách chủ đề</h3>
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpenAdd}
           className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors"
         >
           <Plus className="w-5 h-5" />
@@ -92,13 +126,33 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
               <h4 className="font-bold text-slate-800 text-base mb-2">{topic.name}</h4>
               <p className="text-sm text-slate-500 line-clamp-3">{topic.description || 'Không có mô tả'}</p>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
-              <span>Trạng thái: {topic.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
+            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span>Trạng thái: {topic.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(topic)}
+                    className="p-1.5 text-slate-400 hover:text-[#008BC5] hover:bg-blue-50 rounded transition-colors"
+                    title="Sửa chủ đề"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(topic)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                    title="Ngừng sử dụng chủ đề"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
               {onViewQuestions && (
                 <button
                   type="button"
                   onClick={() => onViewQuestions(topic._id)}
-                  className="text-xs font-semibold text-[#008BC5] hover:underline"
+                  className="w-full text-right text-xs font-semibold text-[#008BC5] hover:underline"
                 >
                   Xem câu hỏi →
                 </button>
@@ -119,8 +173,8 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
             <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-lg text-[#0F172A]">Thêm chủ đề mới</h3>
-              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="font-bold text-lg text-[#0F172A]">{editingTopic ? 'Sửa chủ đề' : 'Thêm chủ đề mới'}</h3>
+              <button onClick={() => { setIsOpen(false); setEditingTopic(null); }} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -149,7 +203,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => { setIsOpen(false); setEditingTopic(null); }}
                   className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   Hủy
@@ -160,7 +214,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
                   className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Lưu
+                  {editingTopic ? 'Cập nhật' : 'Lưu'}
                 </button>
               </div>
             </form>
