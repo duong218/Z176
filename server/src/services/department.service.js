@@ -25,10 +25,23 @@ export async function createDepartment({ name, code }) {
   }
 }
 
+// Escape ký tự đặc biệt trong regex để tránh lỗi hoặc khớp sai khi tên bộ
+// phận chứa các ký tự như . ( ) + * ? [ ] ^ $ | \
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export async function findDepartmentByName(name) {
   const trimmed = name?.trim();
   if (!trimmed) return null;
-  return Department.findOne({ name: trimmed, isActive: true });
+  // So khớp KHÔNG phân biệt hoa/thường (vd "Công nghệ thông tin" và
+  // "công nghệ thông tin" phải được coi là cùng 1 bộ phận) — trước đây dùng
+  // exact match nên chỉ cần lệch hoa/thường khi nhập Excel là báo không tìm
+  // thấy bộ phận, dù bộ phận đó đã tồn tại trong hệ thống.
+  return Department.findOne({
+    name: { $regex: `^${escapeRegExp(trimmed)}$`, $options: 'i' },
+    isActive: true,
+  });
 }
 
 export async function getDepartmentById(id) {
