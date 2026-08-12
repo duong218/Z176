@@ -120,3 +120,22 @@ export const resetPassword = asyncHandler(async (req, res) => {
     tempPassword,
   });
 });
+
+export const importExcel = asyncHandler(async (req, res) => {
+  if (!req.file?.path) {
+    throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');
+  }
+
+  const data = await userService.importEmployeesFromExcelFile(
+    req.file.path,
+    req.auth.userId,
+    req.ip,
+  );
+
+  res.json({
+    success: true,
+    message: `Import xong: ${data.created} tạo mới, ${data.updated} cập nhật, ${data.failed} lỗi`,
+    code: 'EMPLOYEE_IMPORT_DONE',
+    data,
+  });
+});

@@ -98,3 +98,55 @@ export async function triggerBackup() {
     downloadUrl: 'https://drive.google.com/file/d/demo-backup-link/view'
   };
 }
+
+/**
+ * Import hàng loạt nhân viên (tài khoản 'candidate') từ file Excel.
+ * Trả về { total, created, updated, failed, results: [...] } — xem
+ * server/src/services/user.service.js#importEmployeesFromExcelFile để biết
+ * đầy đủ ý nghĩa từng field trong results.
+ */
+export async function importEmployeesExcel(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers = getAuthHeaders();
+  delete headers['Content-Type']; // để browser tự set boundary cho multipart/form-data
+
+  const res = await apiRequest('/users/import', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+  return res.data;
+}
+
+// Xuất kết quả import ra CSV (UTF-8 BOM) để admin tải về — dùng gửi
+// username/mật khẩu tạm cho hàng nghìn nhân viên cùng lúc.
+export function downloadImportResultsCsv(results) {
+  const header = ['Dòng', 'Mã NV', 'Username', 'Họ tên', 'Phòng ban', 'Trạng thái', 'Mật khẩu tạm', 'Ghi chú'];
+  const statusLabel = { created: 'Tạo mới', updated: 'Cập nhật', error: 'Lỗi' };
+  const rows = results.map((r) => [
+    r.row,
+    r.employeeCode,
+    r.username,
+    r.fullname,
+    r.department,
+    statusLabel[r.status] || r.status,
+    r.tempPassword,
+    r.message,
+  ]);
+  const csvLines = [header, ...rows].map((row) =>
+    row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','),
+  );
+  const csvContent = '\uFEFF' + csvLines.join('\r\n'); // BOM để Excel đọc đúng UTF-8
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ket-qua-import-nhan-vien-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

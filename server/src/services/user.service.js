@@ -1,9 +1,12 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import fs from 'fs';
+import XLSX from 'xlsx';
 import { User, Role, Employee } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import * as auditService from './audit.service.js';
 import { assignEmployeeToActiveExamIfAny } from './exam-code-generation.service.js';
+import { findOrCreateDepartmentByName, findOrCreateDepartmentByCode } from './department.service.js';
 
 /** Lấy danh sách user kèm thông tin role */
 export async function listUsers() {
@@ -173,4 +176,258 @@ export async function resetUserPassword({ adminId, userId, ipAddress }) {
   });
 
   return { tempPassword };
+}
+
+// ─── Import Excel danh sách nhân viên (bulk) ───────────────────────────────
+
+function normalizeKey(key) {
+  return String(key ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/đ/g, 'd')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, '');
+}
+
+function mapRowKeys(row) {
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[normalizeKey(k)] = v;
+  }
+  return out;
+}
+
+// Sinh username từ mã nhân viên: bỏ dấu, bỏ mọi ký tự không phải a-z0-9
+// (vd "NV-001" -> "nv001", "NV_045" -> "nv045") — đã chốt với người dùng.
+function usernameFromEmployeeCode(code) {
+  return String(code)
+    .trim()
+    .toLowerCase()
+    .replace(/đ/g, 'd')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+async function buildEmployeeImportRow(row, rowIndex) {
+  const r = mapRowKeys(row);
+  const fullname = r.fullname ?? r.hoten ?? r.hovaten;
+  const deptCodeRaw = r.maphongban ?? r.mabophan ?? r.maban ?? r.madepartment;
+  const deptName = r.department ?? r.phongban ?? r.bophan;
+  const employeeCodeRaw = r.employeecode ?? r.manhanvien ?? r.manv ?? r.ma ?? r.masonhanvien;
+
+  if (!String(fullname ?? '').trim()) {
+    throw new ApiError(400, `Dòng ${rowIndex}: thiếu họ tên`, 'IMPORT_ROW_INVALID');
+  }
+  if (!String(deptCodeRaw ?? '').trim() && !String(deptName ?? '').trim()) {
+    throw new ApiError(
+      400,
+      `Dòng ${rowIndex}: thiếu phòng ban (cần Mã phòng ban hoặc Phòng ban)`,
+      'IMPORT_ROW_INVALID',
+    );
+  }
+
+  // Thiếu mã nhân viên -> tự sinh mã tạm dựa theo số thứ tự dòng, tránh
+  // chặn cả dòng chỉ vì thiếu mã (theo yêu cầu người dùng).
+  const employeeCode = String(employeeCodeRaw ?? '').trim() || `TMP${rowIndex}`;
+
+  const username = usernameFromEmployeeCode(employeeCode);
+  if (!username) {
+    throw new ApiError(
+      400,
+      `Dòng ${rowIndex}: mã nhân viên "${employeeCode}" không sinh được username hợp lệ`,
+      'IMPORT_ROW_INVALID',
+    );
+  }
+
+  // MÃ PHÒNG BAN là khoá chính để xác định/tạo phòng ban (nếu có trong file
+  // Excel) — "cntt" và "CNTT" luôn quy về đúng 1 phòng ban, bất kể cột
+  // "Phòng ban" ở các dòng ghi khác nhau ("cong nghe thong tin" hay "công
+  // nghệ thông tin"). Cột tên chỉ dùng để đặt tên hiển thị khi cần tạo mới.
+  // Nếu file không có cột mã (tương thích file mẫu cũ) thì rơi về so khớp
+  // theo tên đã chuẩn hoá dấu/hoa-thường.
+  const dept = String(deptCodeRaw ?? '').trim()
+    ? await findOrCreateDepartmentByCode({ code: deptCodeRaw, name: deptName })
+    : await findOrCreateDepartmentByName(String(deptName));
+  if (!dept) {
+    throw new ApiError(400, `Dòng ${rowIndex}: phòng ban không hợp lệ`, 'IMPORT_ROW_INVALID');
+  }
+
+  return {
+    rowIndex,
+    fullname: String(fullname).trim(),
+    employeeCode,
+    username,
+    departmentId: dept._id,
+    departmentName: dept.name,
+  };
+}
+
+/**
+ * Import hàng loạt nhân viên/tài khoản thí sinh từ Excel.
+ * Quy tắc (đã chốt với người dùng):
+ * - username = mã nhân viên đã bỏ dấu/ký tự đặc biệt, lowercase.
+ * - phòng ban được xác định theo cột "Mã phòng ban" (khoá chính, không phân
+ *   biệt hoa/thường/dấu) nếu có; nếu file không có cột mã thì fallback theo
+ *   cột "Phòng ban" (tên, cũng không phân biệt dấu/hoa-thường). Không khớp
+ *   phòng ban nào đã có thì TỰ ĐỘNG TẠO MỚI (không còn báo lỗi dòng).
+ * - dòng có employeeCode đã tồn tại (Employee.employeeCode) -> CẬP NHẬT lại
+ *   fullname/departmentId cho Employee đã có, KHÔNG tạo User mới.
+ * - dòng thiếu employeeCode -> tự sinh mã tạm TMP<rowIndex>.
+ * - luôn gán role 'candidate'.
+ */
+export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress) {
+  if (!fs.existsSync(filePath)) {
+    throw new ApiError(400, 'Không đọc được file upload', 'IMPORT_FILE_MISSING');
+  }
+
+  const candidateRole = await Role.findOne({ code: 'candidate' });
+  if (!candidateRole) {
+    throw new ApiError(500, 'Chưa cấu hình role candidate trong hệ thống', 'ROLE_NOT_FOUND');
+  }
+
+  const workbook = XLSX.readFile(filePath, { cellDates: false });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new ApiError(400, 'File Excel không có sheet', 'IMPORT_EMPTY');
+
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+  if (!rows.length) throw new ApiError(400, 'Sheet trống', 'IMPORT_EMPTY');
+
+  const results = [];
+  let processedCount = 0;
+  let createdCount = 0;
+  let updatedCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowIndex = i + 2; // dòng 1 là header
+
+    // Bỏ qua dòng trống hoặc dòng chú thích/hướng dẫn ở cuối file mẫu (vd
+    // "Ghi chú:", "- Cột màu xanh...") — các dòng này chỉ có nội dung ở 1
+    // cột duy nhất (thường là cột "Họ tên"), không phải dòng dữ liệu nhân
+    // viên thật, nên KHÔNG tính là lỗi thiếu phòng ban/họ tên.
+    const nonEmptyCellCount = Object.values(rows[i]).filter(
+      (v) => String(v ?? '').trim() !== '',
+    ).length;
+    if (nonEmptyCellCount <= 1) {
+      continue;
+    }
+
+    processedCount += 1;
+    try {
+      const parsed = await buildEmployeeImportRow(rows[i], rowIndex);
+
+      const existingEmployee = await Employee.findOne({ employeeCode: parsed.employeeCode });
+
+      if (existingEmployee) {
+        existingEmployee.fullname = parsed.fullname;
+        existingEmployee.departmentId = parsed.departmentId;
+        await existingEmployee.save();
+
+        const existingUser = await User.findById(existingEmployee.userId);
+
+        results.push({
+          row: rowIndex,
+          employeeCode: parsed.employeeCode,
+          username: existingUser?.username ?? '',
+          fullname: parsed.fullname,
+          department: parsed.departmentName,
+          status: 'updated',
+          tempPassword: '',
+          message: 'Đã cập nhật hồ sơ (không tạo tài khoản mới)',
+        });
+        updatedCount += 1;
+        continue;
+      }
+
+      const usernameTaken = await User.findOne({ username: parsed.username });
+      if (usernameTaken) {
+        throw new ApiError(
+          400,
+          `Dòng ${rowIndex}: username "${parsed.username}" đã tồn tại (thuộc mã nhân viên khác) — kiểm tra lại dữ liệu`,
+          'IMPORT_USERNAME_CONFLICT',
+        );
+      }
+
+      const tempPassword = crypto.randomInt(100000, 999999).toString();
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+      const newUser = await User.create({
+        username: parsed.username,
+        roleId: candidateRole._id,
+        passwordHash,
+        mustChangePassword: true,
+      });
+
+      let employee;
+      try {
+        employee = await Employee.create({
+          fullname: parsed.fullname,
+          departmentId: parsed.departmentId,
+          userId: newUser._id,
+          employeeCode: parsed.employeeCode,
+          isActive: true,
+        });
+      } catch (err) {
+        await User.deleteOne({ _id: newUser._id });
+        throw new ApiError(
+          400,
+          `Dòng ${rowIndex}: không thể tạo hồ sơ nhân viên (${err.message})`,
+          'EMPLOYEE_CREATE_FAILED',
+        );
+      }
+
+      // Không chặn import nếu bước gán mã đề thất bại
+      await assignEmployeeToActiveExamIfAny(employee).catch(() => {});
+
+      results.push({
+        row: rowIndex,
+        employeeCode: parsed.employeeCode,
+        username: parsed.username,
+        fullname: parsed.fullname,
+        department: parsed.departmentName,
+        status: 'created',
+        tempPassword,
+        message: 'Tạo tài khoản thành công',
+      });
+      createdCount += 1;
+    } catch (err) {
+      failedCount += 1;
+      results.push({
+        row: rowIndex,
+        employeeCode: '',
+        username: '',
+        fullname: '',
+        department: '',
+        status: 'error',
+        tempPassword: '',
+        message: err.message ?? 'Lỗi không xác định',
+      });
+    }
+  }
+
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    /* ignore cleanup */
+  }
+
+  if (createdCount > 0 || updatedCount > 0) {
+    await auditService.writeAudit({
+      actorUserId: adminId,
+      action: 'Import nhân viên từ Excel',
+      resourceType: 'User',
+      metadata: { created: createdCount, updated: updatedCount, failed: failedCount },
+      ipAddress,
+    });
+  }
+
+  return {
+    total: processedCount,
+    created: createdCount,
+    updated: updatedCount,
+    failed: failedCount,
+    results,
+  };
 }

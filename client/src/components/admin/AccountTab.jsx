@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check } from 'lucide-react';
-import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword } from '../../services/admin.service';
+import { useState, useEffect, useRef } from 'react';
+import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, importEmployeesExcel, downloadImportResultsCsv } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
 import { getAuthHeaders } from '../../services/auth.service';
 
@@ -40,6 +40,11 @@ export const AccountTab = ({ currentUser }) => {
     password: ''
   });
   const [copied, setCopied] = useState(false);
+
+  // Import Excel (bulk) state
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { total, created, updated, failed, results }
+  const fileInputRef = useRef(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -168,6 +173,24 @@ export const AccountTab = ({ currentUser }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Import Excel hàng loạt nhân viên (role candidate) — xem admin.service.js
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const data = await importEmployeesExcel(file);
+      setImportResult(data);
+      await loadData();
+    } catch (err) {
+      alert(err.message || 'Import thất bại');
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   // Filter users based on search term
   const filteredUsers = users.filter(user => 
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
@@ -209,13 +232,30 @@ export const AccountTab = ({ currentUser }) => {
           />
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
         </div>
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Thêm tài khoản</span>
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors flex-1 sm:flex-none justify-center disabled:opacity-50"
+          >
+            {importLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+            <span>Import Excel</span>
+          </button>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors flex-1 sm:flex-none justify-center"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Thêm tài khoản</span>
+          </button>
+        </div>
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
@@ -556,6 +596,58 @@ export const AccountTab = ({ currentUser }) => {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT EXCEL — KẾT QUẢ MODAL */}
+      {importResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Kết quả import
+              </h3>
+              <button onClick={() => setImportResult(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-green-50 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-[#22C55E]">{importResult.created}</div>
+                  <div className="text-xs text-slate-500">Tạo mới</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-[#008BC5]">{importResult.updated}</div>
+                  <div className="text-xs text-slate-500">Cập nhật</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-[#E53E3E]">{importResult.failed}</div>
+                  <div className="text-xs text-slate-500">Lỗi</div>
+                </div>
+              </div>
+
+              {importResult.failed > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-800 max-h-32 overflow-y-auto space-y-1">
+                  <p className="flex items-center gap-1 font-semibold"><AlertTriangle className="w-3.5 h-3.5" /> Các dòng lỗi:</p>
+                  {importResult.results.filter(r => r.status === 'error').map(r => (
+                    <p key={r.row}>Dòng {r.row}: {r.message}</p>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => downloadImportResultsCsv(importResult.results)}
+                className="w-full py-2.5 bg-[#0F172A] text-white rounded-lg font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4 rotate-180" /> Tải file kết quả (username + mật khẩu)
+              </button>
+              <p className="text-xs text-slate-400 text-center">
+                File chứa mật khẩu tạm — chỉ tải được 1 lần từ đây, hãy lưu lại cẩn thận.
+              </p>
             </div>
           </div>
         </div>
