@@ -1,6 +1,7 @@
 import { Exam, Topic } from '../models/index.js';
 import { EXAM_STATUS } from '../models/constants.js';
 import { ApiError } from '../utils/api-error.js';
+import { generateExamCodesAndAssignCandidates } from './exam-code-generation.service.js';
 
 export const examService = {
   async listExams(filters = {}) {
@@ -103,6 +104,11 @@ export const examService = {
     if (exam.status !== EXAM_STATUS.APPROVED) {
       throw new ApiError(400, 'Chỉ có thể phát hành kỳ thi đã được duyệt', 'EXAM_INVALID_STATUS');
     }
+
+    // Sinh mã đề theo phòng ban + gán thí sinh TRƯỚC khi đổi trạng thái —
+    // nếu ngân hàng câu hỏi không đủ, lỗi sẽ chặn ở đây và kỳ thi vẫn giữ
+    // nguyên trạng thái 'approved', tránh publish dở dang.
+    await generateExamCodesAndAssignCandidates(exam);
 
     // Archive any currently published exam
     await Exam.updateMany(
