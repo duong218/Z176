@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Loader2, X, AlertCircle } from 'lucide-react';
 import { fetchTopics, createTopic } from '../../services/examiner.service';
 
-export const TopicTab = () => {
+export const TopicTab = ({ onViewQuestions } = {}) => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -94,6 +94,15 @@ export const TopicTab = () => {
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
               <span>Trạng thái: {topic.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
+              {onViewQuestions && (
+                <button
+                  type="button"
+                  onClick={() => onViewQuestions(topic._id)}
+                  className="text-xs font-semibold text-[#008BC5] hover:underline"
+                >
+                  Xem câu hỏi →
+                </button>
+              )}
             </div>
           </div>
         ))}

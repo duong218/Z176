@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions } from '../../services/examiner.service';
 
-export const QuestionBankTab = () => {
+export const QuestionBankTab = ({ initialFilter } = {}) => {
   const [questions, setQuestions] = useState([]);
   const [topics, setTopics] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -17,6 +17,7 @@ export const QuestionBankTab = () => {
   const [selectedScope, setSelectedScope] = useState('');
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
+  const [selectedAnswerType, setSelectedAnswerType] = useState('');
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -53,7 +54,8 @@ export const QuestionBankTab = () => {
           topicId: selectedTopic,
           scope: selectedScope,
           departmentId: selectedDept,
-          difficulty: selectedDifficulty
+          difficulty: selectedDifficulty,
+          answerType: selectedAnswerType
         }),
         fetchTopics(),
         fetchDepartments()
@@ -71,7 +73,18 @@ export const QuestionBankTab = () => {
 
   useEffect(() => {
     loadData(1);
-  }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty]);
+  }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType]);
+
+  // Khi nhận filter từ bên ngoài (vd bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở
+  // tab Chủ đề), áp topicId đó vào bộ lọc. Dùng initialFilter?.ts (mốc thời
+  // gian) trong dependency thay vì chỉ topicId, để nếu người dùng bấm lại
+  // đúng chủ đề vừa xem, effect vẫn chạy lại (đảm bảo tab luôn được kéo về
+  // đúng trạng thái đã lọc, kể cả khi giữa chừng người dùng đã tự đổi filter
+  // khác đi).
+  useEffect(() => {
+    if (!initialFilter?.topicId) return;
+    setSelectedTopic(initialFilter.topicId);
+  }, [initialFilter?.topicId, initialFilter?.ts]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -255,7 +268,7 @@ export const QuestionBankTab = () => {
           </button>
         </form>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <select
             value={selectedTopic}
             onChange={(e) => setSelectedTopic(e.target.value)}
@@ -294,6 +307,16 @@ export const QuestionBankTab = () => {
             <option value="easy">Dễ</option>
             <option value="medium">Trung bình</option>
             <option value="hard">Khó</option>
+          </select>
+
+          <select
+            value={selectedAnswerType}
+            onChange={(e) => setSelectedAnswerType(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+          >
+            <option value="">-- Hình thức đáp án --</option>
+            <option value="single">Một đáp án (Single)</option>
+            <option value="multiple">Nhiều đáp án (Multiple)</option>
           </select>
         </div>
 

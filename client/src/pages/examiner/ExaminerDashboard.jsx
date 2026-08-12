@@ -7,6 +7,17 @@ import { BookOpen, FolderOpen, Building, FileSignature } from 'lucide-react';
 
 export const ExaminerDashboard = () => {
   const [activeTab, setActiveTab] = useState('questions');
+  // Khi bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở tab Chủ đề, lưu topicId + mốc
+  // thời gian (seed) vào đây rồi chuyển sang tab Ngân hàng câu hỏi. Kèm seed
+  // để nếu người dùng bấm lại đúng chủ đề cũ lần nữa, QuestionBankTab vẫn
+  // nhận biết được đây là 1 yêu cầu áp filter MỚI (không chỉ so sánh topicId
+  // không đổi mà bỏ qua).
+  const [questionsFilterSeed, setQuestionsFilterSeed] = useState(null);
+
+  const handleViewQuestionsByTopic = (topicId) => {
+    setQuestionsFilterSeed({ topicId, ts: Date.now() });
+    setActiveTab('questions');
+  };
 
   const tabs = [
     { id: 'questions', label: 'Ngân hàng câu hỏi', icon: <BookOpen className="w-5 h-5" /> },
@@ -43,8 +54,8 @@ export const ExaminerDashboard = () => {
 
         {/* Tab Content */}
         <div className="p-4 md:p-6 bg-slate-50/50 min-h-[400px]">
-          {activeTab === 'questions' && <QuestionBankTab />}
-          {activeTab === 'topics' && <TopicTab />}
+          {activeTab === 'questions' && <QuestionBankTab initialFilter={questionsFilterSeed} />}
+          {activeTab === 'topics' && <TopicTab onViewQuestions={handleViewQuestionsByTopic} />}
           {activeTab === 'departments' && <DepartmentTab />}
           {activeTab === 'proposals' && <ExamProposalTab />}
         </div>
