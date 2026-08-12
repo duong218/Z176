@@ -21,7 +21,9 @@ export const RegulationsSection = ({ onStartExam }) => {
             <Clock className="w-6 h-6 text-[#008BC5] shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-base text-[#0F172A]">Thời gian làm bài</h3>
-              <p className="text-sm text-[#334155] font-medium">20 phút đếm ngược tự động cho 20 câu hỏi trắc nghiệm.</p>
+              <p className="text-sm text-[#334155] font-medium">
+                Hệ thống tự động đếm ngược theo đúng số câu hỏi của đề thi được cấp cho bạn.
+              </p>
             </div>
           </div>
 
@@ -29,7 +31,9 @@ export const RegulationsSection = ({ onStartExam }) => {
             <HelpCircle className="w-6 h-6 text-[#008BC5] shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-base text-[#0F172A]">Cấu trúc bài thi</h3>
-              <p className="text-sm text-[#334155] font-medium">20 câu hỏi trắc nghiệm (mỗi câu gồm 4 phương án chọn 1).</p>
+              <p className="text-sm text-[#334155] font-medium">
+                Bộ câu hỏi trắc nghiệm (mỗi câu gồm 4 phương án, chọn 1 hoặc nhiều đáp án đúng tuỳ yêu cầu từng câu).
+              </p>
             </div>
           </div>
 
@@ -37,7 +41,9 @@ export const RegulationsSection = ({ onStartExam }) => {
             <CheckCircle2 className="w-6 h-6 text-[#22C55E] shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-base text-[#0F172A]">Tỷ lệ đạt yêu cầu</h3>
-              <p className="text-sm text-[#334155] font-medium">Trả lời đúng từ <strong className="text-[#22C55E] font-bold">15/20 câu</strong> (75%) trở lên được tính là ĐẠT.</p>
+              <p className="text-sm text-[#334155] font-medium">
+                Trả lời đúng từ <strong className="text-[#22C55E] font-bold">75% tổng số câu</strong> trở lên được tính là ĐẠT.
+              </p>
             </div>
           </div>
 
@@ -67,14 +73,14 @@ export const RegulationsSection = ({ onStartExam }) => {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-6 h-6 rounded-full bg-[#EAF6FF] text-[#008BC5] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
-              <span>Sau khi chọn hết 20 câu, nhấn nút <strong>NỘP BÀI THI</strong> để xem kết quả và giấy xác nhận hoàn thành ngay tức thì.</span>
+              <span>Sau khi hoàn thành toàn bộ các câu hỏi (có thể dùng lưới điều hướng để kiểm tra lại câu chưa làm), nhấn nút <strong>NỘP BÀI THI</strong> để xem kết quả và giấy xác nhận hoàn thành ngay tức thì.</span>
             </li>
           </ul>
 
           <div className="pt-2">
             <button
               onClick={onStartExam}
-              className="w-full min-h-[48px] bg-[#008BC5] text-white font-bold text-base rounded-[10px] hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2"
+              className="w-full min-h-[52px] bg-[#008BC5] text-white font-bold text-base rounded-[10px] hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 min-touch-target"
             >
               <span>Đã hiểu quy chế — Bắt đầu vào thi</span>
             </button>

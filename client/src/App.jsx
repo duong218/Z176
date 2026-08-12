@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Lenis from 'lenis';
 import { Header } from './components/Header';
 import { Banner } from './components/Banner';
 import { TimeAndCountdown } from './components/TimeAndCountdown';
@@ -149,6 +150,34 @@ export default function App() {
   const handleOpenExam = () => {
     setIsExamOpen(true);
   };
+
+  // ── Lenis smooth scroll ─────────────────────────────────────
+  // Chỉ cải thiện cảm giác cuộn trang, không ảnh hưởng đến state/logic nào khác.
+  // lenisRef tránh việc React.StrictMode chạy effect 2 lần lúc mount tạo ra
+  // 2 instance Lenis chồng nhau (nguyên nhân gây giật/lag khi cuộn).
+  const lenisRef = useRef(null);
+  useEffect(() => {
+    if (lenisRef.current) return undefined;
+
+    // lerp: hệ số làm mượt mỗi lần lăn chuột — số càng nhỏ càng "trôi" lâu, càng dễ cảm nhận.
+    // wheelMultiplier: độ nhạy khi lăn chuột. autoRaf: để Lenis tự quản lý vòng lặp render,
+    // tránh khả năng vòng lặp requestAnimationFrame tự viết tay bị lỗi/không chạy.
+    const lenis = new Lenis({
+      lerp: 0.1,
+      duration: 1.2,
+      wheelMultiplier: 1,
+      smoothWheel: true,
+      autoRaf: true,
+    });
+    lenisRef.current = lenis;
+    document.documentElement.classList.add('lenis');
+
+    return () => {
+      lenis.destroy();
+      document.documentElement.classList.remove('lenis');
+      lenisRef.current = null;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-[#0F172A] antialiased selection:bg-[#008BC5] selection:text-white">

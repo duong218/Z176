@@ -2,7 +2,7 @@ export const Z176_COMPANY_INFO = {
   name: 'CÔNG TY TNHH MTV 176 - BỘ QUỐC PHÒNG',
   shortName: 'Z176',
   badge: 'DOANH NGHIỆP BỘ QUỐC PHÒNG',
-  contestTitle: 'CUỘC THI TÌM HIỂU KIẾN THỨC AN TOÀN LAO ĐỘNG VÀ QUY CHẾ NỘI BỘ',
+  contestTitle: 'HỆ THỐNG THI TRẮC NGHIỆM CHUYÊN MÔN DÀNH CHO CÁN BỘ, CÔNG NHÂN VIÊN',
   contestEdition: 'Lần thứ V, năm 2026',
   startDate: '01/09/2026',
   endDate: '15/09/2026',

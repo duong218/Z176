@@ -21,7 +21,7 @@ export const QuickGuideSection = ({ onStartExam }) => {
     {
       number: '3',
       title: 'Làm bài',
-      desc: 'Đọc kỹ câu hỏi và tích chọn 1 phương án đúng (A, B, C, D) trong 20 phút.',
+      desc: 'Đọc kỹ từng câu hỏi, tích chọn đáp án đúng. Đồng hồ đếm ngược hiển thị trên màn hình trong suốt bài thi.',
       icon: PenTool,
       color: 'bg-amber-50 border-amber-200 text-amber-600',
       badgeBg: 'bg-amber-600 text-white',
@@ -99,7 +99,7 @@ export const QuickGuideSection = ({ onStartExam }) => {
               Dễ dàng, không phức tạp — Bắt đầu ngay!
             </span>
             <span className="text-xs text-[#334155] font-medium">
-              Chỉ mất 1 phút đăng nhập và 20 phút làm bài
+              Chỉ mất 1 phút đăng nhập, thời gian làm bài theo đúng quy định của đề thi
             </span>
           </div>
           <button

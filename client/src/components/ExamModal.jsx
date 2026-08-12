@@ -39,6 +39,9 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const [examSecondsLeft, setExamSecondsLeft] = useState(0);
   const [submitError, setSubmitError] = useState(null);
 
+  // Hiển thị/ẩn lưới điều hướng câu hỏi trên màn hình nhỏ (thuần UI, không ảnh hưởng dữ liệu)
+  const [showQuestionGrid, setShowQuestionGrid] = useState(false);
+
   const [resultData, setResultData] = useState(null);
 
   const finishingRef = useRef(false);
@@ -147,6 +150,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const questions = examData?.questions ?? [];
   const currentQ = questions[currentQuestionIndex];
   const answeredCount = Object.keys(selectedAnswers).filter((qId) => (selectedAnswers[qId] || []).length > 0).length;
+  const progressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
   const handleSelectOption = (question, optionId) => {
     setSelectedAnswers((prev) => {
@@ -159,6 +163,11 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
       }
       return { ...prev, [question.id]: [optionId] };
     });
+  };
+
+  const handleJumpToQuestion = (index) => {
+    setCurrentQuestionIndex(index);
+    setShowQuestionGrid(false);
   };
 
   return (
@@ -301,21 +310,66 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         {step === 'testing' && currentQ && (
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Top Bar with Timer & Progress */}
-            <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between text-sm shrink-0">
-              <div className="flex items-center gap-2 font-bold text-[#0F172A]">
-                <span>
-                  Câu {currentQuestionIndex + 1}/{questions.length}
-                </span>
-                <span className="text-slate-400">•</span>
-                <span className="text-[#008BC5]">
-                  Đã chọn: {answeredCount}/{questions.length}
-                </span>
+            <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 shrink-0 space-y-2">
+              <div className="flex items-center justify-between text-sm gap-2">
+                <button
+                  onClick={() => setShowQuestionGrid((v) => !v)}
+                  className="flex items-center gap-2 font-bold text-[#0F172A] px-2 py-1 -mx-2 -my-1 rounded-lg hover:bg-slate-200 transition-colors min-touch-target"
+                  aria-expanded={showQuestionGrid}
+                  aria-label="Mở/đóng danh sách câu hỏi"
+                >
+                  <span>
+                    Câu {currentQuestionIndex + 1}/{questions.length}
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-[#008BC5]">
+                    Đã chọn: {answeredCount}/{questions.length}
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0F172A] text-white font-bold font-mono text-base rounded-md shrink-0">
+                  <Clock className="w-4 h-4 text-[#008BC5]" />
+                  <span>{formatTimer(examSecondsLeft)}</span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0F172A] text-white font-bold font-mono text-base rounded-md">
-                <Clock className="w-4 h-4 text-[#008BC5]" />
-                <span>{formatTimer(examSecondsLeft)}</span>
+              {/* Progress bar - thuần hiển thị, tính từ answeredCount/questions.length đã có sẵn */}
+              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#008BC5] rounded-full transition-all"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
+
+              {/* Question grid navigator - mở rộng khi bấm vào "Câu x/y" phía trên.
+                  Hữu ích cho đề 30-40 câu để nhảy nhanh tới câu cần xem lại. */}
+              {showQuestionGrid && (
+                <div className="pt-1 pb-0.5 max-h-40 overflow-y-auto">
+                  <div className="grid grid-cols-8 min-[420px]:grid-cols-10 gap-1.5">
+                    {questions.map((q, idx) => {
+                      const isAnswered = (selectedAnswers[q.id] || []).length > 0;
+                      const isCurrent = idx === currentQuestionIndex;
+                      return (
+                        <button
+                          key={q.id}
+                          onClick={() => handleJumpToQuestion(idx)}
+                          className={`aspect-square rounded-md text-xs font-bold flex items-center justify-center border transition-colors ${
+                            isCurrent
+                              ? 'bg-[#008BC5] border-[#008BC5] text-white ring-2 ring-[#008BC5]/40'
+                              : isAnswered
+                              ? 'bg-[#EAF6FF] border-[#008BC5]/40 text-[#008BC5]'
+                              : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                          }`}
+                          aria-label={`Đi tới câu ${idx + 1}${isAnswered ? ', đã trả lời' : ', chưa trả lời'}`}
+                          aria-current={isCurrent}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Question Content */}

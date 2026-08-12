@@ -27,3 +27,18 @@
   min-width: 48px;
 }
 
+/* ── Lenis smooth scroll ──────────────────────────────────
+   Tắt scroll-behavior gốc của trình duyệt để không bị "mượt chồng mượt"
+   với Lenis (gây giật/lag khi cuộn chuột). */
+html.lenis, html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
