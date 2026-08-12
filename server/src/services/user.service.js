@@ -8,9 +8,30 @@ import * as auditService from './audit.service.js';
 import { assignEmployeeToActiveExamIfAny } from './exam-code-generation.service.js';
 import { findOrCreateDepartmentByName, findOrCreateDepartmentByCode } from './department.service.js';
 
-/** Lấy danh sách user kèm thông tin role */
+/** Lấy danh sách user kèm thông tin role + hồ sơ nhân viên (nếu có) */
 export async function listUsers() {
-  return User.find().populate('roleId', 'code name').sort({ createdAt: -1 }).lean();
+  const users = await User.find().populate('roleId', 'code name').sort({ createdAt: -1 }).lean();
+
+  const employees = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
+    .populate('departmentId', 'name code')
+    .lean();
+  const employeeByUserId = new Map(employees.map((e) => [e.userId.toString(), e]));
+
+  return users.map((u) => {
+    const emp = employeeByUserId.get(u._id.toString());
+    return {
+      ...u,
+      fullname: emp?.fullname ?? '',
+      employeeCode: emp?.employeeCode ?? '',
+      departmentId: emp?.departmentId?._id ?? emp?.departmentId ?? '',
+      departmentName: emp?.departmentId?.name ?? '',
+      dob: emp?.dob ?? '',
+      gender: emp?.gender ?? '',
+      phone: emp?.phone ?? '',
+      address: emp?.address ?? '',
+      position: emp?.position ?? '',
+    };
+  });
 }
 
 /**
@@ -216,6 +237,12 @@ async function buildEmployeeImportRow(row, rowIndex) {
   const deptCodeRaw = r.maphongban ?? r.mabophan ?? r.maban ?? r.madepartment;
   const deptName = r.department ?? r.phongban ?? r.bophan;
   const employeeCodeRaw = r.employeecode ?? r.manhanvien ?? r.manv ?? r.ma ?? r.masonhanvien;
+  // Các field "hồ sơ tham khảo" — không bắt buộc, chỉ lưu để hiển thị.
+  const dob = r.ngaysinh ?? r.dob ?? '';
+  const gender = r.gioitinh ?? r.gender ?? '';
+  const phone = r.sodienthoai ?? r.dienthoai ?? r.sdt ?? r.phone ?? '';
+  const address = r.diachi ?? r.address ?? '';
+  const position = r.chucvu ?? r.position ?? '';
 
   if (!String(fullname ?? '').trim()) {
     throw new ApiError(400, `Dòng ${rowIndex}: thiếu họ tên`, 'IMPORT_ROW_INVALID');
@@ -261,6 +288,11 @@ async function buildEmployeeImportRow(row, rowIndex) {
     username,
     departmentId: dept._id,
     departmentName: dept.name,
+    dob: String(dob ?? '').trim(),
+    gender: String(gender ?? '').trim(),
+    phone: String(phone ?? '').trim(),
+    address: String(address ?? '').trim(),
+    position: String(position ?? '').trim(),
   };
 }
 
@@ -323,6 +355,11 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
       if (existingEmployee) {
         existingEmployee.fullname = parsed.fullname;
         existingEmployee.departmentId = parsed.departmentId;
+        existingEmployee.dob = parsed.dob;
+        existingEmployee.gender = parsed.gender;
+        existingEmployee.phone = parsed.phone;
+        existingEmployee.address = parsed.address;
+        existingEmployee.position = parsed.position;
         await existingEmployee.save();
 
         const existingUser = await User.findById(existingEmployee.userId);
@@ -367,6 +404,11 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
           departmentId: parsed.departmentId,
           userId: newUser._id,
           employeeCode: parsed.employeeCode,
+          dob: parsed.dob,
+          gender: parsed.gender,
+          phone: parsed.phone,
+          address: parsed.address,
+          position: parsed.position,
           isActive: true,
         });
       } catch (err) {

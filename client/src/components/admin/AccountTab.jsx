@@ -1,8 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown } from 'lucide-react';
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, importEmployeesExcel, downloadImportResultsCsv } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
 import { getAuthHeaders } from '../../services/auth.service';
+
+// Danh sách cột có thể hiển thị trong bảng tài khoản. `alwaysOn` = cột lõi
+// không cho ẩn (Username, Phân quyền, Trạng thái, Hành động). Các cột còn
+// lại lấy từ hồ sơ nhân viên (Employee) — có thể trống nếu tài khoản không
+// phải role 'candidate' hoặc chưa được import kèm dữ liệu đó.
+const ACCOUNT_COLUMNS = [
+  { key: 'fullname', label: 'Họ tên' },
+  { key: 'employeeCode', label: 'Mã NV' },
+  { key: 'departmentName', label: 'Phòng ban' },
+  { key: 'dob', label: 'Ngày sinh' },
+  { key: 'gender', label: 'Giới tính' },
+  { key: 'phone', label: 'SĐT' },
+  { key: 'address', label: 'Địa chỉ' },
+  { key: 'position', label: 'Chức vụ' },
+];
+
+const ACCOUNT_COLUMNS_STORAGE_KEY = 'z176_account_table_columns';
 
 // TODO: nếu dự án đã có department.service.js riêng, thay hàm tạm này bằng
 // import fetchDepartments từ đó để đồng nhất convention thay vì gọi apiRequest trực tiếp ở đây.
@@ -18,6 +35,43 @@ export const AccountTab = ({ currentUser }) => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Cột hiển thị trong bảng — nhớ lựa chọn của người dùng giữa các lần vào
+  // lại trang (localStorage), mặc định hiện tất cả cột.
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ACCOUNT_COLUMNS_STORAGE_KEY) || 'null');
+      if (saved && typeof saved === 'object') {
+        return { ...Object.fromEntries(ACCOUNT_COLUMNS.map((c) => [c.key, true])), ...saved };
+      }
+    } catch {
+      /* ignore parse error, dùng mặc định */
+    }
+    return Object.fromEntries(ACCOUNT_COLUMNS.map((c) => [c.key, true]));
+  });
+  const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+  const columnMenuRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem(ACCOUNT_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    if (!isColumnMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(e.target)) {
+        setIsColumnMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isColumnMenuOpen]);
+
+  const toggleColumn = (key) => {
+    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const activeColumns = ACCOUNT_COLUMNS.filter((c) => visibleColumns[c.key]);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -233,6 +287,36 @@ export const AccountTab = ({ currentUser }) => {
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          <div className="relative" ref={columnMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsColumnMenuOpen((v) => !v)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors justify-center"
+            >
+              <Columns3 className="w-5 h-5" />
+              <span className="hidden sm:inline">Cột hiển thị</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {isColumnMenuOpen && (
+              <div className="absolute z-20 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-2 right-0">
+                <p className="text-xs font-semibold text-slate-500 uppercase px-2 pb-1">Hiện/ẩn cột</p>
+                {ACCOUNT_COLUMNS.map((col) => (
+                  <label
+                    key={col.key}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer text-sm text-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!visibleColumns[col.key]}
+                      onChange={() => toggleColumn(col.key)}
+                      className="rounded border-slate-300 text-[#008BC5] focus:ring-[#008BC5]"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -264,6 +348,9 @@ export const AccountTab = ({ currentUser }) => {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
               <th className="p-4 font-semibold">Tài khoản (Username)</th>
+              {activeColumns.map((col) => (
+                <th key={col.key} className="p-4 font-semibold whitespace-nowrap">{col.label}</th>
+              ))}
               <th className="p-4 font-semibold">Phân quyền</th>
               <th className="p-4 font-semibold">Trạng thái</th>
               <th className="p-4 font-semibold text-right">Hành động</th>
@@ -273,6 +360,11 @@ export const AccountTab = ({ currentUser }) => {
             {filteredUsers.map(user => (
               <tr key={user._id} className="hover:bg-slate-50/50">
                 <td className="p-4 font-medium text-[#0F172A]">{user.username} {isSelf(user) && <span className="text-xs text-slate-400 font-normal italic">(Bạn)</span>}</td>
+                {activeColumns.map((col) => (
+                  <td key={col.key} className="p-4 text-sm text-slate-600 whitespace-nowrap">
+                    {user[col.key] || <span className="text-slate-300">—</span>}
+                  </td>
+                ))}
                 <td className="p-4">
                   <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
                     user.roleCode === 'admin' ? 'bg-purple-100 text-purple-700' :
@@ -364,6 +456,19 @@ export const AccountTab = ({ currentUser }) => {
                 <span className="text-[#E53E3E] font-medium flex items-center gap-1"><Lock className="w-4 h-4" /> Đã khóa</span>
               )}
             </div>
+
+            {activeColumns.some((col) => user[col.key]) && (
+              <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-500 pt-1">
+                {activeColumns
+                  .filter((col) => user[col.key])
+                  .map((col) => (
+                    <div key={col.key}>
+                      <span className="text-slate-400">{col.label}: </span>
+                      <span className="text-slate-700 font-medium">{user[col.key]}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2 border-t border-slate-100">
               <button
