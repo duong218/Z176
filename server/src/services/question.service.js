@@ -8,6 +8,7 @@ import {
   QUESTION_SCOPE,
   Answer,
   Question,
+  Department,
 } from '../models/index.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 import { findDepartmentByName } from './department.service.js';
@@ -121,20 +122,8 @@ function serializeQuestion(doc, answers) {
   };
 }
 
-export async function listQuestions(filters = {}) {
-  const {
-    topicId,
-    scope,
-    departmentId,
-    questionKind,
-    difficulty,
-    answerType,
-    isActive = true,
-    search,
-    page = 1,
-    limit = 20,
-  } = filters;
-
+function buildQuestionQuery(filters = {}) {
+  const { topicId, scope, departmentId, questionKind, difficulty, answerType, isActive = true, search } = filters;
   const query = {};
   if (isActive !== undefined && isActive !== 'all') {
     query.isActive = isActive === true || isActive === 'true';
@@ -148,6 +137,12 @@ export async function listQuestions(filters = {}) {
   if (search?.trim()) {
     query.content = { $regex: search.trim(), $options: 'i' };
   }
+  return query;
+}
+
+export async function listQuestions(filters = {}) {
+  const { page = 1, limit = 20 } = filters;
+  const query = buildQuestionQuery(filters);
 
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
@@ -292,6 +287,58 @@ export async function deactivateQuestion(id, actorUserId, ipAddress) {
   });
 
   return { id: question._id.toString(), isActive: false };
+}
+
+/**
+ * Xóa mềm HÀNG LOẠT — 2 chế độ:
+ *  - { ids: [...] }: chỉ xóa đúng các câu hỏi có id trong danh sách (dùng
+ *    khi người dùng tick chọn từng câu qua checkbox).
+ *  - { filters: {...} }: xóa TẤT CẢ câu hỏi khớp bộ lọc hiện tại trên UI
+ *    (dùng khi người dùng bấm "Xóa tất cả theo bộ lọc hiện tại" — tiện dọn
+ *    dữ liệu test/trùng lặp mà không cần tick từng ô). Bắt buộc phải có ít
+ *    nhất 1 điều kiện lọc CỤ THỂ ngoài isActive, để tránh xóa nhầm toàn bộ
+ *    ngân hàng câu hỏi chỉ vì quên chọn bộ lọc.
+ * Chỉ tác động tới câu hỏi đang isActive:true (đã xóa mềm rồi thì bỏ qua).
+ */
+export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId, ipAddress) {
+  let query;
+  if (Array.isArray(ids) && ids.length > 0) {
+    const validIds = ids.filter((id) => mongoose.isValidObjectId(id));
+    if (validIds.length === 0) {
+      throw new ApiError(400, 'Danh sách ID không hợp lệ', 'QUESTION_BULK_DELETE_INVALID_IDS');
+    }
+    query = { _id: { $in: validIds }, isActive: true };
+  } else if (filters && typeof filters === 'object') {
+    const hasSpecificFilter = ['topicId', 'scope', 'departmentId', 'questionKind', 'difficulty', 'answerType', 'search']
+      .some((k) => filters[k] !== undefined && filters[k] !== null && filters[k] !== '');
+    if (!hasSpecificFilter) {
+      throw new ApiError(
+        400,
+        'Vui lòng chọn ít nhất 1 bộ lọc (chủ đề, phạm vi, bộ phận, độ khó...) trước khi xóa tất cả, để tránh xóa nhầm toàn bộ ngân hàng câu hỏi.',
+        'QUESTION_BULK_DELETE_NO_FILTER',
+      );
+    }
+    query = buildQuestionQuery({ ...filters, isActive: true });
+  } else {
+    throw new ApiError(400, 'Thiếu ids hoặc filters để xóa hàng loạt', 'QUESTION_BULK_DELETE_MISSING_PARAMS');
+  }
+
+  const matchedIds = await Question.find(query).distinct('_id');
+  if (matchedIds.length === 0) {
+    return { deactivatedCount: 0, questionIds: [] };
+  }
+
+  await Question.updateMany({ _id: { $in: matchedIds } }, { $set: { isActive: false } });
+
+  await writeAudit({
+    actorUserId,
+    action: 'question.bulk_deactivate',
+    resourceType: 'Question',
+    metadata: { count: matchedIds.length, mode: ids ? 'by_ids' : 'by_filter' },
+    ipAddress,
+  });
+
+  return { deactivatedCount: matchedIds.length, questionIds: matchedIds.map((id) => id.toString()) };
 }
 
 function resolveEnum(map, raw, fieldLabel) {
@@ -459,5 +506,54 @@ export async function importQuestionsFromExcelFile(filePath, createdBy, actorUse
     failed: errors.length,
     errors,
     questionIds: created,
+  };
+}
+
+/**
+ * Thống kê số câu hỏi ACTIVE theo 1 chủ đề, dùng cho form "Tạo đề xuất kỳ
+ * thi" (ExamProposalTab) — giúp người soạn biết trước tối đa có thể nhập
+ * bao nhiêu câu chung / câu riêng cho từng phòng ban, tránh nhập vượt quá số
+ * câu thực có trong ngân hàng câu hỏi.
+ *
+ * Trả về: { topicId, commonCount, departments: [{ departmentId, name, code, count }] }
+ * `departments` liệt kê TẤT CẢ phòng ban đang hoạt động (kể cả phòng ban 0
+ * câu hỏi riêng thuộc chủ đề này), để UI hiển thị đủ, không bị ẩn mất phòng
+ * ban thiếu câu hỏi.
+ */
+export async function getQuestionStatsByTopic(topicId) {
+  if (!mongoose.isValidObjectId(topicId)) {
+    throw new ApiError(400, 'topicId không hợp lệ', 'QUESTION_STATS_INVALID_TOPIC');
+  }
+
+  const [commonCount, deptCountsRaw, departments] = await Promise.all([
+    Question.countDocuments({
+      topicId,
+      scope: QUESTION_SCOPE.COMMON,
+      isActive: true,
+    }),
+    Question.aggregate([
+      {
+        $match: {
+          topicId: new mongoose.Types.ObjectId(topicId),
+          scope: QUESTION_SCOPE.DEPARTMENT_SPECIFIC,
+          isActive: true,
+        },
+      },
+      { $group: { _id: '$departmentId', count: { $sum: 1 } } },
+    ]),
+    Department.find({ isActive: true }).sort({ name: 1 }).lean(),
+  ]);
+
+  const countByDeptId = new Map(deptCountsRaw.map((d) => [d._id.toString(), d.count]));
+
+  return {
+    topicId,
+    commonCount,
+    departments: departments.map((dept) => ({
+      departmentId: dept._id.toString(),
+      name: dept.name,
+      code: dept.code,
+      count: countByDeptId.get(dept._id.toString()) ?? 0,
+    })),
   };
 }

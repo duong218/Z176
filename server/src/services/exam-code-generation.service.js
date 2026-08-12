@@ -37,9 +37,17 @@ function buildExamCode(exam, department) {
 }
 
 /**
- * Kiểm tra đủ câu hỏi (chung + riêng phòng ban) cho 1 phòng ban theo đúng
- * commonQuestionCount/departmentQuestionCount của Exam. Ném lỗi rõ ràng nếu
- * thiếu, trả về 2 pool câu hỏi nếu đủ (để tái sử dụng, tránh query lại).
+ * Kiểm tra & tính TOÁN PHƯƠNG ÁN lấy câu hỏi (chung + riêng phòng ban) cho 1
+ * phòng ban. Không còn cứng nhắc theo đúng commonQuestionCount/
+ * departmentQuestionCount như trước — nếu câu RIÊNG không đủ, phần thiếu
+ * (shortfall) sẽ được BÙ THÊM từ pool câu CHUNG (cộng dồn vào số lượng lấy
+ * từ pool chung, không đổi cấu trúc field của Exam). Chỉ ném lỗi chặn hẳn
+ * khi TỔNG 2 pool (chung + riêng phòng ban) vẫn không đủ tổng số câu cần
+ * (commonQuestionCount + departmentQuestionCount) — tức là kể cả bù cũng
+ * không đủ, để đảm bảo KHÔNG có thí sinh nào bị thiếu đề/không được gán đề.
+ *
+ * Trả về pool câu hỏi kèm "plan" (số lượng thực tế sẽ lấy từ mỗi pool) để
+ * bước tạo mã đề dùng lại, tránh phải tính lại.
  */
 async function validateQuestionAvailability(exam, department) {
   const commonQuestions = await Question.find({
@@ -47,13 +55,6 @@ async function validateQuestionAvailability(exam, department) {
     scope: QUESTION_SCOPE.COMMON,
     isActive: true,
   });
-  if (commonQuestions.length < exam.commonQuestionCount) {
-    throw new ApiError(
-      400,
-      `Ngân hàng câu hỏi chung của chủ đề không đủ: cần ${exam.commonQuestionCount} câu, hiện chỉ có ${commonQuestions.length} câu.`,
-      'INSUFFICIENT_COMMON_QUESTIONS',
-    );
-  }
 
   const deptQuestions = await Question.find({
     topicId: exam.topicId,
@@ -61,21 +62,36 @@ async function validateQuestionAvailability(exam, department) {
     departmentId: department._id,
     isActive: true,
   });
-  if (deptQuestions.length < exam.departmentQuestionCount) {
+
+  const totalNeeded = exam.commonQuestionCount + exam.departmentQuestionCount;
+  const deptPickCount = Math.min(deptQuestions.length, exam.departmentQuestionCount);
+  const shortfall = exam.departmentQuestionCount - deptPickCount;
+  // Số câu cần lấy từ pool chung = số câu chung gốc + phần bù do thiếu câu riêng
+  const commonPickCount = exam.commonQuestionCount + shortfall;
+
+  if (commonQuestions.length < commonPickCount) {
+    // Kể cả đã bù hết mức có thể từ pool riêng vẫn không đủ tổng số câu cần.
+    const totalAvailable = commonQuestions.length + deptQuestions.length;
     throw new ApiError(
       400,
-      `Phòng ban "${department.name}" không đủ câu hỏi riêng: cần ${exam.departmentQuestionCount} câu, hiện chỉ có ${deptQuestions.length} câu.`,
-      'INSUFFICIENT_DEPARTMENT_QUESTIONS',
+      `Phòng ban "${department.name}" không đủ câu hỏi để tạo đề (cần tổng ${totalNeeded} câu, ` +
+        `hiện có ${commonQuestions.length} câu chung + ${deptQuestions.length} câu riêng = ${totalAvailable} câu). ` +
+        `Vui lòng bổ sung thêm câu hỏi (chung hoặc riêng cho phòng ban này) thuộc chủ đề đã chọn.`,
+      'INSUFFICIENT_QUESTIONS',
     );
   }
 
-  return { commonQuestions, deptQuestions };
+  return {
+    commonQuestions,
+    deptQuestions,
+    plan: { commonPickCount, deptPickCount, shortfall },
+  };
 }
 
-/** Tạo ExamCode + ExamCodeQuestion cho 1 phòng ban từ 2 pool đã kiểm tra đủ. */
-async function createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions) {
-  const commonPick = pickRandom(commonQuestions, exam.commonQuestionCount);
-  const deptPick = pickRandom(deptQuestions, exam.departmentQuestionCount);
+/** Tạo ExamCode + ExamCodeQuestion cho 1 phòng ban từ 2 pool đã kiểm tra đủ, theo đúng plan đã tính (có thể đã bù thêm từ pool chung nếu thiếu câu riêng). */
+async function createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions, plan) {
+  const commonPick = pickRandom(commonQuestions, plan.commonPickCount);
+  const deptPick = pickRandom(deptQuestions, plan.deptPickCount);
   const allQuestions = shuffle([...commonPick, ...deptPick]);
 
   const examCode = await ExamCode.create({
@@ -105,10 +121,10 @@ async function ensureExamCodeForDepartment(exam, department) {
   const existing = await ExamCode.findOne({ examId: exam._id, departmentId: department._id });
   if (existing) return existing;
 
-  const { commonQuestions, deptQuestions } = await validateQuestionAvailability(exam, department);
+  const { commonQuestions, deptQuestions, plan } = await validateQuestionAvailability(exam, department);
 
   try {
-    return await createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions);
+    return await createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions, plan);
   } catch (err) {
     // Trường hợp đụng độ hiếm gặp: 2 request tạo nhân viên cùng phòng ban chạy
     // song song, cả 2 cùng thấy "chưa có mã đề" rồi cùng tạo -> vi phạm unique
@@ -150,17 +166,17 @@ export async function generateExamCodesAndAssignCandidates(exam) {
     _id: { $in: [...employeesByDept.keys()] },
   });
 
-  // Validate hết trước (fail-fast), giữ nguyên pool đã query để tạo ở bước sau.
+  // Validate hết trước (fail-fast), giữ nguyên pool + plan đã tính để tạo ở bước sau.
   const pools = new Map();
   for (const dept of departments) {
-    const { commonQuestions, deptQuestions } = await validateQuestionAvailability(exam, dept);
-    pools.set(dept._id.toString(), { commonQuestions, deptQuestions });
+    const { commonQuestions, deptQuestions, plan } = await validateQuestionAvailability(exam, dept);
+    pools.set(dept._id.toString(), { commonQuestions, deptQuestions, plan });
   }
 
   const candidateDocs = [];
   for (const dept of departments) {
-    const { commonQuestions, deptQuestions } = pools.get(dept._id.toString());
-    const examCode = await createExamCodeForDepartment(exam, dept, commonQuestions, deptQuestions);
+    const { commonQuestions, deptQuestions, plan } = pools.get(dept._id.toString());
+    const examCode = await createExamCodeForDepartment(exam, dept, commonQuestions, deptQuestions, plan);
 
     const deptEmployees = employeesByDept.get(dept._id.toString()) || [];
     for (const emp of deptEmployees) {

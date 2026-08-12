@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics } from '../../services/examiner.service';
-import { FilePlus, Send, AlertCircle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
+import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 export const ExamProposalTab = () => {
   const [exams, setExams] = useState([]);
@@ -17,6 +17,26 @@ export const ExamProposalTab = () => {
     departmentQuestionCount: 10,
     passThresholdPercent: 70,
   });
+
+  // Thống kê số câu hỏi (chung + riêng theo từng bộ phận) của chủ đề đang
+  // chọn trong form — dùng để hiển thị gợi ý và validate ngay trên UI, tránh
+  // để tới lúc Người duyệt đề publish mới phát hiện thiếu câu hỏi.
+  const [topicStats, setTopicStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!formData.topicId) {
+      setTopicStats(null);
+      return;
+    }
+    let cancelled = false;
+    setStatsLoading(true);
+    fetchQuestionStatsByTopic(formData.topicId)
+      .then((data) => { if (!cancelled) setTopicStats(data); })
+      .catch(() => { if (!cancelled) setTopicStats(null); })
+      .finally(() => { if (!cancelled) setStatsLoading(false); });
+    return () => { cancelled = true; };
+  }, [formData.topicId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -38,8 +58,37 @@ export const ExamProposalTab = () => {
     loadData();
   }, []);
 
+  // Tính trước xem cấu hình (commonQuestionCount/departmentQuestionCount) có
+  // khả thi không, THEO ĐÚNG công thức bù mà backend
+  // (exam-code-generation.service.js) đang dùng: nếu 1 bộ phận thiếu câu
+  // riêng, phần thiếu sẽ được bù từ pool câu chung. Chỉ thật sự KHÔNG khả
+  // thi nếu pool chung không đủ để bù cho bộ phận đó.
+  const commonCount = topicStats?.commonCount ?? 0;
+  const common = Number(formData.commonQuestionCount) || 0;
+  const perDept = Number(formData.departmentQuestionCount) || 0;
+  const total = Number(formData.totalQuestions) || 0;
+
+  const commonExceedsPool = common > commonCount;
+  const sumMismatch = formData.topicId && common + perDept !== total;
+
+  const infeasibleDepartments = (topicStats?.departments ?? [])
+    .map((d) => {
+      const shortfall = Math.max(0, perDept - d.count);
+      const neededCommon = common + shortfall;
+      return { ...d, shortfall, neededCommon, infeasible: neededCommon > commonCount };
+    })
+    .filter((d) => d.shortfall > 0);
+
+  const hasBlockingError =
+    !!formData.topicId &&
+    (commonExceedsPool || sumMismatch || infeasibleDepartments.some((d) => d.infeasible));
+
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (hasBlockingError) {
+      alert('Cấu hình số câu hỏi chưa hợp lệ so với ngân hàng câu hỏi hiện có của chủ đề này. Vui lòng kiểm tra lại phần cảnh báo trong form.');
+      return;
+    }
     try {
       await createExamProposal({
         ...formData,
@@ -184,6 +233,33 @@ export const ExamProposalTab = () => {
                   </select>
                 </div>
 
+                {formData.topicId && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-2">
+                    {statsLoading ? (
+                      <p className="text-slate-500">Đang tải số liệu ngân hàng câu hỏi...</p>
+                    ) : topicStats ? (
+                      <>
+                        <p className="font-semibold text-slate-700">
+                          Ngân hàng câu hỏi của chủ đề này: <span className="text-[#008BC5]">{topicStats.commonCount} câu chung</span>
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1">
+                          {topicStats.departments.map((d) => (
+                            <div key={d.departmentId} className="flex justify-between text-slate-600">
+                              <span className="truncate" title={d.name}>{d.name}</span>
+                              <span className="font-semibold ml-1">{d.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-slate-400 italic">
+                          Nếu bộ phận nào thiếu câu riêng, hệ thống sẽ tự động bù thêm từ pool câu chung khi phát hành đề — miễn pool chung còn đủ dư.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-red-500">Không tải được số liệu câu hỏi cho chủ đề này.</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian (phút)</label>
@@ -196,6 +272,12 @@ export const ExamProposalTab = () => {
                       value={formData.totalQuestions} onChange={e => setFormData({ ...formData, totalQuestions: e.target.value })} />
                   </div>
                 </div>
+                {sumMismatch && (
+                  <p className="text-xs text-red-600 flex items-center gap-1 -mt-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    Số câu chung + số câu bộ phận ({common + perDept}) phải bằng đúng Tổng số câu hỏi ({total}).
+                  </p>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -210,6 +292,30 @@ export const ExamProposalTab = () => {
                   </div>
                 </div>
 
+                {formData.topicId && topicStats && (
+                  <>
+                    {commonExceedsPool && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        Số câu chung ({common}) vượt quá số câu chung hiện có ({commonCount}) của chủ đề này.
+                      </p>
+                    )}
+                    {infeasibleDepartments.length > 0 && (
+                      <div className="space-y-1">
+                        {infeasibleDepartments.map((d) => (
+                          <p key={d.departmentId} className={`text-xs flex items-center gap-1 ${d.infeasible ? 'text-red-600' : 'text-amber-600'}`}>
+                            {d.infeasible ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                            {d.name}: chỉ có {d.count}/{perDept} câu riêng
+                            {d.infeasible
+                              ? ` — kể cả bù từ pool chung cũng không đủ (cần bù ${d.shortfall} câu nhưng pool chung chỉ có ${commonCount} câu, cần ${d.neededCommon} câu).`
+                              : ` — sẽ tự bù ${d.shortfall} câu từ pool chung (đủ khả thi).`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Điểm đạt tối thiểu (%)</label>
                   <input required type="number" min="0" max="100" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
@@ -222,7 +328,8 @@ export const ExamProposalTab = () => {
               <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
                 Hủy
               </button>
-              <button type="submit" form="createExamForm" className="px-4 py-2 bg-[#008BC5] hover:bg-sky-600 text-white rounded-lg font-medium transition-colors">
+              <button type="submit" form="createExamForm" disabled={hasBlockingError}
+                className="px-4 py-2 bg-[#008BC5] hover:bg-sky-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#008BC5]">
                 Lưu đề xuất
               </button>
             </div>

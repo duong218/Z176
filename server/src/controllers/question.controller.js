@@ -154,6 +154,30 @@ export const remove = asyncHandler(async (req, res) => {
   });
 });
 
+export const bulkRemove = asyncHandler(async (req, res) => {
+  const { ids, filters } = req.body ?? {};
+  const data = await questionService.deactivateManyQuestions({ ids, filters }, req.auth.userId, clientIp(req));
+
+  await writeAudit({
+    actorUserId: req.auth.userId,
+    action: 'BULK_DELETE_QUESTIONS',
+    resourceType: 'Question',
+    metadata: { detail: `Xóa hàng loạt câu hỏi (${data.deactivatedCount} câu)` },
+    ipAddress: clientIp(req),
+  });
+  res.json({
+    success: true,
+    message: `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi`,
+    code: 'QUESTION_BULK_DEACTIVATED',
+    data,
+  });
+});
+
+export const getStatsByTopic = asyncHandler(async (req, res) => {
+  const data = await questionService.getQuestionStatsByTopic(req.params.topicId);
+  res.json({ success: true, message: 'OK', code: 'QUESTION_STATS_OK', data });
+});
+
 export const importExcel = asyncHandler(async (req, res) => {
   if (!req.file?.path) {
     throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');

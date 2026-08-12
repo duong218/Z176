@@ -61,6 +61,15 @@ export async function importQuestions(file) {
   return res.data;
 }
 
+export async function bulkDeleteQuestions({ ids, filters }) {
+  const res = await apiRequest('/questions/bulk-delete', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ids, filters }),
+  });
+  return res.data;
+}
+
 export async function fetchTopics() {
   const res = await apiRequest('/topics', {
     headers: getAuthHeaders(),
@@ -122,6 +131,13 @@ export async function updateDepartment(id, payload) {
 export async function deleteDepartment(id) {
   const res = await apiRequest(`/departments/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
+export async function fetchQuestionStatsByTopic(topicId) {
+  const res = await apiRequest(`/questions/stats/by-topic/${topicId}`, {
     headers: getAuthHeaders(),
   });
   return res.data;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions } from '../../services/examiner.service';
+import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions } from '../../services/examiner.service';
 
 export const QuestionBankTab = ({ initialFilter } = {}) => {
   const [questions, setQuestions] = useState([]);
@@ -18,6 +18,10 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
   const [selectedAnswerType, setSelectedAnswerType] = useState('');
+
+  // Chọn nhiều câu hỏi (checkbox) để xóa hàng loạt. Reset mỗi khi đổi trang/
+  // bộ lọc để tránh giữ id của câu hỏi không còn hiển thị trên màn hình.
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -72,6 +76,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   };
 
   useEffect(() => {
+    setSelectedIds([]);
     loadData(1);
   }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType]);
 
@@ -223,6 +228,71 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     }
   };
 
+  const toggleSelectId = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const allOnPageSelected = questions.length > 0 && questions.every((q) => selectedIds.includes(q.id));
+
+  const toggleSelectAllOnPage = () => {
+    if (allOnPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !questions.some((q) => q.id === id)));
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...questions.map((q) => q.id)])]);
+    }
+  };
+
+  const handleBulkDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng ${selectedIds.length} câu hỏi đã chọn?`)) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await bulkDeleteQuestions({ ids: selectedIds });
+      setSelectedIds([]);
+      await loadData(1);
+      alert(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi.`);
+    } catch (err) {
+      setError(err.message || 'Lỗi khi xóa hàng loạt câu hỏi');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Xóa TOÀN BỘ câu hỏi khớp đúng bộ lọc đang áp dụng trên UI (không giới
+  // hạn theo trang hiện tại) — tiện cho việc dọn dữ liệu test/trùng lặp.
+  // Backend sẽ tự chặn nếu chưa chọn bộ lọc cụ thể nào (tránh xóa nhầm toàn
+  // bộ ngân hàng câu hỏi).
+  const handleDeleteAllByFilter = async () => {
+    const hasFilter = selectedTopic || selectedScope || selectedDept || selectedDifficulty || selectedAnswerType || search.trim();
+    if (!hasFilter) {
+      alert('Vui lòng chọn ít nhất 1 bộ lọc (chủ đề, phạm vi, bộ phận, độ khó, hình thức đáp án hoặc từ khóa tìm kiếm) trước khi xóa tất cả, để tránh xóa nhầm toàn bộ ngân hàng câu hỏi.');
+      return;
+    }
+    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng TẤT CẢ ${pagination.total} câu hỏi đang khớp bộ lọc hiện tại (không chỉ trang này)? Hành động này áp dụng cho toàn bộ kết quả lọc, không thể hoàn tác qua giao diện.`)) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await bulkDeleteQuestions({
+        filters: {
+          topicId: selectedTopic,
+          scope: selectedScope,
+          departmentId: selectedDept,
+          difficulty: selectedDifficulty,
+          answerType: selectedAnswerType,
+          search,
+        },
+      });
+      setSelectedIds([]);
+      await loadData(1);
+      alert(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc.`);
+    } catch (err) {
+      setError(err.message || 'Lỗi khi xóa tất cả theo bộ lọc');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleImportSubmit = async (e) => {
     e.preventDefault();
     if (!importFile) return;
@@ -341,6 +411,42 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
         </div>
       </div>
 
+      {/* Bulk actions bar */}
+      {questions.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <button
+            type="button"
+            onClick={toggleSelectAllOnPage}
+            className="flex items-center gap-2 text-slate-600 hover:text-[#008BC5] font-medium"
+          >
+            {allOnPageSelected ? <CheckSquare className="w-4 h-4 text-[#008BC5]" /> : <Square className="w-4 h-4" />}
+            {allOnPageSelected ? 'Bỏ chọn tất cả trang này' : 'Chọn tất cả trang này'}
+            {selectedIds.length > 0 && <span className="text-slate-400 font-normal">({selectedIds.length} đã chọn)</span>}
+          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleBulkDeleteSelected}
+              disabled={selectedIds.length === 0 || actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              Xóa {selectedIds.length > 0 ? `${selectedIds.length} câu đã chọn` : 'đã chọn'}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteAllByFilter}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Xóa toàn bộ câu hỏi khớp bộ lọc hiện tại, không chỉ trang này"
+            >
+              <Trash2 className="w-4 h-4" />
+              Xóa tất cả theo bộ lọc ({pagination.total})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* List Questions */}
       {loading ? (
         <div className="space-y-4">
@@ -354,9 +460,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       ) : (
         <div className="space-y-4">
           {questions.map((q) => (
-            <div key={q.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition-shadow">
+            <div key={q.id} className={`bg-white p-5 rounded-xl border shadow-sm space-y-4 hover:shadow-md transition-shadow ${selectedIds.includes(q.id) ? 'border-[#008BC5] ring-1 ring-[#008BC5]/30' : 'border-slate-200'}`}>
               <div className="flex justify-between items-start gap-4">
-                <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectId(q.id)}
+                    className="mt-1 shrink-0 text-slate-400 hover:text-[#008BC5]"
+                    title="Chọn câu hỏi này"
+                  >
+                    {selectedIds.includes(q.id) ? <CheckSquare className="w-5 h-5 text-[#008BC5]" /> : <Square className="w-5 h-5" />}
+                  </button>
+                  <div className="space-y-2">
                   <div className="flex flex-wrap gap-2 items-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
                         q.difficulty === 'medium' ? 'bg-blue-100 text-blue-700' :
@@ -372,6 +487,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                     </span>
                   </div>
                   <h4 className="font-bold text-slate-800 text-base leading-snug">{q.content}</h4>
+                  </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button
