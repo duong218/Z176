@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { User, Role, Employee } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import * as auditService from './audit.service.js';
+import { assignEmployeeToActiveExamIfAny } from './exam-code-generation.service.js';
 
 /** Lấy danh sách user kèm thông tin role */
 export async function listUsers() {
@@ -71,6 +72,11 @@ export async function createUser({ adminId, username, roleId, ipAddress, employe
         'EMPLOYEE_CREATE_FAILED',
       );
     }
+
+    // Nếu đang có kỳ thi published, tự động gán nhân viên mới vào đúng mã đề
+    // của phòng ban họ (tạo mã đề mới nếu phòng ban chưa có). KHÔNG chặn việc
+    // tạo tài khoản nếu bước này thất bại — chỉ log cảnh báo phía service.
+    await assignEmployeeToActiveExamIfAny(employee);
   }
 
   // Audit

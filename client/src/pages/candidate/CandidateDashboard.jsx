@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   UserCircle2,
   Building2,
@@ -40,12 +40,25 @@ const SIDEBAR_ITEMS = [
   { id: 'materials', label: 'Tài liệu ôn tập', icon: BookOpen },
 ];
 
-export const CandidateDashboard = ({ currentUser, onOpenExam }) => {
+export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [results, setResults] = useState([]);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // ExamModal được mở/đóng ở App.jsx (dùng chung cho cả trang chủ). Khi modal
+  // vừa chuyển từ mở -> đóng (thí sinh vừa thi xong hoặc huỷ), tự fetch lại
+  // kết quả — nếu không, Dashboard sẽ hiển thị số liệu cũ dù backend đã có
+  // Result mới (đây chính là bug đã gặp: nộp bài xong nhưng dashboard không đổi).
+  const prevExamModalOpenRef = useRef(examModalOpen);
+  useEffect(() => {
+    if (prevExamModalOpenRef.current && !examModalOpen) {
+      setRefreshTick((t) => t + 1);
+    }
+    prevExamModalOpenRef.current = examModalOpen;
+  }, [examModalOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +83,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam }) => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   const totalAttempts = results.length;
   const bestResult = results.reduce((best, r) => {

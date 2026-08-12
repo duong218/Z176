@@ -195,7 +195,7 @@ export default function App() {
         ) : activeTab === 'leader-dashboard' && currentUser?.roleCode === 'leader' ? (
           <LeaderDashboard onLogout={handleLogout} />
         ) : activeTab === 'candidate-dashboard' && currentUser?.roleCode === 'candidate' ? (
-          <CandidateDashboard currentUser={currentUser} onOpenExam={handleOpenExam} />
+          <CandidateDashboard currentUser={currentUser} onOpenExam={handleOpenExam} examModalOpen={isExamOpen} />
         ) : (
           <>
             {/* 2. Banner giới thiệu cuộc thi */}
