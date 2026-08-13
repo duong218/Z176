@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Result } from '../models/result.model.js';
 import { Employee } from '../models/employee.model.js';
 
@@ -52,12 +53,63 @@ const getBasePipeline = () => [
     },
   },
   { $unwind: '$exam' },
+  // Bài thi (exam) gắn với 1 chủ đề (topic). Nếu exam của bạn không có field
+  // `topicId`, sửa lại `localField` bên dưới cho đúng schema thực tế.
+  {
+    $lookup: {
+      from: 'topics',
+      localField: 'exam.topicId',
+      foreignField: '_id',
+      as: 'topic',
+    },
+  },
+  {
+    $unwind: { path: '$topic', preserveNullAndEmptyArrays: true },
+  },
 ];
 
 // Escape ký tự đặc biệt regex trước khi đưa vào $regex — tránh regex injection
 // từ input người dùng nhập ở ô tra cứu public.
 function escapeRegex(str) {
   return String(str ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ============ Excel styling helpers (ExcelJS) ============
+const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF008BC5' } };
+const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+const THIN_BORDER = {
+  top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+  left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+  bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+  right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+};
+
+function styleHeaderRow(row) {
+  row.eachCell((cell) => {
+    cell.fill = HEADER_FILL;
+    cell.font = HEADER_FONT;
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = THIN_BORDER;
+  });
+  row.height = 24;
+}
+
+function styleDataRow(row, { centerCols = [], passedCol = null, passedValue = null } = {}) {
+  row.eachCell((cell, colNumber) => {
+    cell.border = THIN_BORDER;
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: centerCols.includes(colNumber) ? 'center' : 'left',
+    };
+  });
+  if (passedCol) {
+    const cell = row.getCell(passedCol);
+    if (passedValue === true || passedValue === 'Đạt') {
+      cell.font = { color: { argb: 'FF15803D' }, bold: true };
+    } else if (passedValue === false || passedValue === 'Không đạt') {
+      cell.font = { color: { argb: 'FFDC2626' }, bold: true };
+    }
+  }
 }
 
 export const reportService = {
@@ -136,6 +188,55 @@ export const reportService = {
         },
       },
       { $sort: { departmentName: 1 } },
+    ];
+
+    const results = await Result.aggregate(pipeline);
+    return results.map(r => ({
+      ...r,
+      passRate: Number(r.passRate.toFixed(2)),
+      avgScore: Number(r.avgScore.toFixed(2)),
+    }));
+  },
+
+  /**
+   * MỚI — Thống kê kết quả thi theo Bài thi (exam), kèm tên Chủ đề (topic) mà
+   * bài thi đó thuộc về. Cùng dạng dữ liệu như getResultsByDepartment() để FE
+   * dùng chung 1 kiểu bảng.
+   */
+  async getResultsByExam() {
+    const pipeline = [
+      ...getBasePipeline(),
+      {
+        $group: {
+          _id: '$exam._id',
+          examTitle: { $first: '$exam.title' },
+          topicName: { $first: '$topic.name' },
+          totalSubmissions: { $sum: 1 },
+          passedCount: { $sum: { $cond: ['$passed', 1, 0] } },
+          avgScore: { $avg: '$score' },
+          uniqueCandidates: { $addToSet: '$employee._id' },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          examTitle: 1,
+          topicName: { $ifNull: ['$topicName', 'Chưa gán chủ đề'] },
+          totalSubmissions: 1,
+          totalCandidates: { $size: '$uniqueCandidates' },
+          passedCount: 1,
+          failedCount: { $subtract: ['$totalSubmissions', '$passedCount'] },
+          passRate: {
+            $cond: [
+              { $gt: ['$totalSubmissions', 0] },
+              { $multiply: [{ $divide: ['$passedCount', '$totalSubmissions'] }, 100] },
+              0,
+            ],
+          },
+          avgScore: 1,
+        },
+      },
+      { $sort: { examTitle: 1 } },
     ];
 
     const results = await Result.aggregate(pipeline);
@@ -333,6 +434,88 @@ export const reportService = {
     xlsx.utils.book_append_sheet(workbook, worksheet, 'Ket_qua_thi');
 
     return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  },
+
+  /**
+   * MỚI — Xuất Excel danh sách kết quả thi theo Bài thi (exam/topic), định
+   * dạng đẹp bằng ExcelJS: header có màu nền + chữ trắng đậm, border cho toàn
+   * bảng, đóng băng dòng tiêu đề, tô màu xanh/đỏ cho cột "Đạt/Không đạt",
+   * auto-width cột.
+   *
+   * Có 2 sheet:
+   *  - "Tong_hop": số liệu tổng hợp theo từng bài thi (giống bảng hiển thị FE)
+   *  - "Chi_tiet": danh sách từng lượt thi, group theo bài thi
+   */
+  async exportResultsByExamExcel() {
+    const summary = await this.getResultsByExam();
+
+    const pipeline = [...getBasePipeline(), { $sort: { 'exam.title': 1, createdAt: -1 } }];
+    const detail = await Result.aggregate(pipeline);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Z176 - He thong thi noi bo';
+    workbook.created = new Date();
+
+    // ---------- Sheet 1: Tổng hợp theo bài thi ----------
+    const sumSheet = workbook.addWorksheet('Tong_hop', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    sumSheet.columns = [
+      { header: 'Bài thi', key: 'examTitle', width: 32 },
+      { header: 'Chủ đề', key: 'topicName', width: 24 },
+      { header: 'Số thí sinh', key: 'totalCandidates', width: 12 },
+      { header: 'Số lượt nộp', key: 'totalSubmissions', width: 12 },
+      { header: 'Đạt', key: 'passedCount', width: 10 },
+      { header: 'Không đạt', key: 'failedCount', width: 12 },
+      { header: 'Tỷ lệ Đạt (%)', key: 'passRate', width: 14 },
+      { header: 'Điểm TB', key: 'avgScore', width: 12 },
+    ];
+    styleHeaderRow(sumSheet.getRow(1));
+    summary.forEach((item) => {
+      const row = sumSheet.addRow(item);
+      styleDataRow(row, { centerCols: [3, 4, 5, 6, 7, 8] });
+      row.getCell('passedCount').font = { color: { argb: 'FF15803D' }, bold: true };
+      row.getCell('failedCount').font = { color: { argb: 'FFDC2626' }, bold: true };
+    });
+    sumSheet.autoFilter = { from: 'A1', to: `H${summary.length + 1}` };
+
+    // ---------- Sheet 2: Chi tiết từng lượt thi ----------
+    const detailSheet = workbook.addWorksheet('Chi_tiet', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    detailSheet.columns = [
+      { header: 'STT', key: 'stt', width: 6 },
+      { header: 'Bài thi', key: 'examTitle', width: 30 },
+      { header: 'Chủ đề', key: 'topicName', width: 22 },
+      { header: 'Họ và tên', key: 'fullname', width: 25 },
+      { header: 'Phòng ban', key: 'departmentName', width: 20 },
+      { header: 'Điểm', key: 'score', width: 10 },
+      { header: 'Kết quả', key: 'passedText', width: 14 },
+      { header: 'Ngày nộp', key: 'submittedAt', width: 20 },
+    ];
+    styleHeaderRow(detailSheet.getRow(1));
+    detail.forEach((item, index) => {
+      const row = detailSheet.addRow({
+        stt: index + 1,
+        examTitle: item.exam.title,
+        topicName: item.topic?.name || 'Chưa gán chủ đề',
+        fullname: item.employee.fullname,
+        departmentName: item.department.name,
+        score: item.score,
+        passedText: item.passed ? 'Đạt' : 'Không đạt',
+        submittedAt: item.attempt.submittedAt
+          ? new Date(item.attempt.submittedAt).toLocaleString('vi-VN')
+          : '',
+      });
+      styleDataRow(row, {
+        centerCols: [1, 6, 7, 8],
+        passedCol: 7,
+        passedValue: item.passed,
+      });
+    });
+    detailSheet.autoFilter = { from: 'A1', to: `H${detail.length + 1}` };
+
+    return workbook.xlsx.writeBuffer();
   },
 
   /**

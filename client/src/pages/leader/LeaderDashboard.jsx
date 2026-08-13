@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { LayoutDashboard, Building2, FileBarChart, PieChart, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, Building2, FileBarChart, PieChart, CheckCircle, BookOpen } from 'lucide-react';
 import { OverviewTab } from '../../components/leader/OverviewTab';
 import { DepartmentReportTab } from '../../components/leader/DepartmentReportTab';
+import { ExamReportTab } from '../../components/leader/ExamReportTab';
 import { DetailedResultsTab } from '../../components/leader/DetailedResultsTab';
 import { ExamReviewTab } from '../../components/leader/ExamReviewTab';
 
@@ -11,6 +12,7 @@ export const LeaderDashboard = () => {
   const tabs = [
     { id: 'overview', label: 'Tổng quan', icon: <PieChart className="w-5 h-5" /> },
     { id: 'department', label: 'Theo phòng ban', icon: <Building2 className="w-5 h-5" /> },
+    { id: 'exam', label: 'Theo bài thi', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'detailed', label: 'Kết quả chi tiết', icon: <FileBarChart className="w-5 h-5" /> },
     { id: 'review', label: 'Duyệt kỳ thi', icon: <CheckCircle className="w-5 h-5" /> },
   ];
@@ -51,6 +53,7 @@ export const LeaderDashboard = () => {
         <div className="p-6 bg-slate-800 text-slate-300">
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'department' && <DepartmentReportTab />}
+          {activeTab === 'exam' && <ExamReportTab />}
           {activeTab === 'detailed' && <DetailedResultsTab />}
           {activeTab === 'review' && <ExamReviewTab />}
         </div>
@@ -58,4 +61,3 @@ export const LeaderDashboard = () => {
     </div>
   );
 };
-

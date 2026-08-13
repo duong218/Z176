@@ -21,7 +21,9 @@ router.use(authenticate, requireRoleCodes('leader', 'admin'));
 
 router.get('/overview', reportController.getOverviewStats);
 router.get('/by-department', reportController.getResultsByDepartment);
+router.get('/by-exam', reportController.getResultsByExam);
 router.get('/results', reportController.getDetailedResults);
 router.get('/export', reportController.exportDetailedResultsExcel);
+router.get('/export-by-exam', reportController.exportResultsByExamExcel);
 
 export const reportRoutes = router;

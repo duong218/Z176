@@ -18,6 +18,15 @@ export const reportController = {
     });
   }),
 
+  // MỚI — Thống kê kết quả thi theo Bài thi (exam/topic).
+  getResultsByExam: asyncHandler(async (req, res) => {
+    const data = await reportService.getResultsByExam();
+    res.json({
+      success: true,
+      data,
+    });
+  }),
+
   // PUBLIC — trang chủ, không đăng nhập. Chỉ tên phòng ban + tỷ lệ đạt.
   getPublicResultsByDepartment: asyncHandler(async (req, res) => {
     const data = await reportService.getPublicResultsByDepartment();
@@ -70,6 +79,21 @@ export const reportController = {
     res.setHeader(
       'Content-Disposition',
       'attachment; filename="ket_qua_thi.xlsx"'
+    );
+    res.send(buffer);
+  }),
+
+  // MỚI — Xuất Excel thống kê + chi tiết kết quả thi theo Bài thi (exam/topic).
+  exportResultsByExamExcel: asyncHandler(async (req, res) => {
+    const buffer = await reportService.exportResultsByExamExcel();
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="ket_qua_thi_theo_bai_thi.xlsx"'
     );
     res.send(buffer);
   }),
