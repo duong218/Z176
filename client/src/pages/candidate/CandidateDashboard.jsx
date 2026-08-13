@@ -14,6 +14,16 @@ import {
   Clock,
   ShieldCheck,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { fetchMyResults } from '../../services/report.service';
 
 const formatDateTime = (value) => {
@@ -234,6 +244,68 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     </div>
                   </div>
                 </div>
+
+                {/* MỚI — Biểu đồ điểm số qua các lần thi, giúp thí sinh thấy
+                    ngay xu hướng kết quả của mình thay vì phải mở tab "Lịch
+                    sử kết quả" và tự đọc bảng. Sắp xếp theo thời gian nộp bài
+                    tăng dần (cũ → mới, trái → phải) để đọc như 1 dòng thời
+                    gian. Cột tô màu theo đúng 2 màu semantic Đạt/Không đạt. */}
+                {results.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-6">
+                    <h2 className="text-lg font-bold text-[#0F172A] mb-1 flex items-center gap-2">
+                      <History className="w-5 h-5 text-[#008BC5]" />
+                      Điểm số qua các lần thi
+                    </h2>
+                    <p className="text-sm text-slate-500 mb-4">Sắp xếp theo thời gian, từ lần thi cũ nhất đến gần nhất</p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={[...results]
+                            .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
+                            .map((r) => ({
+                              label: r.examTitle,
+                              score: r.score,
+                              passed: r.passed,
+                              submittedAt: formatDateTime(r.submittedAt),
+                            }))}
+                          margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                          <XAxis
+                            dataKey="label"
+                            tick={{ fill: '#334155', fontSize: 12 }}
+                            axisLine={{ stroke: '#E2E8F0' }}
+                            tickLine={false}
+                            interval={0}
+                            angle={-15}
+                            textAnchor="end"
+                            height={50}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            tick={{ fill: '#334155', fontSize: 13 }}
+                            axisLine={{ stroke: '#E2E8F0' }}
+                            tickLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}
+                            formatter={(value, _name, props) => [
+                              `${value} điểm — ${props?.payload?.passed ? 'Đạt' : 'Không đạt'}`,
+                              props?.payload?.submittedAt,
+                            ]}
+                          />
+                          <Bar dataKey="score" name="Điểm" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                            {[...results]
+                              .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
+                              .map((r, index) => (
+                                <Cell key={index} fill={r.passed ? '#22C55E' : '#E53E3E'} />
+                              ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
 
                 {/* Lối tắt vào thi ngay từ Dashboard */}
                 <div className="bg-[#0F172A] rounded-xl shadow-z176 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

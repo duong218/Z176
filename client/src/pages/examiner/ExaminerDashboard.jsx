@@ -3,10 +3,11 @@ import { QuestionBankTab } from '../../components/examiner/QuestionBankTab';
 import { TopicTab } from '../../components/examiner/TopicTab';
 import { DepartmentTab } from '../../components/examiner/DepartmentTab';
 import { ExamProposalTab } from '../../components/examiner/ExamProposalTab';
-import { BookOpen, FolderOpen, Building, FileSignature } from 'lucide-react';
+import { OverviewTab } from '../../components/examiner/OverviewTab';
+import { LayoutDashboard, BookOpen, FolderOpen, Building, FileSignature } from 'lucide-react';
 
 export const ExaminerDashboard = () => {
-  const [activeTab, setActiveTab] = useState('questions');
+  const [activeTab, setActiveTab] = useState('overview');
   // Khi bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở tab Chủ đề, lưu topicId + mốc
   // thời gian (seed) vào đây rồi chuyển sang tab Ngân hàng câu hỏi. Kèm seed
   // để nếu người dùng bấm lại đúng chủ đề cũ lần nữa, QuestionBankTab vẫn
@@ -20,6 +21,7 @@ export const ExaminerDashboard = () => {
   };
 
   const tabs = [
+    { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'questions', label: 'Ngân hàng câu hỏi', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'topics', label: 'Chủ đề', icon: <FolderOpen className="w-5 h-5" /> },
     { id: 'departments', label: 'Bộ phận / Phòng ban', icon: <Building className="w-5 h-5" /> },
@@ -54,6 +56,7 @@ export const ExaminerDashboard = () => {
 
         {/* Tab Content */}
         <div className="p-4 md:p-6 bg-slate-50/50 min-h-[400px]">
+          {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'questions' && <QuestionBankTab initialFilter={questionsFilterSeed} />}
           {activeTab === 'topics' && <TopicTab onViewQuestions={handleViewQuestionsByTopic} />}
           {activeTab === 'departments' && <DepartmentTab />}

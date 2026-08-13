@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Users, Shield, FileCheck, ClipboardList, GraduationCap, Cloud, Loader2, CheckCircle, ServerCrash } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { fetchOverviewStats, triggerBackup } from '../../services/admin.service';
 
 const ROLE_META = {
@@ -15,6 +25,12 @@ const COLOR_CLASSES = {
   amber: 'bg-amber-100 text-amber-600',
   green: 'bg-[#22C55E]/10 text-[#22C55E]',
 };
+
+// Bảng màu dùng cho cột biểu đồ — giữ đúng 5 màu chức năng của design-system.md,
+// không thêm màu trang trí ngoài hệ thống (tím ở đây chỉ để phân biệt role admin
+// trên card, không phải màu chức năng — trên biểu đồ dùng lại xanh chính làm
+// màu cột duy nhất để tránh việc mỗi cột 1 màu gây rối mắt với người 30–60 tuổi).
+const CHART_BAR_COLOR = '#008BC5';
 
 export const OverviewTab = () => {
   const [stats, setStats] = useState(null);
@@ -84,6 +100,9 @@ export const OverviewTab = () => {
     ...meta,
     count: stats.usersByRole?.[code] || 0,
   }));
+
+  const chartData = roleEntries.map((r) => ({ label: r.label, count: r.count }));
+  const hasUsers = stats.totalUsers > 0;
 
   const activeExam = stats.activeExam;
 
@@ -179,6 +198,46 @@ export const OverviewTab = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* MỚI — Biểu đồ cột phân bổ tài khoản theo vai trò, trực quan hóa các
+          con số ở bảng card phía trên. Chỉ 1 màu cột (xanh chính) theo đúng
+          nguyên tắc "càng ít màu càng dễ nhớ" của design-system.md — không tô
+          mỗi cột 1 màu khác nhau. */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <p className="text-sm font-medium text-slate-500 mb-3">Biểu đồ phân bổ tài khoản theo vai trò</p>
+        {!hasUsers ? (
+          <div className="py-10 text-center text-slate-400 text-sm">Chưa có tài khoản nào trong hệ thống.</div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: '#334155', fontSize: 13 }}
+                  axisLine={{ stroke: '#E2E8F0' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: '#334155', fontSize: 13 }}
+                  axisLine={{ stroke: '#E2E8F0' }}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}
+                  formatter={(value) => [`${value} tài khoản`, 'Số lượng']}
+                />
+                <Bar dataKey="count" name="Số tài khoản" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={index} fill={CHART_BAR_COLOR} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     </div>
   );
