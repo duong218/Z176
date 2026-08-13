@@ -59,13 +59,13 @@ export const ResultsLookupSection = () => {
         <form onSubmit={handleSearch} className="bg-slate-50 p-4 rounded-[10px] border border-slate-200 shadow-z176 space-y-3">
           <div>
             <label className="block text-sm font-semibold text-[#0F172A] mb-1">
-              Tìm theo Mã NV hoặc Họ tên:
+              Tìm theo Mã NV-Mã nhân viên hoặc Họ tên:
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
                   type="text"
-                  placeholder="Ví dụ: NV17601 hoặc Nguyễn Văn An"
+                  placeholder="NV-17601 hoặc Nguyễn Văn An"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full min-h-[48px] pl-10 pr-3 bg-white border border-slate-300 rounded-lg text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#008BC5]"

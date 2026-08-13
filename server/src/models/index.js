@@ -10,6 +10,7 @@ export { ExamCode } from './exam-code.model.js';
 export { ExamCodeQuestion } from './exam-code-question.model.js';
 export { ExamCandidate } from './exam-candidate.model.js';
 export { ExamAttempt } from './exam-attempt.model.js';
+export { AttemptQuestion } from './attempt-question.model.js';
 export { CandidateAnswer } from './candidate-answer.model.js';
 export { Result } from './result.model.js';
 export { StudyDocument } from './study-document.model.js';

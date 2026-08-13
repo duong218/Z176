@@ -1,5 +1,5 @@
 export const Z176_COMPANY_INFO = {
-  name: 'CÔNG TY TNHH MTV 176 - BỘ QUỐC PHÒNG',
+  name: 'CÔNG TY TNHH MTV 76 - BỘ QUỐC PHÒNG',
   shortName: 'Z176',
   badge: 'DOANH NGHIỆP BỘ QUỐC PHÒNG',
   contestTitle: 'HỆ THỐNG THI TRẮC NGHIỆM CHUYÊN MÔN DÀNH CHO CÁN BỘ, CÔNG NHÂN VIÊN',

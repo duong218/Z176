@@ -17,6 +17,7 @@ import { Footer } from './components/Footer';
 import { LoginModal } from './components/LoginModal';
 import { ExamModal } from './components/ExamModal';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
+import { fetchMyExam } from './services/exam-attempt.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
 import { LeaderDashboard } from './pages/leader/LeaderDashboard';
@@ -53,6 +54,30 @@ export default function App() {
       })
       .finally(() => setAuthLoading(false));
   }, []);
+
+  // Tự động mở lại ExamModal nếu tài khoản đang có lượt thi dở dang (vd sau khi
+  // F5/tải lại trang giữa chừng lúc đang làm bài). Chỉ kiểm tra 1 lần sau khi
+  // đã xác định được currentUser (tránh gọi khi chưa biết trạng thái đăng nhập).
+  // Không ảnh hưởng tới luồng bắt đầu thi bình thường — chỉ tự mở modal, việc
+  // lấy đúng câu hỏi/đáp án đã xáo vẫn do ExamModal tự xử lý như cũ.
+  useEffect(() => {
+    if (authLoading || !currentUser || currentUser.roleCode !== 'candidate') return;
+
+    let cancelled = false;
+    fetchMyExam()
+      .then((data) => {
+        if (!cancelled && data?.attempt) {
+          setIsExamOpen(true);
+        }
+      })
+      .catch(() => {
+        /* không có kỳ thi active / chưa gán đề — bỏ qua, không cần báo lỗi ở đây */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, currentUser]);
 
   const [activeExam, setActiveExam] = useState(null);
 

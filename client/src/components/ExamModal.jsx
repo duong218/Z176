@@ -18,6 +18,40 @@ import { Z176_COMPANY_INFO } from '../data';
 import { fetchMyResults } from '../services/report.service';
 import { fetchMyExam, startExamAttempt, submitExamAttempt } from '../services/exam-attempt.service';
 
+// ── Lưu tạm tiến trình đang làm dở vào localStorage ─────────────────────────
+// Chỉ để tránh mất lựa chọn khi reload trang giữa chừng — điểm số/chấm điểm
+// thật vẫn luôn do backend quyết định lúc nộp bài (submitExamAttempt), dữ liệu
+// này KHÔNG được tin tưởng để tính điểm, chỉ để khôi phục lại UI.
+const draftKey = (attemptId) => `z176_exam_draft_${attemptId}`;
+
+function loadDraftAnswers(attemptId) {
+  if (!attemptId) return {};
+  try {
+    const raw = localStorage.getItem(draftKey(attemptId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraftAnswers(attemptId, answers) {
+  if (!attemptId) return;
+  try {
+    localStorage.setItem(draftKey(attemptId), JSON.stringify(answers));
+  } catch {
+    /* localStorage đầy/bị chặn — bỏ qua, không chặn luồng làm bài */
+  }
+}
+
+function clearDraftAnswers(attemptId) {
+  if (!attemptId) return;
+  try {
+    localStorage.removeItem(draftKey(attemptId));
+  } catch {
+    /* ignore */
+  }
+}
+
 export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   // step: 'loading' | 'confirm' | 'testing' | 'submitting' | 'result' | 'error'
   const [step, setStep] = useState('loading');
@@ -93,6 +127,13 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
       const data = await startExamAttempt();
       setAttemptId(data.attemptId);
       setExpiresAt(new Date(data.expiresAt));
+
+      // Lấy lại đề thi ngay sau khi bắt đầu/tiếp tục lượt thi — lúc này backend
+      // đã có attempt "in_progress" nên trả về đúng bộ câu/đáp án đã xáo riêng
+      // cho lượt thi này, thay vì bản preview mặc định (chưa xáo) lúc xác nhận.
+      const freshExamData = await fetchMyExam();
+      setExamData(freshExamData);
+
       setStep('testing');
     } catch (err) {
       setSubmitError(err?.message || 'Không thể bắt đầu lượt thi.');
@@ -112,6 +153,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
 
     try {
       const data = await submitExamAttempt(attemptId, answers);
+      clearDraftAnswers(attemptId);
       setResultData(data);
       setStep('result');
     } catch (err) {
@@ -139,6 +181,16 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
     return () => clearInterval(timer);
   }, [step, expiresAt, handleFinishExam]);
 
+  // Khôi phục lựa chọn đã lưu tạm (nếu có) ngay khi biết attemptId — chạy cho
+  // cả trường hợp vừa bắt đầu (trống) lẫn resume sau F5 (có dữ liệu cũ).
+  useEffect(() => {
+    if (!attemptId) return;
+    const draft = loadDraftAnswers(attemptId);
+    if (Object.keys(draft).length > 0) {
+      setSelectedAnswers(draft);
+    }
+  }, [attemptId]);
+
   if (!isOpen) return null;
 
   const formatTimer = (seconds) => {
@@ -155,13 +207,15 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const handleSelectOption = (question, optionId) => {
     setSelectedAnswers((prev) => {
       const prevSelected = prev[question.id] || [];
-      if (question.answerType === 'multiple') {
-        const next = prevSelected.includes(optionId)
-          ? prevSelected.filter((id) => id !== optionId)
-          : [...prevSelected, optionId];
-        return { ...prev, [question.id]: next };
-      }
-      return { ...prev, [question.id]: [optionId] };
+      const next =
+        question.answerType === 'multiple'
+          ? prevSelected.includes(optionId)
+            ? prevSelected.filter((id) => id !== optionId)
+            : [...prevSelected, optionId]
+          : [optionId];
+      const updated = { ...prev, [question.id]: next };
+      saveDraftAnswers(attemptId, updated);
+      return updated;
     });
   };
 

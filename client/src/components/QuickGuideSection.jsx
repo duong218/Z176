@@ -5,7 +5,7 @@ export const QuickGuideSection = ({ onStartExam }) => {
     {
       number: '1',
       title: 'Đăng nhập',
-      desc: 'Nhập Mã nhân viên (trên thẻ công nhân), Họ tên và chọn Xưởng/Phòng làm việc.',
+      desc: 'Nhập Mã nhân viên (trên thẻ công nhân) và mật khẩu do ban tổ chức cấp .',
       icon: UserCheck,
       color: 'bg-blue-50 border-blue-200 text-[#008BC5]',
       badgeBg: 'bg-[#008BC5] text-white',
@@ -13,7 +13,7 @@ export const QuickGuideSection = ({ onStartExam }) => {
     {
       number: '2',
       title: 'Chọn đề',
-      desc: 'Xác nhận thông tin cá nhân và bấm bắt đầu bài thi An toàn - BHLĐ.',
+      desc: 'Xác nhận thông tin cá nhân và bấm bắt đầu bài thi theo chủ đề đã được ban tổ chức .',
       icon: ListChecks,
       color: 'bg-indigo-50 border-indigo-200 text-indigo-600',
       badgeBg: 'bg-indigo-600 text-white',
