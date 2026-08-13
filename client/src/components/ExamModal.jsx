@@ -16,12 +16,22 @@ import {
 } from 'lucide-react';
 import { Z176_COMPANY_INFO } from '../data';
 import { fetchMyResults } from '../services/report.service';
-import { fetchMyExam, startExamAttempt, submitExamAttempt } from '../services/exam-attempt.service';
+import {
+  fetchMyExam,
+  startExamAttempt,
+  submitExamAttempt,
+  answerExamQuestion,
+  sendExamHeartbeat,
+} from '../services/exam-attempt.service';
 
 // ── Lưu tạm tiến trình đang làm dở vào localStorage ─────────────────────────
-// Chỉ để tránh mất lựa chọn khi reload trang giữa chừng — điểm số/chấm điểm
-// thật vẫn luôn do backend quyết định lúc nộp bài (submitExamAttempt), dữ liệu
-// này KHÔNG được tin tưởng để tính điểm, chỉ để khôi phục lại UI.
+// Chỉ để tránh mất lựa chọn khi reload trang giữa chừng TRÊN CÙNG THIẾT BỊ.
+// Điểm số/chấm điểm thật vẫn luôn do backend quyết định lúc nộp bài
+// (submitExamAttempt), dữ liệu này KHÔNG được tin tưởng để tính điểm.
+//
+// Nguồn sự thật để KHÔI PHỤC lựa chọn khi mở lại (kể cả từ thiết bị khác) là
+// `savedAnswers` server trả về trong fetchMyExam() — localStorage chỉ là lớp
+// dự phòng cho trường hợp offline tạm thời trước khi autosave kịp gửi lên.
 const draftKey = (attemptId) => `z176_exam_draft_${attemptId}`;
 
 function loadDraftAnswers(attemptId) {
@@ -52,8 +62,25 @@ function clearDraftAnswers(attemptId) {
   }
 }
 
+/** Chuyển savedAnswers dạng mảng [{questionId, selectedAnswerIds}] từ server
+ * thành object { [questionId]: string[] } để khớp với state selectedAnswers. */
+function savedAnswersToMap(savedAnswers) {
+  const map = {};
+  for (const item of savedAnswers ?? []) {
+    if (!item?.questionId) continue;
+    map[item.questionId] = Array.isArray(item.selectedAnswerIds) ? item.selectedAnswerIds : [];
+  }
+  return map;
+}
+
+// Client heartbeat mỗi 15s trong khi tab đang hiển thị — backend tính timeout
+// dựa trên lastActiveAt (mốc server nhận request gần nhất), không phải đồng hồ
+// client, nên khoảng heartbeat này chỉ cần đủ dày để phát hiện sớm, không cần
+// chính xác tuyệt đối.
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
 export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
-  // step: 'loading' | 'confirm' | 'testing' | 'submitting' | 'result' | 'error'
+  // step: 'loading' | 'confirm' | 'testing' | 'submitting' | 'result' | 'auto-submitted' | 'error'
   const [step, setStep] = useState('loading');
   const [loadError, setLoadError] = useState(null);
 
@@ -79,6 +106,9 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const [resultData, setResultData] = useState(null);
 
   const finishingRef = useRef(false);
+  // Giữ attemptId mới nhất trong ref để heartbeat/interval luôn đọc đúng giá
+  // trị hiện tại mà không phải dựng lại interval mỗi lần state đổi.
+  const attemptIdRef = useRef(null);
 
   // ── Tải dữ liệu khi mở modal ─────────────────────────────
   useEffect(() => {
@@ -103,6 +133,16 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         if (cancelled) return;
         setEmployee(resultsData?.employee ?? null);
         setExamData(exam);
+
+        // Nếu đang có lượt thi dở (resume, kể cả từ thiết bị/trình duyệt khác),
+        // khôi phục ngay đáp án đã autosave trên server — đây là nguồn sự thật,
+        // không phải localStorage (localStorage chỉ đúng trên đúng thiết bị đó).
+        if (exam?.attempt) {
+          setAttemptId(exam.attempt.id);
+          setExpiresAt(exam.attempt.expiresAt ? new Date(exam.attempt.expiresAt) : null);
+          setSelectedAnswers(savedAnswersToMap(exam.savedAnswers));
+        }
+
         setStep('confirm');
       })
       .catch((err) => {
@@ -131,8 +171,11 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
       // Lấy lại đề thi ngay sau khi bắt đầu/tiếp tục lượt thi — lúc này backend
       // đã có attempt "in_progress" nên trả về đúng bộ câu/đáp án đã xáo riêng
       // cho lượt thi này, thay vì bản preview mặc định (chưa xáo) lúc xác nhận.
+      // Đồng thời trả kèm savedAnswers — nếu là resume (kể cả từ thiết bị
+      // khác) thì đây chính là chỗ khôi phục đúng các lựa chọn đã chọn trước đó.
       const freshExamData = await fetchMyExam();
       setExamData(freshExamData);
+      setSelectedAnswers(savedAnswersToMap(freshExamData?.savedAnswers));
 
       setStep('testing');
     } catch (err) {
@@ -140,7 +183,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
     }
   };
 
-  // ── Nộp bài ─────────────────────────────────────────────
+  // ── Nộp bài (thí sinh tự bấm) ─────────────────────────────
   const handleFinishExam = useCallback(async () => {
     if (!attemptId || finishingRef.current) return;
     finishingRef.current = true;
@@ -181,15 +224,97 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
     return () => clearInterval(timer);
   }, [step, expiresAt, handleFinishExam]);
 
-  // Khôi phục lựa chọn đã lưu tạm (nếu có) ngay khi biết attemptId — chạy cho
-  // cả trường hợp vừa bắt đầu (trống) lẫn resume sau F5 (có dữ liệu cũ).
+  // Khôi phục lựa chọn đã lưu tạm trong localStorage (nếu có) ngay khi biết
+  // attemptId — chỉ dùng làm lớp dự phòng bổ sung cho những câu CHƯA có trong
+  // savedAnswers từ server (vd vừa chọn xong nhưng autosave chưa kịp gửi lên
+  // trước khi F5). Không ghi đè lên đáp án đã có từ server.
   useEffect(() => {
     if (!attemptId) return;
     const draft = loadDraftAnswers(attemptId);
     if (Object.keys(draft).length > 0) {
-      setSelectedAnswers(draft);
+      setSelectedAnswers((prev) => ({ ...draft, ...prev }));
     }
   }, [attemptId]);
+
+  // ── Giữ attemptIdRef đồng bộ với state để interval bên dưới luôn đọc đúng ──
+  useEffect(() => {
+    attemptIdRef.current = attemptId;
+  }, [attemptId]);
+
+  // ── Heartbeat định kỳ trong lúc đang làm bài ─────────────────────────────
+  // Chỉ gửi khi tab đang thực sự hiển thị (document.visibilityState==='visible')
+  // — đúng yêu cầu ban đầu, tránh heartbeat "ma" khi thí sinh đang ở tab khác.
+  // Nếu backend phát hiện đã rời quá 1 phút (autoSubmitReason khác null), coi
+  // như bài đã bị hệ thống tự nộp — dừng làm bài ngay và hiện đúng thông báo.
+  useEffect(() => {
+    if (step !== 'testing' || !attemptId) return;
+
+    let cancelled = false;
+
+    const beat = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const currentAttemptId = attemptIdRef.current;
+      if (!currentAttemptId) return;
+      try {
+        const data = await sendExamHeartbeat(currentAttemptId);
+        if (cancelled) return;
+        if (data?.autoSubmitReason) {
+          clearDraftAnswers(currentAttemptId);
+          setStep('auto-submitted');
+        }
+      } catch {
+        // Lỗi mạng tạm thời khi heartbeat — bỏ qua, thử lại ở lần kế tiếp,
+        // không làm gián đoạn bài thi vì 1 lần heartbeat lỡ nhịp.
+      }
+    };
+
+    // Gửi ngay 1 lần khi vào testing (không đợi đủ 15s đầu tiên), và mỗi khi
+    // tab quay lại hiển thị — để bắt kịp trường hợp thí sinh rời tab >1 phút
+    // rồi quay lại ngay, thay vì phải đợi tới chu kỳ interval kế tiếp.
+    beat();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') beat();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const timer = setInterval(beat, HEARTBEAT_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [step, attemptId]);
+
+  // ── Autosave 1 câu trả lời lên server, không chặn UI (fire-and-forget) ───
+  const answerRequestSeqRef = useRef(0);
+  const autosaveAnswer = useCallback(
+    async (questionId, selectedAnswerIds) => {
+      const currentAttemptId = attemptIdRef.current;
+      if (!currentAttemptId) return;
+      const seq = ++answerRequestSeqRef.current;
+      try {
+        const data = await answerExamQuestion(currentAttemptId, questionId, selectedAnswerIds);
+        // Nếu có request answer khác đã chạy sau request này, bỏ qua kết quả
+        // cũ để tránh xử lý autoSubmit trùng/lệch thứ tự.
+        if (seq !== answerRequestSeqRef.current) return;
+        if (data?.autoSubmitReason) {
+          clearDraftAnswers(currentAttemptId);
+          setStep('auto-submitted');
+        }
+      } catch (err) {
+        // Backend trả lỗi ATTEMPT_INVALID_STATUS nếu lượt thi vừa bị tự nộp
+        // ngay giữa lúc client đang gửi câu trả lời — coi như đã tự nộp.
+        if (err?.code === 'ATTEMPT_INVALID_STATUS') {
+          clearDraftAnswers(currentAttemptId);
+          setStep('auto-submitted');
+        }
+        // Các lỗi mạng khác: bỏ qua, đáp án vẫn còn trong localStorage draft
+        // và selectedAnswers state, sẽ tự thử gửi lại ở lần chọn tiếp theo.
+      }
+    },
+    [],
+  );
 
   if (!isOpen) return null;
 
@@ -215,6 +340,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
           : [optionId];
       const updated = { ...prev, [question.id]: next };
       saveDraftAnswers(attemptId, updated);
+      autosaveAnswer(question.id, next);
       return updated;
     });
   };
@@ -317,10 +443,15 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                   </li>
                   <li>Mỗi câu hỏi chọn 1 hoặc nhiều đáp án đúng tuỳ theo yêu cầu của từng câu.</li>
                   <li>Không thoát trình duyệt trong khi đang làm bài.</li>
+                  <li>
+                    Nếu rời khỏi tab đang thi quá 1 phút mà không quay lại, hệ thống sẽ tự động nộp bài với các đáp
+                    án đã chọn gần nhất.
+                  </li>
                   <li>Mỗi thí sinh có {examData.maxAttempts} lượt thi chính thức. Muốn thi lại cần được Người duyệt đề cấp phép riêng.</li>
                   {examData.attempt && (
                     <li className="text-[#008BC5] font-semibold">
-                      Bạn đang có 1 lượt thi dở dang — bấm bên dưới để tiếp tục đúng lượt đó (không tính thêm lượt mới).
+                      Bạn đang có 1 lượt thi dở dang — bấm bên dưới để tiếp tục đúng lượt đó (không tính thêm lượt mới,
+                      các câu đã chọn trước đó sẽ được khôi phục kể cả khi đổi thiết bị).
                     </li>
                   )}
                 </ul>
@@ -508,6 +639,26 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500 flex-1">
             <Loader2 className="w-8 h-8 animate-spin text-[#008BC5]" />
             <span>Đang nộp bài và chấm điểm...</span>
+          </div>
+        )}
+
+        {/* STEP: AUTO-SUBMITTED (hệ thống tự nộp do rời khỏi ca thi quá 1 phút) */}
+        {step === 'auto-submitted' && (
+          <div className="p-6 flex flex-col items-center justify-center gap-3 text-center flex-1">
+            <div className="w-16 h-16 rounded-full bg-amber-500 flex items-center justify-center shadow-z176">
+              <AlertCircle className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-[#0F172A]">Bạn đã rời khỏi ca thi quá 1 phút</h3>
+            <p className="text-sm text-[#334155] max-w-sm">
+              Hệ thống đã tự động nộp bài với các đáp án bạn đã chọn gần nhất. Nếu cần thi lại, vui lòng liên hệ
+              Người duyệt đề để được xem xét cấp phép cho lượt thi mới.
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-2 px-6 py-3 bg-[#334155] text-white font-bold text-base rounded-lg hover:bg-[#1e293b] transition-colors min-touch-target"
+            >
+              Đóng
+            </button>
           </div>
         )}
 

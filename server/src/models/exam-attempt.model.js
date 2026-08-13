@@ -25,6 +25,21 @@ const examAttemptSchema = new mongoose.Schema(
     /** Token phiên thi — khác accessToken JWT đăng nhập (GLOSSARY.md) */
     examSessionTokenHash: { type: String, select: false },
     expiresAt: { type: Date },
+    /**
+     * Cập nhật mỗi lần server nhận được heartbeat / getMyExam / answer cho lượt
+     * thi này trong lúc đang in_progress. Dùng để phát hiện thí sinh đã rời
+     * trang thi quá lâu mà không quay lại (xem checkAndAutoSubmitIfInactive
+     * trong exam-attempt.service.js).
+     */
+    lastActiveAt: { type: Date },
+    /**
+     * Lý do nếu lượt thi bị HỆ THỐNG tự động nộp thay vì thí sinh tự bấm nộp.
+     * Để trống (undefined) nếu là nộp bài bình thường.
+     */
+    autoSubmitReason: {
+      type: String,
+      enum: ['inactive_timeout'],
+    },
   },
   { timestamps: true },
 );

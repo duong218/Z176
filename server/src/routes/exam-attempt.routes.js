@@ -12,5 +12,7 @@ router.use(requireRoleCodes('candidate'));
 router.get('/my-exam', examAttemptController.getMyExam);
 router.post('/start', examAttemptController.start);
 router.post('/:id/submit', examAttemptController.submit);
+router.patch('/:id/answer', examAttemptController.answer);
+router.post('/:id/heartbeat', examAttemptController.heartbeat);
 
 export default router;
