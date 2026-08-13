@@ -212,10 +212,25 @@ export async function changePassword(userId, currentPassword, newPassword) {
   await user.save();
 }
 
+/**
+ * MỚI: phân biệt "access token hết hạn do quá thời gian sống" (JWT
+ * TokenExpiredError) với "token không hợp lệ" (sai chữ ký, bị sửa, sai
+ * định dạng...). Trước đây cả 2 trường hợp đều chung 1 mã AUTH_ACCESS_INVALID
+ * nên frontend không thể biết khi nào nên tự động gọi /auth/refresh rồi thử
+ * lại, so với khi nào nên đăng xuất luôn (token rác/giả mạo thì refresh cũng
+ * vô ích, không nên tốn 1 lượt gọi API).
+ *
+ * jsonwebtoken ném ra instance TokenExpiredError (kế thừa từ JsonWebTokenError)
+ * khi token còn đúng chữ ký nhưng đã qua `exp` — dùng `err.name` để phân biệt
+ * thay vì `instanceof` để không phải import thêm class từ thư viện.
+ */
 export function verifyAccessToken(token) {
   try {
     return jwt.verify(token, env.jwtSecret);
-  } catch {
+  } catch (err) {
+    if (err?.name === 'TokenExpiredError') {
+      throw new ApiError(401, 'Phiên đăng nhập đã hết hạn', 'AUTH_ACCESS_EXPIRED');
+    }
     throw new ApiError(401, 'Phiên không hợp lệ', 'AUTH_ACCESS_INVALID');
   }
 }

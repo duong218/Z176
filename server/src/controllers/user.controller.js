@@ -14,7 +14,7 @@ export const create = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Thiếu thông tin bắt buộc (username, roleId)', 'MISSING_FIELDS');
   }
 
-  const { user, tempPassword, employee } = await userService.createUser({
+  const { user, tempPassword, employee, reused } = await userService.createUser({
     adminId: req.auth.userId,
     username,
     roleId,
@@ -25,19 +25,25 @@ export const create = asyncHandler(async (req, res) => {
     employeeInfo: { fullname, departmentId, employeeCode },
   });
 
-  await writeAudit({
-    actorUserId: req.auth.userId,
-    action: 'CREATE_USER',
-    resourceType: 'User',
-    resourceId: user._id,
-    metadata: { detail: `Tạo tài khoản mới: ${username}` },
-    ipAddress: req.ip,
-  });
+  // Khi reused=true, userService đã tự ghi audit riêng ("Tái sử dụng tài khoản
+  // đã khóa") nên không ghi lại audit CREATE_USER ở đây để tránh trùng lặp log.
+  if (!reused) {
+    await writeAudit({
+      actorUserId: req.auth.userId,
+      action: 'CREATE_USER',
+      resourceType: 'User',
+      resourceId: user._id,
+      metadata: { detail: `Tạo tài khoản mới: ${username}` },
+      ipAddress: req.ip,
+    });
+  }
 
   res.status(201).json({
     success: true,
-    message: 'Tạo tài khoản thành công',
-    code: 'USER_CREATED',
+    message: reused
+      ? `Mã nhân viên "${employeeCode}" trùng với tài khoản đã bị khóa — đã tự động mở khóa và cấp lại cho nhân viên mới`
+      : 'Tạo tài khoản thành công',
+    code: reused ? 'USER_REUSED' : 'USER_CREATED',
     data: { ...user, employee },
     tempPassword, // Chỉ trả về 1 lần
   });
@@ -134,7 +140,7 @@ export const importExcel = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: `Import xong: ${data.created} tạo mới, ${data.updated} cập nhật, ${data.failed} lỗi`,
+    message: `Import xong: ${data.created} tạo mới, ${data.reused} tái sử dụng (mã trùng tài khoản đã khóa), ${data.updated} cập nhật, ${data.failed} lỗi`,
     code: 'EMPLOYEE_IMPORT_DONE',
     data,
   });

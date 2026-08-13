@@ -1,24 +1,13 @@
 import { apiRequest } from './api.js';
+import { getAccessToken, saveAccessToken, clearAccessToken, getAuthHeaders } from './token-store.js';
 
-const TOKEN_KEY = 'z176_access_token';
-
-// ── Token helpers ──────────────────────────────────────────────
-export function getAccessToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function saveAccessToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearAccessToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-export function getAuthHeaders() {
-  const token = getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+// Giữ nguyên các hàm getAccessToken/saveAccessToken/clearAccessToken/getAuthHeaders
+// re-export từ token-store.js để KHÔNG phải sửa import ở mọi file khác đang
+// dùng `from './auth.service.js'` (admin.service.js, examiner.service.js...).
+// Việc lưu trữ token thật sự nằm ở token-store.js vì api.js cũng cần dùng nó
+// để tự refresh khi access token hết hạn — nếu để ở auth.service.js như cũ sẽ
+// tạo import vòng (api.js -> auth.service.js -> api.js).
+export { getAccessToken, saveAccessToken, clearAccessToken, getAuthHeaders };
 
 // ── API calls ──────────────────────────────────────────────────
 
@@ -39,6 +28,10 @@ export async function loginUser(username, password) {
 
 /**
  * Refresh access token (dựa vào httpOnly cookie — FE không cần gửi gì thêm).
+ * Lưu ý: cơ chế tự-refresh-khi-401 chính giờ nằm ở api.js (gọi thẳng
+ * fetch('/auth/refresh') nội bộ, không qua hàm này) để tránh việc nhiều
+ * request refresh chạy song song. Hàm này vẫn được giữ lại cho nơi nào muốn
+ * chủ động refresh thủ công (vd sau khi lấy lại focus tab).
  */
 export async function refreshAccessToken() {
   const result = await apiRequest('/auth/refresh', {

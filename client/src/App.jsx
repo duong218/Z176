@@ -20,6 +20,7 @@ import { SessionRevokedModal } from './components/SessionRevokedModal';
 import { ToastProvider } from './components/ToastContext';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
+import { SESSION_EXPIRED_EVENT } from './services/api';
 import { fetchMyExam } from './services/exam-attempt.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
@@ -90,9 +91,8 @@ function App() {
 
   // ── Buộc đăng xuất về màn hình đăng nhập, kèm modal chặn giải thích lý do ──
   // Dùng chung cho mọi trường hợp phiên bị vô hiệu từ phía server (đăng nhập
-  // nơi khác, đổi mật khẩu ở thiết bị khác, admin khoá tài khoản...), không
-  // chỉ riêng AUTH_ACCESS_REVOKED — nhưng hiện tại chỉ có polling bên dưới gọi
-  // tới với lý do đó.
+  // nơi khác, đổi mật khẩu ở thiết bị khác, admin khoá tài khoản, refresh
+  // token cũng đã hết hạn...), không chỉ riêng AUTH_ACCESS_REVOKED.
   const forceLogout = (message) => {
     setCurrentUser(null);
     setIsExamOpen(false);
@@ -107,6 +107,18 @@ function App() {
     setSessionRevokedMessage(null);
     setIsLoginOpen(true);
   };
+
+  // ── MỚI: lắng nghe sự kiện phiên hết hạn thật sự (access token hết hạn VÀ
+  // refresh token cũng hết hạn/không hợp lệ) do api.js phát ra sau khi đã tự
+  // thử refresh nhưng thất bại. Trước đây các request cứ 401 thẳng ra UI mà
+  // không có bước tự làm mới, giờ chỉ khi refresh cũng fail mới tới đây.
+  useEffect(() => {
+    const handleSessionExpired = (event) => {
+      forceLogout(event.detail?.message || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   // ── Kiểm tra định kỳ: tài khoản có vừa bị đăng nhập ở trình duyệt/thiết bị
   // khác hay không (chỉ 1 phiên đăng nhập được hoạt động tại 1 thời điểm —
@@ -129,9 +141,11 @@ function App() {
               'Tài khoản của bạn đang được đăng nhập ở một trình duyệt/thiết bị khác. Vui lòng đăng nhập lại để tiếp tục.',
             );
           }
-          // Các lỗi khác (mất mạng tạm thời, timeout...) bỏ qua, thử lại ở lần
-          // kiểm tra kế tiếp — không nên đăng xuất người dùng chỉ vì 1 lần lỡ
-          // request mạng.
+          // AUTH_ACCESS_EXPIRED không cần xử lý ở đây nữa — api.js đã tự
+          // refresh + retry request này rồi, nên lỗi rơi tới đây chỉ còn là
+          // "refresh cũng fail" (đã có event SESSION_EXPIRED_EVENT xử lý ở
+          // effect trên) hoặc lỗi mạng tạm thời — không nên đăng xuất người
+          // dùng chỉ vì 1 lần lỡ request mạng.
         });
     };
 
