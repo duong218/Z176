@@ -95,6 +95,16 @@ export async function loginWithUsernamePassword(username, password) {
 
   await clearFailedLogin(user);
 
+  // Mỗi lần đăng nhập thành công đều tăng tokenVersion — nghĩa là bất kỳ
+  // access/refresh token nào đã cấp trước đó (ví dụ đang mở ở 1 trình duyệt
+  // khác) sẽ ngay lập tức lệch `tv` so với DB và bị middleware `authenticate`
+  // từ chối với mã AUTH_ACCESS_REVOKED ở request kế tiếp của nó — tận dụng
+  // đúng cơ chế thu hồi phiên đã có sẵn (vốn dùng cho đổi mật khẩu/logout),
+  // để đạt hiệu quả "chỉ 1 phiên đăng nhập hoạt động tại 1 thời điểm" mà
+  // không cần thêm field/schema mới.
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+  await user.save();
+
   const accessToken = signAccessToken(user, role.code);
   const refreshToken = signRefreshToken(user);
 

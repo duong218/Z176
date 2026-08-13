@@ -444,8 +444,8 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                   <li>Mỗi câu hỏi chọn 1 hoặc nhiều đáp án đúng tuỳ theo yêu cầu của từng câu.</li>
                   <li>Không thoát trình duyệt trong khi đang làm bài.</li>
                   <li>
-                    Nếu rời khỏi tab đang thi quá 1 phút mà không quay lại, hệ thống sẽ tự động nộp bài với các đáp
-                    án đã chọn gần nhất.
+                    Nếu không có thao tác nào trên trang thi quá 1 phút (chuyển tab, khoá máy, mất mạng...), hệ thống
+                    sẽ tự động nộp bài với các đáp án đã chọn gần nhất.
                   </li>
                   <li>Mỗi thí sinh có {examData.maxAttempts} lượt thi chính thức. Muốn thi lại cần được Người duyệt đề cấp phép riêng.</li>
                   {examData.attempt && (
@@ -648,10 +648,15 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
             <div className="w-16 h-16 rounded-full bg-amber-500 flex items-center justify-center shadow-z176">
               <AlertCircle className="w-10 h-10 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-[#0F172A]">Bạn đã rời khỏi ca thi quá 1 phút</h3>
+            <h3 className="text-xl font-bold text-[#0F172A]">Bài thi đã bị tự động nộp</h3>
             <p className="text-sm text-[#334155] max-w-sm">
-              Hệ thống đã tự động nộp bài với các đáp án bạn đã chọn gần nhất. Nếu cần thi lại, vui lòng liên hệ
-              Người duyệt đề để được xem xét cấp phép cho lượt thi mới.
+              Hệ thống ghi nhận bạn <strong>không có thao tác nào trên trang thi trong hơn 1 phút</strong> — có thể do
+              chuyển sang tab/ứng dụng khác, khoá màn hình, đóng trình duyệt, hoặc mất kết nối mạng. Để đảm bảo tính
+              nghiêm túc của kỳ thi, hệ thống đã tự động nộp bài với các đáp án bạn đã chọn gần nhất trước khi rời đi.
+            </p>
+            <p className="text-sm text-[#334155] max-w-sm">
+              Nếu đây là sự cố ngoài ý muốn (mất mạng, rớt nguồn...) và cần thi lại, vui lòng liên hệ Người duyệt đề
+              để được xem xét cấp phép cho lượt thi mới.
             </p>
             <button
               onClick={onClose}

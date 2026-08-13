@@ -16,6 +16,8 @@ import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { LoginModal } from './components/LoginModal';
 import { ExamModal } from './components/ExamModal';
+import { SessionRevokedModal } from './components/SessionRevokedModal';
+import { ToastProvider } from './components/ToastContext';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { fetchMyExam } from './services/exam-attempt.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -30,7 +32,27 @@ import { AlertCircle } from 'lucide-react';
 // Giúp Hero Section tự cập nhật khi Người duyệt đề vừa "Đăng chính thức" mà không cần F5.
 const ACTIVE_EXAM_POLL_INTERVAL_MS = 60_000;
 
-export default function App() {
+// Khoảng thời gian kiểm tra định kỳ xem tài khoản có vừa bị đăng nhập ở nơi
+// khác hay không (mỗi lần đăng nhập mới, backend tăng tokenVersion khiến mọi
+// access token cũ lập tức bị thu hồi — xem auth.service.js). 5s theo đúng yêu
+// cầu: phát hiện gần như ngay lập tức, không bắt người dùng cũ chờ lâu mà
+// không hiểu vì sao thao tác bị chặn.
+const SESSION_CHECK_INTERVAL_MS = 5_000;
+
+// App được tách làm 2 lớp: AppShell (bọc ToastProvider) và App (nội dung thật,
+// dùng được hook useToast() vì đã nằm bên trong Provider). Tách vậy vì hook
+// chỉ hoạt động được bên trong component con của Provider, không thể gọi
+// ngay tại nơi định nghĩa Provider. ToastProvider vẫn giữ ở đây vì các phần
+// khác của app (vd AccountTab, ExamModal...) có thể đang/sẽ dùng chung.
+export default function AppShell() {
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+}
+
+function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isExamOpen, setIsExamOpen] = useState(false);
@@ -39,6 +61,12 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+
+  // Nội dung thông báo phiên bị thu hồi. null = không hiện modal.
+  // Khác với Toast (có thể lờ đi/tự ẩn), modal này CHẶN thao tác — người dùng
+  // bắt buộc phải bấm "Đăng nhập lại" mới đóng được, theo đúng yêu cầu: tránh
+  // để người dùng tiếp tục thao tác trên phiên đã không còn hợp lệ.
+  const [sessionRevokedMessage, setSessionRevokedMessage] = useState(null);
 
   // Auto-login: kiểm tra accessToken khi mount
   useEffect(() => {
@@ -54,6 +82,61 @@ export default function App() {
       })
       .finally(() => setAuthLoading(false));
   }, []);
+
+  // ── Buộc đăng xuất về màn hình đăng nhập, kèm modal chặn giải thích lý do ──
+  // Dùng chung cho mọi trường hợp phiên bị vô hiệu từ phía server (đăng nhập
+  // nơi khác, đổi mật khẩu ở thiết bị khác, admin khoá tài khoản...), không
+  // chỉ riêng AUTH_ACCESS_REVOKED — nhưng hiện tại chỉ có polling bên dưới gọi
+  // tới với lý do đó.
+  const forceLogout = (message) => {
+    setCurrentUser(null);
+    setIsExamOpen(false);
+    setIsChangePasswordOpen(false);
+    setIsLoginOpen(false); // đóng luôn LoginModal cũ nếu lỡ đang mở, tránh chồng 2 modal
+    setActiveTab('home');
+    setSessionRevokedMessage(message);
+  };
+
+  // Bấm "Đăng nhập lại" trong modal: đóng modal cảnh báo, mở lại màn đăng nhập.
+  const handleConfirmSessionRevoked = () => {
+    setSessionRevokedMessage(null);
+    setIsLoginOpen(true);
+  };
+
+  // ── Kiểm tra định kỳ: tài khoản có vừa bị đăng nhập ở trình duyệt/thiết bị
+  // khác hay không (chỉ 1 phiên đăng nhập được hoạt động tại 1 thời điểm —
+  // xem auth.service.js: mỗi lần login mới sẽ tăng tokenVersion, khiến access
+  // token đang dùng ở nơi khác lập tức bị thu hồi). Chỉ chạy khi đã đăng nhập.
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let cancelled = false;
+
+    const checkSession = () => {
+      fetchMe()
+        .then(() => {
+          /* vẫn hợp lệ, không cần làm gì */
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err?.code === 'AUTH_ACCESS_REVOKED') {
+            forceLogout(
+              'Tài khoản của bạn đang được đăng nhập ở một trình duyệt/thiết bị khác. Vui lòng đăng nhập lại để tiếp tục.',
+            );
+          }
+          // Các lỗi khác (mất mạng tạm thời, timeout...) bỏ qua, thử lại ở lần
+          // kiểm tra kế tiếp — không nên đăng xuất người dùng chỉ vì 1 lần lỡ
+          // request mạng.
+        });
+    };
+
+    const intervalId = setInterval(checkSession, SESSION_CHECK_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
 
   // Tự động mở lại ExamModal nếu tài khoản đang có lượt thi dở dang (vd sau khi
   // F5/tải lại trang giữa chừng lúc đang làm bài). Chỉ kiểm tra 1 lần sau khi
@@ -306,6 +389,14 @@ export default function App() {
         username={currentUser?.username}
         onPasswordChanged={(updatedUser) => setCurrentUser(updatedUser)}
         preventClose={currentUser?.mustChangePassword === true}
+      />
+
+      {/* Modal chặn khi phiên bị thu hồi (đăng nhập nơi khác) — z-[110],
+          cao hơn Toast (z-[100]) để luôn đè lên trên nếu cả 2 cùng tồn tại. */}
+      <SessionRevokedModal
+        isOpen={!!sessionRevokedMessage}
+        message={sessionRevokedMessage}
+        onConfirm={handleConfirmSessionRevoked}
       />
     </div>
   );
