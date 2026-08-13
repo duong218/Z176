@@ -76,7 +76,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, username, onPasswordChang
 
         {success ? (
           <div className="p-8 text-center space-y-3">
-            <div className="w-16 h-16 bg-green-100 text-[#22C55E] rounded-full flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 bg-[#F0FDF4] text-[#22C55E] rounded-full flex items-center justify-center mx-auto">
               <CheckCircle className="w-10 h-10" />
             </div>
             <h4 className="text-xl font-bold text-slate-800">Đổi mật khẩu thành công!</h4>
@@ -85,7 +85,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, username, onPasswordChang
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg flex items-start gap-2.5">
+              <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] text-sm rounded-lg flex items-start gap-2.5">
                 <AlertCircle className="w-5 h-5 shrink-0" />
                 <span>{error}</span>
               </div>

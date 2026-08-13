@@ -416,12 +416,12 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm">
+                  <div className="p-3 bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg text-[#0F172A] text-sm">
                     Tài khoản của bạn chưa được liên kết với hồ sơ nhân viên. Vui lòng liên hệ quản trị viên.
                   </div>
                 )
               ) : (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm font-medium flex items-center justify-between gap-2">
+                <div className="p-3 bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg text-[#0F172A] text-sm font-medium flex items-center justify-between gap-2">
                   <span>Bạn chưa đăng nhập thông tin nhân viên.</span>
                   <button
                     onClick={onOpenLogin}
@@ -459,7 +459,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
             )}
 
             {submitError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-center gap-2">
+              <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{submitError}</span>
               </div>
@@ -560,7 +560,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
             {/* Question Content */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
               {submitError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-center gap-2">
+                <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] text-sm flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{submitError}</span>
                 </div>
@@ -645,7 +645,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         {/* STEP: AUTO-SUBMITTED (hệ thống tự nộp do rời khỏi ca thi quá 1 phút) */}
         {step === 'auto-submitted' && (
           <div className="p-6 flex flex-col items-center justify-center gap-3 text-center flex-1">
-            <div className="w-16 h-16 rounded-full bg-amber-500 flex items-center justify-center shadow-z176">
+            <div className="w-16 h-16 rounded-full bg-[#F6AD37] flex items-center justify-center shadow-z176">
               <AlertCircle className="w-10 h-10 text-white" />
             </div>
             <h3 className="text-xl font-bold text-[#0F172A]">Bài thi đã bị tự động nộp</h3>

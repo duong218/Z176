@@ -360,6 +360,7 @@ export const reportService = {
 
     const results = data.map((item) => ({
       _id: item._id,
+      examId: item.exam._id,
       examTitle: item.exam.title,
       score: item.score,
       correctCount: item.correctCount,

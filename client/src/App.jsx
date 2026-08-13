@@ -18,6 +18,7 @@ import { LoginModal } from './components/LoginModal';
 import { ExamModal } from './components/ExamModal';
 import { SessionRevokedModal } from './components/SessionRevokedModal';
 import { ToastProvider } from './components/ToastContext';
+import { ConfirmProvider } from './components/ConfirmDialog';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { fetchMyExam } from './services/exam-attempt.service';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -39,15 +40,19 @@ const ACTIVE_EXAM_POLL_INTERVAL_MS = 60_000;
 // không hiểu vì sao thao tác bị chặn.
 const SESSION_CHECK_INTERVAL_MS = 5_000;
 
-// App được tách làm 2 lớp: AppShell (bọc ToastProvider) và App (nội dung thật,
-// dùng được hook useToast() vì đã nằm bên trong Provider). Tách vậy vì hook
-// chỉ hoạt động được bên trong component con của Provider, không thể gọi
-// ngay tại nơi định nghĩa Provider. ToastProvider vẫn giữ ở đây vì các phần
-// khác của app (vd AccountTab, ExamModal...) có thể đang/sẽ dùng chung.
+// App được tách làm 2 lớp: AppShell (bọc ToastProvider + ConfirmProvider) và
+// App (nội dung thật, dùng được hook useToast()/useConfirm() vì đã nằm bên
+// trong Provider). Tách vậy vì hook chỉ hoạt động được bên trong component
+// con của Provider, không thể gọi ngay tại nơi định nghĩa Provider.
+// ConfirmProvider thay cho window.confirm() gốc trình duyệt (không style
+// được) — dùng chung ở AccountTab, DepartmentTab, TopicTab, ExamReviewTab,
+// QuestionBankTab... nên đặt cùng cấp với ToastProvider ở đây.
 export default function AppShell() {
   return (
     <ToastProvider>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
     </ToastProvider>
   );
 }
@@ -307,17 +312,17 @@ function App() {
       <main className="flex-1">
         {currentUser?.mustChangePassword && (
           <div className="max-w-6xl mx-auto px-4 mt-20 -mb-12">
-            <div className="p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
+            <div className="p-4 bg-[#FFFBEB] border border-[#F6AD37]/40 text-[#0F172A] rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold text-base">Yêu cầu đổi mật khẩu!</p>
-                  <p className="text-sm text-orange-700 font-medium">Tài khoản của bạn đang dùng mật khẩu tạm thời. Vui lòng đổi mật khẩu mới để bảo mật và mở khóa đầy đủ chức năng hệ thống.</p>
+                  <p className="text-sm text-[#334155] font-medium">Tài khoản của bạn đang dùng mật khẩu tạm thời. Vui lòng đổi mật khẩu mới để bảo mật và mở khóa đầy đủ chức năng hệ thống.</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsChangePasswordOpen(true)}
-                className="px-4 py-2 bg-[#F6AD37] hover:bg-orange-500 text-white rounded-lg text-sm font-semibold shrink-0 transition-colors shadow-sm"
+                className="px-4 py-2 bg-[#F6AD37] hover:bg-[#B45309] text-white rounded-lg text-sm font-semibold shrink-0 transition-colors shadow-sm"
               >
                 Đổi mật khẩu ngay
               </button>
@@ -332,7 +337,12 @@ function App() {
         ) : activeTab === 'leader-dashboard' && currentUser?.roleCode === 'leader' ? (
           <LeaderDashboard onLogout={handleLogout} />
         ) : activeTab === 'candidate-dashboard' && currentUser?.roleCode === 'candidate' ? (
-          <CandidateDashboard currentUser={currentUser} onOpenExam={handleOpenExam} examModalOpen={isExamOpen} />
+          <CandidateDashboard
+            currentUser={currentUser}
+            onOpenExam={handleOpenExam}
+            examModalOpen={isExamOpen}
+            activeExam={activeExam}
+          />
         ) : (
           <>
             {/* 2. Banner giới thiệu cuộc thi */}

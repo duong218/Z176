@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../services/examiner.service';
+import { useConfirm } from '../ConfirmDialog';
 
 export const DepartmentTab = () => {
+  const confirmAction = useConfirm();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -73,7 +75,11 @@ export const DepartmentTab = () => {
   };
 
   const handleDelete = async (dept) => {
-    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng bộ phận "${dept.name}"? Các câu hỏi/nhân viên đang gắn với bộ phận này sẽ không bị xóa, nhưng bộ phận sẽ không còn hiển thị để chọn nữa.`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ngừng sử dụng bộ phận "${dept.name}"? Các câu hỏi/nhân viên đang gắn với bộ phận này sẽ không bị xóa, nhưng bộ phận sẽ không còn hiển thị để chọn nữa.`,
+      { title: 'Ngừng sử dụng bộ phận', confirmLabel: 'Ngừng sử dụng' }
+    );
+    if (!ok) return;
     setActionLoading(true);
     setError('');
     try {
@@ -106,7 +112,7 @@ export const DepartmentTab = () => {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-3">
+        <div className="p-4 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>

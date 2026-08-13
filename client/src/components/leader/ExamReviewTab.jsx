@@ -9,10 +9,12 @@ import {
   archiveExam,
 } from '../../services/exam-review.service';
 import { CheckCircle, XCircle, Clock, Globe, Calendar, History, Archive } from 'lucide-react';
+import { useToast } from '../ToastContext';
+import { useConfirm } from '../ConfirmDialog';
 
 // Cấu hình hiển thị badge trạng thái cho bảng "Lịch sử duyệt kỳ thi"
 const STATUS_BADGE = {
-  rejected: { label: 'Đã từ chối', className: 'bg-red-100 text-red-700' },
+  rejected: { label: 'Đã từ chối', className: 'bg-[#FEECEC] text-[#C53030]' },
   published: { label: 'Đang phát hành', className: 'bg-[#008BC5]/10 text-[#008BC5]' },
   archived: { label: 'Đã lưu trữ', className: 'bg-slate-200 text-slate-600' },
 };
@@ -27,6 +29,8 @@ function StatusBadge({ status }) {
 }
 
 export const ExamReviewTab = () => {
+  const { showToast } = useToast();
+  const confirmAction = useConfirm();
   const [pendingExams, setPendingExams] = useState([]);
   const [approvedExams, setApprovedExams] = useState([]);
   const [historyExams, setHistoryExams] = useState([]);
@@ -73,9 +77,10 @@ export const ExamReviewTab = () => {
       setIsApproveModalOpen(false);
       setStartDate('');
       setEndDate('');
+      showToast('Đã phê duyệt kỳ thi thành công.', 'success');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi duyệt kỳ thi');
+      showToast(error.message || 'Lỗi khi duyệt kỳ thi', 'error');
     }
   };
 
@@ -85,30 +90,41 @@ export const ExamReviewTab = () => {
       await rejectExam(rejectId, rejectReason);
       setIsRejectModalOpen(false);
       setRejectReason('');
+      showToast('Đã từ chối đề xuất kỳ thi.', 'warning');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi từ chối kỳ thi');
+      showToast(error.message || 'Lỗi khi từ chối kỳ thi', 'error');
     }
   };
 
   const handlePublish = async (id) => {
-    if (!confirm('Bạn có chắc chắn muốn đăng chính thức kỳ thi này? Kỳ thi đang diễn ra (nếu có) sẽ bị lưu trữ.')) return;
+    const ok = await confirmAction(
+      'Bạn có chắc chắn muốn đăng chính thức kỳ thi này? Kỳ thi đang diễn ra (nếu có) sẽ bị lưu trữ.',
+      { title: 'Đăng chính thức kỳ thi', confirmLabel: 'Đăng chính thức', danger: false }
+    );
+    if (!ok) return;
     try {
       await publishExam(id);
+      showToast('Đã đăng chính thức kỳ thi.', 'success');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi đăng chính thức');
+      showToast(error.message || 'Lỗi khi đăng chính thức', 'error');
     }
   };
 
   const handleArchive = async (id) => {
-    if (!confirm('Bỏ qua kỳ thi này? Kỳ thi sẽ được lưu trữ và không thể phát hành nữa.')) return;
+    const ok = await confirmAction(
+      'Bỏ qua kỳ thi này? Kỳ thi sẽ được lưu trữ và không thể phát hành nữa.',
+      { title: 'Bỏ qua kỳ thi', confirmLabel: 'Bỏ qua' }
+    );
+    if (!ok) return;
     setArchivingId(id);
     try {
       await archiveExam(id);
+      showToast('Đã lưu trữ kỳ thi.', 'success');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi bỏ qua kỳ thi');
+      showToast(error.message || 'Lỗi khi bỏ qua kỳ thi', 'error');
     } finally {
       setArchivingId(null);
     }
@@ -130,7 +146,7 @@ export const ExamReviewTab = () => {
       {/* Pending Exams */}
       <div>
         <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-amber-500" />
+          <Clock className="w-5 h-5 text-[#F6AD37]" />
           Đề xuất chờ duyệt
         </h2>
         <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -158,10 +174,10 @@ export const ExamReviewTab = () => {
                       <div>Tổng câu: {exam.totalQuestions} (Chung: {exam.commonQuestionCount}, Riêng: {exam.departmentQuestionCount})</div>
                     </td>
                     <td className="p-4 flex gap-2 justify-end">
-                      <button onClick={() => openReject(exam._id)} className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded transition-colors flex items-center gap-1 text-xs">
+                      <button onClick={() => openReject(exam._id)} className="px-3 py-1.5 bg-[#FEECEC] hover:bg-[#FDD8D8] text-[#C53030] font-medium rounded transition-colors flex items-center gap-1 text-xs">
                         Từ chối
                       </button>
-                      <button onClick={() => openApprove(exam._id)} className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium rounded transition-colors flex items-center gap-1 text-xs">
+                      <button onClick={() => openApprove(exam._id)} className="px-3 py-1.5 bg-[#F0FDF4] hover:bg-[#DCFCE7] text-[#16A34A] font-medium rounded transition-colors flex items-center gap-1 text-xs">
                         Phê duyệt
                       </button>
                     </td>
@@ -176,7 +192,7 @@ export const ExamReviewTab = () => {
       {/* Approved Exams */}
       <div>
         <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-emerald-500" />
+          <CheckCircle className="w-5 h-5 text-[#22C55E]" />
           Kỳ thi đã duyệt (Chờ phát hành)
         </h2>
         <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -260,7 +276,7 @@ export const ExamReviewTab = () => {
                       </td>
                       <td className="p-4 text-slate-600 text-xs max-w-xs">
                         {exam.status === 'rejected' ? (
-                          <span className="text-red-600">{exam.rejectionReason || 'Không có lý do'}</span>
+                          <span className="text-[#E53E3E]">{exam.rejectionReason || 'Không có lý do'}</span>
                         ) : exam.status === 'archived' ? (
                           <span className="flex items-center gap-1 text-slate-500">
                             <Archive className="w-3.5 h-3.5" /> Đã bị thay thế bởi kỳ thi khác hoặc bị bỏ qua
@@ -285,7 +301,7 @@ export const ExamReviewTab = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Calendar className="w-5 h-5 text-emerald-500" /> Cài đặt thời gian</h2>
+              <h2 className="font-bold text-slate-800 flex items-center gap-2"><Calendar className="w-5 h-5 text-[#22C55E]" /> Cài đặt thời gian</h2>
               <button onClick={() => setIsApproveModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleApprove} className="p-4 space-y-4">
@@ -301,7 +317,7 @@ export const ExamReviewTab = () => {
               </div>
               <div className="pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsApproveModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium">Phê duyệt</button>
+                <button type="submit" className="px-4 py-2 bg-[#22C55E] hover:bg-[#16A34A] text-white rounded-lg text-sm font-medium">Phê duyệt</button>
               </div>
             </form>
           </div>
@@ -313,19 +329,19 @@ export const ExamReviewTab = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2"><XCircle className="w-5 h-5 text-red-500" /> Từ chối đề xuất</h2>
+              <h2 className="font-bold text-slate-800 flex items-center gap-2"><XCircle className="w-5 h-5 text-[#E53E3E]" /> Từ chối đề xuất</h2>
               <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleReject} className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Lý do từ chối</label>
-                <textarea required className="w-full p-2 border border-slate-300 rounded focus:border-red-500 outline-none min-h-[100px]"
+                <textarea required className="w-full p-2 border border-slate-300 rounded focus:border-[#E53E3E] outline-none min-h-[100px]"
                   placeholder="Nhập lý do để Người ra đề chỉnh sửa..."
                   value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
               </div>
               <div className="pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsRejectModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium">Từ chối</button>
+                <button type="submit" className="px-4 py-2 bg-[#E53E3E] hover:bg-[#C53030] text-white rounded-lg text-sm font-medium">Từ chối</button>
               </div>
             </form>
           </div>

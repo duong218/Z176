@@ -72,8 +72,8 @@ export const OverviewTab = () => {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 flex items-center gap-3">
-        <ServerCrash className="w-5 h-5 shrink-0" />
+      <div className="bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg p-4 flex items-center gap-3">
+        <ServerCrash className="w-5 h-5 shrink-0 text-[#E53E3E]" />
         <p className="font-medium">Không tải được dữ liệu tổng quan. Vui lòng thử lại.</p>
       </div>
     );
@@ -96,7 +96,7 @@ export const OverviewTab = () => {
           <button
             onClick={handleBackup}
             disabled={backupLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F6AD37] text-white rounded-lg font-medium hover:bg-orange-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-[#F6AD37] text-white rounded-lg font-medium hover:bg-[#B45309] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {backupLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Cloud className="w-5 h-5" />}
             <span>Backup dữ liệu</span>
@@ -105,13 +105,30 @@ export const OverviewTab = () => {
         </div>
       </div>
 
+      {/* Kết quả backup — dùng đúng 2 màu chức năng (xanh lá/đỏ) theo design-system,
+          nền nhạt + viền cùng tông để tương phản cao, luôn kèm icon + chữ mô tả rõ ràng */}
       {backupResult && (
-        <div className={`p-4 rounded-lg flex items-start gap-3 ${backupResult.success ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
-          {backupResult.success ? <CheckCircle className="w-5 h-5 shrink-0" /> : <ServerCrash className="w-5 h-5 shrink-0" />}
+        <div
+          className={`p-4 rounded-lg flex items-start gap-3 border ${
+            backupResult.success
+              ? 'bg-[#F0FDF4] border-[#22C55E]/40 text-[#0F172A]'
+              : 'bg-[#FEECEC] border-[#E53E3E]/40 text-[#0F172A]'
+          }`}
+        >
+          {backupResult.success ? (
+            <CheckCircle className="w-5 h-5 shrink-0 text-[#16A34A]" />
+          ) : (
+            <ServerCrash className="w-5 h-5 shrink-0 text-[#C53030]" />
+          )}
           <div>
             <p className="font-medium">{backupResult.message}</p>
             {backupResult.downloadUrl && (
-              <a href={backupResult.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline mt-1 block hover:text-green-600">
+              <a
+                href={backupResult.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm underline mt-1 block text-[#16A34A] hover:text-[#22C55E]"
+              >
                 Xem file trên Google Drive
               </a>
             )}

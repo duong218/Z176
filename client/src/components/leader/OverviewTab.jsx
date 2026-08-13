@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Users, FileText, CheckCircle, XCircle, TrendingUp } from 'lucide-react';
 import { fetchOverviewStats, exportReport } from '../../services/report.service';
+import { useToast } from '../ToastContext';
 
 export const OverviewTab = () => {
+  const { showToast } = useToast();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,7 +33,7 @@ export const OverviewTab = () => {
     try {
       await exportReport();
     } catch (err) {
-      alert(err.message || 'Lỗi khi tải file báo cáo');
+      showToast(err.message || 'Lỗi khi tải file báo cáo', 'error');
     }
   };
 

@@ -3,6 +3,8 @@ import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Che
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, importEmployeesExcel, downloadImportResultsCsv } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
 import { getAuthHeaders } from '../../services/auth.service';
+import { useToast } from '../ToastContext';
+import { useConfirm } from '../ConfirmDialog';
 
 // Danh sách cột có thể hiển thị trong bảng tài khoản. `alwaysOn` = cột lõi
 // không cho ẩn (Username, Phân quyền, Trạng thái, Hành động). Các cột còn
@@ -29,6 +31,8 @@ async function fetchDepartments() {
 }
 
 export const AccountTab = ({ currentUser }) => {
+  const { showToast } = useToast();
+  const confirmAction = useConfirm();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -112,7 +116,7 @@ export const AccountTab = ({ currentUser }) => {
       setRoles(rolesData);
       setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
     } catch (err) {
-      alert(err.message || 'Lỗi khi tải danh sách dữ liệu');
+      showToast(err.message || 'Lỗi khi tải danh sách dữ liệu', 'error');
     } finally {
       setLoading(false);
     }
@@ -140,7 +144,7 @@ export const AccountTab = ({ currentUser }) => {
     e.preventDefault();
     if (!newUsername.trim() || !newRoleId) return;
     if (isCandidateRoleSelected && (!newFullname.trim() || !newDepartmentId)) {
-      alert('Tài khoản thí sinh bắt buộc phải có Họ tên và Phòng ban.');
+      showToast('Tài khoản thí sinh bắt buộc phải có Họ tên và Phòng ban.', 'warning');
       return;
     }
     setActionLoading(true);
@@ -166,7 +170,7 @@ export const AccountTab = ({ currentUser }) => {
         password: res.tempPassword
       });
     } catch (err) {
-      alert(err.message || 'Không thể tạo tài khoản');
+      showToast(err.message || 'Không thể tạo tài khoản', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -183,7 +187,7 @@ export const AccountTab = ({ currentUser }) => {
       setEditingRoleId('');
       await loadData();
     } catch (err) {
-      alert(err.message || 'Không thể đổi quyền');
+      showToast(err.message || 'Không thể đổi quyền', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -191,20 +195,28 @@ export const AccountTab = ({ currentUser }) => {
 
   const handleToggleLock = async (user) => {
     const actionText = user.isActive ? 'Khóa' : 'Mở khóa';
-    if (!confirm(`Bạn có chắc chắn muốn ${actionText.toLowerCase()} tài khoản "${user.username}"?`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ${actionText.toLowerCase()} tài khoản "${user.username}"?`,
+      { title: `${actionText} tài khoản`, confirmLabel: actionText, danger: user.isActive }
+    );
+    if (!ok) return;
     setActionLoading(true);
     try {
       await toggleUserLock(user._id, !user.isActive);
       await loadData();
     } catch (err) {
-      alert(err.message || `Lỗi khi ${actionText.toLowerCase()} tài khoản`);
+      showToast(err.message || `Lỗi khi ${actionText.toLowerCase()} tài khoản`, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleResetPassword = async (user) => {
-    if (!confirm(`Bạn có chắc chắn muốn reset mật khẩu tài khoản "${user.username}"? Mật khẩu mới sẽ được sinh ngẫu nhiên.`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn reset mật khẩu tài khoản "${user.username}"? Mật khẩu mới sẽ được sinh ngẫu nhiên.`,
+      { title: 'Reset mật khẩu', confirmLabel: 'Reset', danger: false }
+    );
+    if (!ok) return;
     setActionLoading(true);
     try {
       const tempPass = await resetUserPassword(user._id);
@@ -215,7 +227,7 @@ export const AccountTab = ({ currentUser }) => {
         password: tempPass
       });
     } catch (err) {
-      alert(err.message || 'Lỗi khi reset mật khẩu');
+      showToast(err.message || 'Lỗi khi reset mật khẩu', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -238,7 +250,7 @@ export const AccountTab = ({ currentUser }) => {
       setImportResult(data);
       await loadData();
     } catch (err) {
-      alert(err.message || 'Import thất bại');
+      showToast(err.message || 'Import thất bại', 'error');
     } finally {
       setImportLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -401,7 +413,7 @@ export const AccountTab = ({ currentUser }) => {
                   <button
                     disabled={actionLoading}
                     onClick={() => handleResetPassword(user)}
-                    className="p-2 text-slate-500 hover:text-[#F6AD37] hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-30"
+                    className="p-2 text-slate-500 hover:text-[#F6AD37] hover:bg-[#FFFBEB] rounded-lg transition-colors disabled:opacity-30"
                     title="Reset mật khẩu"
                   >
                     <KeyRound className="w-4 h-4" />
@@ -485,7 +497,7 @@ export const AccountTab = ({ currentUser }) => {
               <button
                 disabled={actionLoading}
                 onClick={() => handleResetPassword(user)}
-                className="flex-1 py-2 text-sm font-medium text-[#F6AD37] bg-orange-50 rounded-lg disabled:opacity-30"
+                className="flex-1 py-2 text-sm font-medium text-[#F6AD37] bg-[#FFFBEB] rounded-lg disabled:opacity-30"
               >
                 Mật khẩu
               </button>
@@ -690,7 +702,7 @@ export const AccountTab = ({ currentUser }) => {
                 </div>
               </div>
 
-              <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 text-left text-xs text-orange-800 font-medium">
+              <div className="bg-[#FFFBEB] p-3 rounded-lg border border-[#F6AD37]/40 text-left text-xs text-[#92400E] font-medium">
                 ⚠️ Mật khẩu tạm này chỉ hiển thị duy nhất một lần. Hãy sao chép và gửi cho người dùng. Họ sẽ bắt buộc phải đổi mật khẩu khi đăng nhập lần đầu.
               </div>
 
@@ -720,22 +732,22 @@ export const AccountTab = ({ currentUser }) => {
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-green-50 rounded-lg p-3">
+                <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#22C55E]">{importResult.created}</div>
                   <div className="text-xs text-slate-500">Tạo mới</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-3">
+                <div className="bg-[#EAF6FF] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#008BC5]">{importResult.updated}</div>
                   <div className="text-xs text-slate-500">Cập nhật</div>
                 </div>
-                <div className="bg-red-50 rounded-lg p-3">
+                <div className="bg-[#FEECEC] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#E53E3E]">{importResult.failed}</div>
                   <div className="text-xs text-slate-500">Lỗi</div>
                 </div>
               </div>
 
               {importResult.failed > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-800 max-h-32 overflow-y-auto space-y-1">
+                <div className="bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg p-3 text-xs text-[#92400E] max-h-32 overflow-y-auto space-y-1">
                   <p className="flex items-center gap-1 font-semibold"><AlertTriangle className="w-3.5 h-3.5" /> Các dòng lỗi:</p>
                   {importResult.results.filter(r => r.status === 'error').map(r => (
                     <p key={r.row}>Dòng {r.row}: {r.message}</p>

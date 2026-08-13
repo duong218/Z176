@@ -63,7 +63,7 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {errorMessage && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-[#E53E3E] font-medium text-sm flex items-center gap-2">
+            <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] font-medium text-sm flex items-center gap-2">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <span>{errorMessage}</span>
             </div>

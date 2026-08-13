@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions } from '../../services/examiner.service';
+import { useToast } from '../ToastContext';
+import { useConfirm } from '../ConfirmDialog';
 
 export const QuestionBankTab = ({ initialFilter } = {}) => {
+  const { showToast } = useToast();
+  const confirmAction = useConfirm();
   const [questions, setQuestions] = useState([]);
   const [topics, setTopics] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -216,7 +220,8 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Bạn có chắc chắn muốn ngừng sử dụng câu hỏi này?')) return;
+    const ok = await confirmAction('Bạn có chắc chắn muốn ngừng sử dụng câu hỏi này?', { title: 'Ngừng sử dụng câu hỏi', confirmLabel: 'Ngừng sử dụng' });
+    if (!ok) return;
     setActionLoading(true);
     try {
       await deleteQuestion(id);
@@ -244,14 +249,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
   const handleBulkDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng ${selectedIds.length} câu hỏi đã chọn?`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ngừng sử dụng ${selectedIds.length} câu hỏi đã chọn?`,
+      { title: 'Ngừng sử dụng câu hỏi đã chọn', confirmLabel: 'Ngừng sử dụng' }
+    );
+    if (!ok) return;
     setActionLoading(true);
     setError('');
     try {
       const res = await bulkDeleteQuestions({ ids: selectedIds });
       setSelectedIds([]);
       await loadData(1);
-      alert(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi.`);
+      showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi.`, 'success');
     } catch (err) {
       setError(err.message || 'Lỗi khi xóa hàng loạt câu hỏi');
     } finally {
@@ -266,10 +275,14 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   const handleDeleteAllByFilter = async () => {
     const hasFilter = selectedTopic || selectedScope || selectedDept || selectedDifficulty || selectedAnswerType || search.trim();
     if (!hasFilter) {
-      alert('Vui lòng chọn ít nhất 1 bộ lọc (chủ đề, phạm vi, bộ phận, độ khó, hình thức đáp án hoặc từ khóa tìm kiếm) trước khi xóa tất cả, để tránh xóa nhầm toàn bộ ngân hàng câu hỏi.');
+      showToast('Vui lòng chọn ít nhất 1 bộ lọc (chủ đề, phạm vi, bộ phận, độ khó, hình thức đáp án hoặc từ khóa tìm kiếm) trước khi xóa tất cả, để tránh xóa nhầm toàn bộ ngân hàng câu hỏi.', 'warning');
       return;
     }
-    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng TẤT CẢ ${pagination.total} câu hỏi đang khớp bộ lọc hiện tại (không chỉ trang này)? Hành động này áp dụng cho toàn bộ kết quả lọc, không thể hoàn tác qua giao diện.`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ngừng sử dụng TẤT CẢ ${pagination.total} câu hỏi đang khớp bộ lọc hiện tại (không chỉ trang này)? Hành động này áp dụng cho toàn bộ kết quả lọc, không thể hoàn tác qua giao diện.`,
+      { title: 'Ngừng sử dụng tất cả theo bộ lọc', confirmLabel: 'Ngừng sử dụng tất cả' }
+    );
+    if (!ok) return;
     setActionLoading(true);
     setError('');
     try {
@@ -285,7 +298,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       });
       setSelectedIds([]);
       await loadData(1);
-      alert(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc.`);
+      showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc.`, 'success');
     } catch (err) {
       setError(err.message || 'Lỗi khi xóa tất cả theo bộ lọc');
     } finally {
@@ -300,7 +313,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     setError('');
     try {
       const res = await importQuestions(importFile);
-      alert(`Import thành công! Đã nhập: ${res.imported} câu hỏi, Thất bại: ${res.failed} câu hỏi.`);
+      showToast(`Import thành công! Đã nhập: ${res.imported} câu hỏi, Thất bại: ${res.failed} câu hỏi.`, res.failed > 0 ? 'warning' : 'success');
       setIsImportOpen(false);
       setImportFile(null);
       await loadData(1);
@@ -314,7 +327,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-3">
+        <div className="p-4 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -428,7 +441,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               type="button"
               onClick={handleBulkDeleteSelected}
               disabled={selectedIds.length === 0 || actionLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E53E3E]/40 text-[#E53E3E] rounded-lg font-medium hover:bg-[#FEECEC] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-4 h-4" />
               Xóa {selectedIds.length > 0 ? `${selectedIds.length} câu đã chọn` : 'đã chọn'}
@@ -437,7 +450,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               type="button"
               onClick={handleDeleteAllByFilter}
               disabled={actionLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E53E3E] text-white rounded-lg font-medium hover:bg-[#C53030] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               title="Xóa toàn bộ câu hỏi khớp bộ lọc hiện tại, không chỉ trang này"
             >
               <Trash2 className="w-4 h-4" />
@@ -473,16 +486,16 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                   </button>
                   <div className="space-y-2">
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                        q.difficulty === 'medium' ? 'bg-blue-100 text-blue-700' :
-                          'bg-red-100 text-red-700'
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-[#F0FDF4] text-[#16A34A]' :
+                        q.difficulty === 'medium' ? 'bg-[#FFFBEB] text-[#B45309]' :
+                          'bg-[#FEECEC] text-[#C53030]'
                       }`}>
                       {q.difficulty === 'easy' ? 'Dễ' : q.difficulty === 'medium' ? 'Trung bình' : 'Khó'}
                     </span>
                     <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-semibold">
                       {q.questionKind === 'theory' ? 'Lý thuyết' : 'Bài tập'}
                     </span>
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                    <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-semibold">
                       {q.scope === 'Common' ? 'Chung' : 'Riêng bộ phận'}
                     </span>
                   </div>
@@ -508,7 +521,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               {/* Answers list */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-2">
                 {q.answers.map((ans, idx) => (
-                  <div key={ans.id || idx} className={`p-2.5 rounded-lg border text-sm flex items-start gap-2.5 ${ans.isCorrect ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50/50 border-slate-100 text-slate-700'}`}>
+                  <div key={ans.id || idx} className={`p-2.5 rounded-lg border text-sm flex items-start gap-2.5 ${ans.isCorrect ? 'bg-[#F0FDF4] border-[#22C55E]/40 text-[#0F172A]' : 'bg-slate-50/50 border-slate-100 text-slate-700'}`}>
                     <span className="font-semibold">{String.fromCharCode(65 + idx)}.</span>
                     <span className="flex-1">{ans.content}</span>
                   </div>

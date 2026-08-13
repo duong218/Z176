@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { fetchTopics, createTopic, updateTopic, deleteTopic } from '../../services/examiner.service';
+import { useConfirm } from '../ConfirmDialog';
 
 export const TopicTab = ({ onViewQuestions } = {}) => {
+  const confirmAction = useConfirm();
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -69,7 +71,11 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
   };
 
   const handleDelete = async (topic) => {
-    if (!confirm(`Bạn có chắc chắn muốn ngừng sử dụng chủ đề "${topic.name}"? Các câu hỏi đang gắn với chủ đề này sẽ không bị xóa, nhưng chủ đề sẽ không còn hiển thị để chọn nữa.`)) return;
+    const ok = await confirmAction(
+      `Bạn có chắc chắn muốn ngừng sử dụng chủ đề "${topic.name}"? Các câu hỏi đang gắn với chủ đề này sẽ không bị xóa, nhưng chủ đề sẽ không còn hiển thị để chọn nữa.`,
+      { title: 'Ngừng sử dụng chủ đề', confirmLabel: 'Ngừng sử dụng' }
+    );
+    if (!ok) return;
     setActionLoading(true);
     setError('');
     try {
@@ -102,7 +108,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-3">
+        <div className="p-4 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>

@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
 import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useToast } from '../ToastContext';
+import { useConfirm } from '../ConfirmDialog';
 
 export const ExamProposalTab = () => {
+  const { showToast } = useToast();
+  const confirmAction = useConfirm();
   const [exams, setExams] = useState([]);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +90,7 @@ export const ExamProposalTab = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (hasBlockingError) {
-      alert('Cấu hình số câu hỏi chưa hợp lệ so với ngân hàng câu hỏi hiện có của chủ đề này. Vui lòng kiểm tra lại phần cảnh báo trong form.');
+      showToast('Cấu hình số câu hỏi chưa hợp lệ so với ngân hàng câu hỏi hiện có của chủ đề này. Vui lòng kiểm tra lại phần cảnh báo trong form.', 'warning');
       return;
     }
     try {
@@ -99,27 +103,33 @@ export const ExamProposalTab = () => {
         passThresholdPercent: Number(formData.passThresholdPercent),
       });
       setIsModalOpen(false);
+      showToast('Đã tạo đề xuất kỳ thi thành công.', 'success');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi tạo đề xuất');
+      showToast(error.message || 'Lỗi khi tạo đề xuất', 'error');
     }
   };
 
   const handleSubmitReview = async (id) => {
-    if (!confirm('Bạn có chắc chắn muốn gửi đề xuất này cho Người duyệt đề duyệt?')) return;
+    const ok = await confirmAction(
+      'Bạn có chắc chắn muốn gửi đề xuất này cho Người duyệt đề duyệt?',
+      { title: 'Gửi duyệt đề xuất', confirmLabel: 'Gửi duyệt', danger: false }
+    );
+    if (!ok) return;
     try {
       await submitForReview(id);
+      showToast('Đã gửi đề xuất cho Người duyệt đề.', 'success');
       loadData();
     } catch (error) {
-      alert(error.message || 'Lỗi khi gửi duyệt');
+      showToast(error.message || 'Lỗi khi gửi duyệt', 'error');
     }
   };
 
   const getStatusBadge = (status) => {
     switch (status) {
       case 'draft': return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium border border-slate-200 flex items-center gap-1"><FilePlus className="w-3 h-3" /> Nháp</span>;
-      case 'pending_review': return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-medium border border-amber-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Chờ duyệt</span>;
-      case 'rejected': return <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium border border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" /> Bị từ chối</span>;
+      case 'pending_review': return <span className="bg-[#FFFBEB] text-[#B45309] px-2 py-1 rounded text-xs font-medium border border-[#F6AD37]/40 flex items-center gap-1"><Clock className="w-3 h-3" /> Chờ duyệt</span>;
+      case 'rejected': return <span className="bg-[#FEECEC] text-[#C53030] px-2 py-1 rounded text-xs font-medium border border-[#E53E3E]/30 flex items-center gap-1"><XCircle className="w-3 h-3" /> Bị từ chối</span>;
       case 'approved': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã duyệt</span>;
       case 'published': return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-medium border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã đăng</span>;
       case 'archived': return <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-200">Đã lưu trữ</span>;
@@ -179,7 +189,7 @@ export const ExamProposalTab = () => {
                     <td className="p-4">{getStatusBadge(exam.status)}</td>
                     <td className="p-4 text-slate-600">
                       {exam.status === 'rejected' && (
-                        <div className="flex items-start gap-1 text-red-600 text-xs bg-red-50 p-2 rounded">
+                        <div className="flex items-start gap-1 text-[#C53030] text-xs bg-[#FEECEC] p-2 rounded">
                           <AlertCircle className="w-4 h-4 shrink-0" />
                           <span>{exam.rejectionReason}</span>
                         </div>
@@ -189,7 +199,7 @@ export const ExamProposalTab = () => {
                       {(exam.status === 'draft' || exam.status === 'rejected') && (
                         <button
                           onClick={() => handleSubmitReview(exam._id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded font-medium transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFBEB] hover:bg-[#FDECC8] text-[#92400E] rounded font-medium transition-colors"
                         >
                           <Send className="w-4 h-4" /> Gửi duyệt
                         </button>
@@ -255,7 +265,7 @@ export const ExamProposalTab = () => {
                         </p>
                       </>
                     ) : (
-                      <p className="text-red-500">Không tải được số liệu câu hỏi cho chủ đề này.</p>
+                      <p className="text-[#E53E3E]">Không tải được số liệu câu hỏi cho chủ đề này.</p>
                     )}
                   </div>
                 )}
@@ -273,7 +283,7 @@ export const ExamProposalTab = () => {
                   </div>
                 </div>
                 {sumMismatch && (
-                  <p className="text-xs text-red-600 flex items-center gap-1 -mt-2">
+                  <p className="text-xs text-[#C53030] flex items-center gap-1 -mt-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     Số câu chung + số câu bộ phận ({common + perDept}) phải bằng đúng Tổng số câu hỏi ({total}).
                   </p>
@@ -295,7 +305,7 @@ export const ExamProposalTab = () => {
                 {formData.topicId && topicStats && (
                   <>
                     {commonExceedsPool && (
-                      <p className="text-xs text-red-600 flex items-center gap-1">
+                      <p className="text-xs text-[#C53030] flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                         Số câu chung ({common}) vượt quá số câu chung hiện có ({commonCount}) của chủ đề này.
                       </p>
@@ -303,7 +313,7 @@ export const ExamProposalTab = () => {
                     {infeasibleDepartments.length > 0 && (
                       <div className="space-y-1">
                         {infeasibleDepartments.map((d) => (
-                          <p key={d.departmentId} className={`text-xs flex items-center gap-1 ${d.infeasible ? 'text-red-600' : 'text-amber-600'}`}>
+                          <p key={d.departmentId} className={`text-xs flex items-center gap-1 ${d.infeasible ? 'text-[#C53030]' : 'text-[#B45309]'}`}>
                             {d.infeasible ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
                             {d.name}: chỉ có {d.count}/{perDept} câu riêng
                             {d.infeasible

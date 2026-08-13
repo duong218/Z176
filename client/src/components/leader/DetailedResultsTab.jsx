@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { FileText, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchDetailedResults, exportReport } from '../../services/report.service';
+import { useToast } from '../ToastContext';
 
 export const DetailedResultsTab = () => {
+  const { showToast } = useToast();
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export const DetailedResultsTab = () => {
     try {
       await exportReport(filters);
     } catch (err) {
-      alert(err.message || 'Lỗi khi xuất file Excel');
+      showToast(err.message || 'Lỗi khi xuất file Excel', 'error');
     }
   };
 
@@ -173,9 +175,9 @@ export const DetailedResultsTab = () => {
                         <td className="px-6 py-4 text-center font-bold text-[#F6AD37]">{item.score}</td>
                         <td className="px-6 py-4 text-center">
                           {item.passed ? (
-                            <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded-md text-xs font-semibold">ĐẠT</span>
+                            <span className="px-2 py-1 bg-[#22C55E]/10 text-[#22C55E] rounded-md text-xs font-semibold">ĐẠT</span>
                           ) : (
-                            <span className="px-2 py-1 bg-red-500/10 text-red-400 rounded-md text-xs font-semibold">KHÔNG ĐẠT</span>
+                            <span className="px-2 py-1 bg-[#E53E3E]/10 text-[#E53E3E] rounded-md text-xs font-semibold">KHÔNG ĐẠT</span>
                           )}
                         </td>
                         <td className="px-6 py-4">

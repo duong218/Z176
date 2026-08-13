@@ -27,10 +27,13 @@ const formatDateTime = (value) => {
   });
 };
 
-// Mặc định mỗi thí sinh chỉ có 1 lượt thi chính thức. Muốn thi lại phải được
-// Người duyệt đề cấp phép riêng cho từng trường hợp (chưa có cơ chế cấp phép
-// này ở backend hiện tại — sẽ cần xem exam-candidate.model.js để xác nhận field
-// trước khi nối API thật, không tự bịa field ở đây).
+// Mỗi thí sinh chỉ có 1 lượt thi chính thức CHO MỖI KỲ THI đang được đăng
+// (published) — không phải giới hạn 1 lượt duy nhất trong suốt lịch sử tài
+// khoản. Khi Người ra đề/Người duyệt đề đăng một kỳ thi mới (dù cùng chủ đề
+// cũ hay chủ đề mới), lượt thi phải được làm mới về MAX_ATTEMPTS, vì đây là
+// một exam._id khác — chỉ khi thí sinh đã nộp bài cho ĐÚNG kỳ thi đang active
+// hiện tại thì mới bị khoá nút "Vào thi chính thức". Muốn thi lại chính kỳ
+// thi đó thì vẫn cần Người duyệt đề cấp phép riêng (chưa có cơ chế ở backend).
 const MAX_ATTEMPTS = 1;
 
 const SIDEBAR_ITEMS = [
@@ -40,7 +43,7 @@ const SIDEBAR_ITEMS = [
   { id: 'materials', label: 'Tài liệu ôn tập', icon: BookOpen },
 ];
 
-export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) => {
+export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, activeExam }) => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,12 +88,24 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
     };
   }, [refreshTick]);
 
+  // "Số lần đã thi" ở khối tổng quan Dashboard vẫn hiển thị TOÀN BỘ lịch sử
+  // (thành tích chung của thí sinh qua các kỳ thi) — không liên quan tới việc
+  // khoá/mở nút thi.
   const totalAttempts = results.length;
   const bestResult = results.reduce((best, r) => {
     if (!best) return r;
     return r.score > best.score ? r : best;
   }, null);
-  const attemptsLeft = Math.max(0, MAX_ATTEMPTS - totalAttempts);
+
+  // Lượt thi CHÍNH THỨC chỉ tính trên đúng kỳ thi đang active (activeExam._id)
+  // — đây là chỗ sửa lỗi: trước đây dùng totalAttempts (toàn bộ lịch sử) nên
+  // hễ thí sinh từng thi 1 kỳ thi cũ nào đó là bị khoá vĩnh viễn, kể cả khi
+  // Người duyệt đề đã đăng kỳ thi mới (dù cùng chủ đề cũ hay chủ đề khác).
+  // Không có kỳ thi nào đang active thì coi như chưa có gì để thi.
+  const attemptsForActiveExam = activeExam
+    ? results.filter((r) => String(r.examId) === String(activeExam._id)).length
+    : 0;
+  const attemptsLeft = activeExam ? Math.max(0, MAX_ATTEMPTS - attemptsForActiveExam) : 0;
 
   const handleStartExam = () => {
     if (typeof onOpenExam === 'function') {
@@ -114,12 +129,12 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
           <span>Đang tải dữ liệu...</span>
         </div>
       ) : error ? (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-xl flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>
       ) : !employee ? (
-        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl flex items-center gap-3">
+        <div className="p-4 bg-[#FFFBEB] border border-[#F6AD37]/40 text-[#0F172A] rounded-xl flex items-center gap-3">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>
             Tài khoản của bạn chưa được liên kết với hồ sơ nhân viên nào. Vui lòng liên hệ quản trị viên để được hỗ trợ.
@@ -229,7 +244,9 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
                     <div>
                       <div className="font-bold text-white">Sẵn sàng thi trực tuyến?</div>
                       <div className="text-sm text-slate-400">
-                        Bạn còn {attemptsLeft} lượt thi. Chuyển sang mục "Thi trực tuyến" để bắt đầu.
+                        {activeExam
+                          ? `Bạn còn ${attemptsLeft} lượt thi cho kỳ thi đang diễn ra. Chuyển sang mục "Thi trực tuyến" để bắt đầu.`
+                          : 'Hiện chưa có kỳ thi nào đang diễn ra. Vui lòng quay lại sau.'}
                       </div>
                     </div>
                   </div>
@@ -256,8 +273,8 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
                 <div className="p-6 space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                      <div className="text-xs text-slate-500 mb-1">Số lượt đã thi</div>
-                      <div className="text-xl font-bold text-[#0F172A]">{totalAttempts}/{MAX_ATTEMPTS}</div>
+                      <div className="text-xs text-slate-500 mb-1">Số lượt đã thi (kỳ thi hiện tại)</div>
+                      <div className="text-xl font-bold text-[#0F172A]">{attemptsForActiveExam}/{MAX_ATTEMPTS}</div>
                     </div>
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                       <div className="text-xs text-slate-500 mb-1">Lượt còn lại</div>
@@ -271,13 +288,20 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
                     </div>
                   </div>
 
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm flex items-start gap-2.5">
-                    <Clock className="w-5 h-5 shrink-0 mt-0.5" />
-                    <span>
-                      Vui lòng chuẩn bị đầy đủ thời gian trước khi bắt đầu — bài thi có giới hạn thời gian và không thể
-                      tạm dừng giữa chừng. Không thoát trình duyệt trong khi đang làm bài.
-                    </span>
-                  </div>
+                  {!activeExam ? (
+                    <div className="p-4 bg-[#F6F8FA] border border-slate-200 rounded-lg text-slate-500 text-sm flex items-start gap-2.5">
+                      <Clock className="w-5 h-5 shrink-0 mt-0.5" />
+                      <span>Hiện không có kỳ thi nào đang diễn ra. Vui lòng quay lại sau khi Người duyệt đề đăng kỳ thi mới.</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg text-[#0F172A] text-sm flex items-start gap-2.5">
+                      <Clock className="w-5 h-5 shrink-0 mt-0.5" />
+                      <span>
+                        Vui lòng chuẩn bị đầy đủ thời gian trước khi bắt đầu — bài thi có giới hạn thời gian và không thể
+                        tạm dừng giữa chừng. Không thoát trình duyệt trong khi đang làm bài.
+                      </span>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleStartExam}
@@ -288,10 +312,10 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
                     <span>VÀO THI CHÍNH THỨC</span>
                   </button>
 
-                  {attemptsLeft <= 0 && (
+                  {activeExam && attemptsLeft <= 0 && (
                     <p className="text-center text-sm text-slate-500">
-                      Bạn đã hoàn thành lượt thi chính thức. Nếu cần thi lại, vui lòng liên hệ Người duyệt đề để được
-                      xem xét cấp phép cho lượt thi mới.
+                      Bạn đã hoàn thành lượt thi chính thức cho kỳ thi "{activeExam.title}". Nếu cần thi lại, vui lòng liên hệ
+                      Người duyệt đề để được xem xét cấp phép cho lượt thi mới.
                     </p>
                   )}
                 </div>
@@ -339,7 +363,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen }) =
                                   <Award className="w-3.5 h-3.5" /> Đạt
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-600 font-semibold text-xs">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FEECEC] text-[#C53030] font-semibold text-xs">
                                   <XCircle className="w-3.5 h-3.5" /> Chưa đạt
                                 </span>
                               )}
