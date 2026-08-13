@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown } from 'lucide-react';
-import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, importEmployeesExcel, downloadImportResultsCsv } from '../../services/admin.service';
+import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, previewImportEmployeesExcel, confirmImportEmployeesExcel, downloadImportResultsCsv, downloadSingleAccountCredential, exportCandidateCredentialsExcel } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
 import { getAuthHeaders } from '../../services/auth.service';
 import { useToast } from '../ToastContext';
@@ -38,6 +38,7 @@ export const AccountTab = ({ currentUser }) => {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [exportCredentialsLoading, setExportCredentialsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Cột hiển thị trong bảng — nhớ lựa chọn của người dùng giữa các lần vào
@@ -99,9 +100,12 @@ export const AccountTab = ({ currentUser }) => {
   });
   const [copied, setCopied] = useState(false);
 
-  // Import Excel (bulk) state
-  const [importLoading, setImportLoading] = useState(false);
-  const [importResult, setImportResult] = useState(null); // { total, created, updated, failed, results }
+  // Import Excel (bulk) state — 2 bước: preview (xem trước, chưa ghi DB) rồi
+  // confirm (ghi thật) — xem handleImportFile / handleConfirmImport bên dưới.
+  const [importLoading, setImportLoading] = useState(false); // đang upload + phân tích file (bước preview)
+  const [importPreview, setImportPreview] = useState(null); // { total, toCreate, toReuse, toUpdate, conflicts, errors, rows }
+  const [importConfirming, setImportConfirming] = useState(false); // đang ghi thật (bước confirm)
+  const [importResult, setImportResult] = useState(null); // { total, created, updated, reused, failed, results }
   const fileInputRef = useRef(null);
 
   const loadData = async () => {
@@ -239,21 +243,39 @@ export const AccountTab = ({ currentUser }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Import Excel hàng loạt nhân viên (role candidate) — xem admin.service.js
+  // BƯỚC 1/2 — Xem trước import Excel hàng loạt nhân viên (role candidate):
+  // chỉ đọc + phân loại từng dòng, CHƯA ghi gì vào DB — xem admin.service.js
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportLoading(true);
+    setImportPreview(null);
     setImportResult(null);
     try {
-      const data = await importEmployeesExcel(file);
+      const data = await previewImportEmployeesExcel(file);
+      setImportPreview(data);
+    } catch (err) {
+      showToast(err.message || 'Xem trước import thất bại', 'error');
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // BƯỚC 2/2 — Admin đã xem preview và bấm xác nhận: ghi thật vào DB. Các
+  // dòng 'conflict'/'error' trong preview sẽ tự động bị server bỏ qua.
+  const handleConfirmImport = async () => {
+    if (!importPreview?.rows?.length) return;
+    setImportConfirming(true);
+    try {
+      const data = await confirmImportEmployeesExcel(importPreview.rows);
+      setImportPreview(null);
       setImportResult(data);
       await loadData();
     } catch (err) {
       showToast(err.message || 'Import thất bại', 'error');
     } finally {
-      setImportLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setImportConfirming(false);
     }
   };
 
@@ -261,6 +283,28 @@ export const AccountTab = ({ currentUser }) => {
   const filteredUsers = users.filter(user => 
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // MỚI: Xuất danh sách CHỈ tài khoản nhân viên (role candidate — không gồm
+  // admin/examiner/leader) kèm username + mật khẩu tạm ra Excel. Hành động
+  // này RESET mật khẩu tạm cho TOÀN BỘ tài khoản candidate đang hoạt động,
+  // nên bắt buộc phải xác nhận rõ ràng trước khi thực hiện.
+  const handleExportCandidateCredentials = async () => {
+    const ok = await confirmAction(
+      'Thao tác này sẽ RESET MẬT KHẨU của TẤT CẢ tài khoản nhân viên (thí sinh) đang hoạt động và xuất ra file Excel kèm mật khẩu mới. Mật khẩu cũ sẽ không còn dùng được. Bạn có chắc chắn muốn tiếp tục?',
+      { title: 'Xuất danh sách nhân viên + reset mật khẩu', confirmLabel: 'Xuất & reset', danger: true }
+    );
+    if (!ok) return;
+
+    setExportCredentialsLoading(true);
+    try {
+      await exportCandidateCredentialsExcel();
+      showToast('Đã xuất danh sách và reset mật khẩu thành công', 'success');
+    } catch (err) {
+      showToast(err.message || 'Xuất danh sách thất bại', 'error');
+    } finally {
+      setExportCredentialsLoading(false);
+    }
+  };
 
   const isSelf = (user) => {
     const currentId = currentUser?._id || currentUser?.id;
@@ -329,6 +373,16 @@ export const AccountTab = ({ currentUser }) => {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={handleExportCandidateCredentials}
+            disabled={exportCredentialsLoading}
+            title="Xuất danh sách nhân viên kèm username/mật khẩu — sẽ reset mật khẩu tất cả"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition-colors flex-1 sm:flex-none justify-center disabled:opacity-50"
+          >
+            {exportCredentialsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <KeyRound className="w-5 h-5" />}
+            <span className="hidden sm:inline">Xuất DS nhân viên (kèm mật khẩu)</span>
+          </button>
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -703,8 +757,20 @@ export const AccountTab = ({ currentUser }) => {
               </div>
 
               <div className="bg-[#FFFBEB] p-3 rounded-lg border border-[#F6AD37]/40 text-left text-xs text-[#92400E] font-medium">
-                ⚠️ Mật khẩu tạm này chỉ hiển thị duy nhất một lần. Hãy sao chép và gửi cho người dùng. Họ sẽ bắt buộc phải đổi mật khẩu khi đăng nhập lần đầu.
+                ⚠️ Mật khẩu tạm này chỉ hiển thị duy nhất một lần. Hãy sao chép hoặc tải file, rồi gửi cho người dùng. Họ sẽ bắt buộc phải đổi mật khẩu khi đăng nhập lần đầu.
               </div>
+
+              <button
+                type="button"
+                onClick={() => downloadSingleAccountCredential({
+                  title: tempPasswordModal.title,
+                  username: tempPasswordModal.username,
+                  password: tempPasswordModal.password,
+                })}
+                className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4 rotate-180" /> Tải file tài khoản (username + mật khẩu)
+              </button>
 
               <button
                 type="button"
@@ -718,7 +784,130 @@ export const AccountTab = ({ currentUser }) => {
         </div>
       )}
 
-      {/* IMPORT EXCEL — KẾT QUẢ MODAL */}
+      {/* IMPORT EXCEL — XEM TRƯỚC & XÁC NHẬN MODAL (bước 1/2) */}
+      {importPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Xem trước import — chưa ghi vào hệ thống
+              </h3>
+              <button
+                onClick={() => setImportPreview(null)}
+                disabled={importConfirming}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+                <div className="bg-[#F0FDF4] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#22C55E]">{importPreview.toCreate}</div>
+                  <div className="text-[11px] text-slate-500">Tạo mới</div>
+                </div>
+                <div className="bg-[#FFF7ED] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#F6AD37]">{importPreview.toReuse}</div>
+                  <div className="text-[11px] text-slate-500">Tái sử dụng</div>
+                </div>
+                <div className="bg-[#EAF6FF] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#008BC5]">{importPreview.toUpdate}</div>
+                  <div className="text-[11px] text-slate-500">Cập nhật</div>
+                </div>
+                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#E53E3E]">{importPreview.conflicts}</div>
+                  <div className="text-[11px] text-slate-500">Trùng t.khoản</div>
+                </div>
+                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#E53E3E]">{importPreview.duplicatesInFile}</div>
+                  <div className="text-[11px] text-slate-500">Trùng trong file</div>
+                </div>
+                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                  <div className="text-xl font-bold text-[#E53E3E]">{importPreview.errors}</div>
+                  <div className="text-[11px] text-slate-500">Lỗi dữ liệu</div>
+                </div>
+              </div>
+
+              {(importPreview.duplicatesInFile > 0) && (
+                <div className="bg-[#FEECEC] border border-[#E53E3E]/40 rounded-lg p-3 text-xs text-[#7F1D1D] flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Có mã nhân viên xuất hiện ở <b>nhiều dòng trong cùng file</b> — các dòng này bị bỏ qua vì không thể xác định dòng nào đúng. Hãy sửa lại file (mỗi mã chỉ giữ 1 dòng) rồi import lại riêng các dòng đó.
+                  </span>
+                </div>
+              )}
+
+              {(importPreview.toReuse > 0) && (
+                <div className="bg-[#FFF7ED] border border-[#F6AD37]/40 rounded-lg p-3 text-xs text-[#92400E] flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Các dòng "Tái sử dụng" bên dưới sẽ <b>mở khóa và ghi đè</b> lên tài khoản đã bị khóa của nhân viên cũ (tên nhân viên cũ được ghi rõ ở từng dòng). Hãy kiểm tra kỹ trước khi xác nhận.
+                  </span>
+                </div>
+              )}
+
+              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                {importPreview.rows.map((r) => (
+                  <div key={r.rowIndex} className="p-2.5 text-xs flex items-start gap-2">
+                    <span className="text-slate-400 w-10 shrink-0">Dòng {r.rowIndex}</span>
+                    <div className="flex-1 min-w-0">
+                      {r.action === 'create' && (
+                        <span className="text-[#22C55E] font-medium">Tạo mới — {r.fullname} ({r.employeeCode})</span>
+                      )}
+                      {r.action === 'reuse' && (
+                        <span className="text-[#F6AD37] font-medium">
+                          Tái sử dụng — {r.fullname} ({r.employeeCode}), ghi đè lên tài khoản "{r.reuseTarget?.username}" hiện là "{r.reuseTarget?.fullname}"
+                        </span>
+                      )}
+                      {r.action === 'update' && (
+                        <span className="text-[#008BC5] font-medium">
+                          Cập nhật hồ sơ — {r.fullname} ({r.employeeCode}), tài khoản "{r.updateTarget?.username}"
+                        </span>
+                      )}
+                      {r.action === 'conflict' && (
+                        <span className="text-[#E53E3E] font-medium">
+                          Trùng tài khoản đang hoạt động "{r.conflictWith?.username}" ({r.conflictWith?.fullname || r.conflictWith?.employeeCode}) — bỏ qua, hãy sửa lại file
+                        </span>
+                      )}
+                      {r.action === 'duplicate_in_file' && (
+                        <span className="text-[#E53E3E] font-medium">
+                          Trùng mã trong file — {r.fullname} ({r.employeeCode}), trùng với dòng {r.duplicateRows?.join(', ')} — bỏ qua, hãy sửa lại file
+                        </span>
+                      )}
+                      {r.action === 'error' && (
+                        <span className="text-[#E53E3E] font-medium">Lỗi — {r.message}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setImportPreview(null)}
+                  disabled={importConfirming}
+                  className="flex-1 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={importConfirming || (importPreview.toCreate + importPreview.toReuse + importPreview.toUpdate === 0)}
+                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {importConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Xác nhận nhập ({importPreview.toCreate + importPreview.toReuse + importPreview.toUpdate} dòng)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT EXCEL — KẾT QUẢ MODAL (bước 2/2, sau khi đã ghi thật) */}
       {importResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
@@ -731,10 +920,14 @@ export const AccountTab = ({ currentUser }) => {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-4 gap-3 text-center">
                 <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#22C55E]">{importResult.created}</div>
                   <div className="text-xs text-slate-500">Tạo mới</div>
+                </div>
+                <div className="bg-[#FFF7ED] rounded-lg p-3">
+                  <div className="text-2xl font-bold text-[#F6AD37]">{importResult.reused}</div>
+                  <div className="text-xs text-slate-500">Tái sử dụng</div>
                 </div>
                 <div className="bg-[#EAF6FF] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#008BC5]">{importResult.updated}</div>

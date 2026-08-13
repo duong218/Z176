@@ -12,8 +12,18 @@ router.use(authenticate, adminOnly, requirePasswordChanged);
 
 router.get('/', userController.list);
 
+// MỚI: xuất danh sách tài khoản nhân viên (role candidate) ra Excel kèm
+// username + mật khẩu tạm. Dùng POST (không phải GET) vì đây là hành động
+// có side-effect quan trọng: RESET MẬT KHẨU của toàn bộ tài khoản candidate
+// đang hoạt động, không chỉ đọc dữ liệu.
+router.post('/export-credentials', userController.exportCandidateCredentials);
+
+// MỚI: import Excel tách làm 2 bước — preview (đọc file, phân loại từng dòng,
+// KHÔNG ghi DB) rồi confirm (nhận lại đúng danh sách rows đã phân loại đó,
+// ghi thật). Giúp admin thấy trước dòng nào sẽ ghi đè lên tài khoản đã khóa
+// của ai, và dòng nào trùng tài khoản đang hoạt động, trước khi bấm xác nhận.
 router.post(
-  '/import',
+  '/import/preview',
   (req, res, next) => {
     uploadExcel(req, res, (err) => {
       if (err instanceof ApiError) {
@@ -27,8 +37,10 @@ router.post(
       next();
     });
   },
-  userController.importExcel,
+  userController.previewImportExcel,
 );
+
+router.post('/import/confirm', userController.confirmImportExcel);
 
 router.post('/', userController.create);
 router.patch('/:id/role', userController.updateRole);

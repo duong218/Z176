@@ -56,7 +56,7 @@ export const ContactSection = () => {
           <MapPin className="w-5 h-5 text-[#008BC5] shrink-0 mt-0.5" />
           <div>
             <strong className="text-[#0F172A] font-bold block text-base">{Z176_COMPANY_INFO.name}</strong>
-            <span>Địa chỉ: Xã Kiều Phú, Huyện Quốc Oai, Thành phố Hà Nội</span>
+            <span>Địa chỉ: Nhà máy Z176 - Trung Dương, Gia Lâm, Hà Nội</span>
           </div>
         </div>
       </div>

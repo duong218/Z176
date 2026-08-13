@@ -1,4 +1,4 @@
-import { apiRequest } from './api';
+import { apiRequest, API_BASE_URL } from './api';
 import { getAuthHeaders } from './auth.service';
 import { fetchActiveExam } from './exam-review.service';
 
@@ -113,22 +113,38 @@ export async function triggerBackup() {
 }
 
 /**
- * Import hàng loạt nhân viên (tài khoản 'candidate') từ file Excel.
- * Trả về { total, created, updated, failed, results: [...] } — xem
- * server/src/services/user.service.js#importEmployeesFromExcelFile để biết
- * đầy đủ ý nghĩa từng field trong results.
+ * BƯỚC 1/2 — Xem trước import Excel: gửi file lên, nhận về danh sách từng
+ * dòng đã phân loại (create/reuse/update/conflict/error), CHƯA ghi gì vào DB.
+ * Trả về { total, toCreate, toReuse, toUpdate, conflicts, errors, rows }.
+ * Xem server/src/services/user.service.js#previewEmployeesFromExcelFile để
+ * biết đầy đủ ý nghĩa từng field trong mỗi phần tử của `rows`.
  */
-export async function importEmployeesExcel(file) {
+export async function previewImportEmployeesExcel(file) {
   const formData = new FormData();
   formData.append('file', file);
 
   const headers = getAuthHeaders();
   delete headers['Content-Type']; // để browser tự set boundary cho multipart/form-data
 
-  const res = await apiRequest('/users/import', {
+  const res = await apiRequest('/users/import/preview', {
     method: 'POST',
     headers,
     body: formData,
+  });
+  return res.data;
+}
+
+/**
+ * BƯỚC 2/2 — Xác nhận import: gửi lại đúng mảng `rows` nhận được từ bước
+ * preview (đã phân loại action cho từng dòng) để ghi thật vào DB. Các dòng
+ * action 'conflict'/'error' sẽ bị server bỏ qua.
+ * Trả về { total, created, updated, reused, failed, results: [...] }.
+ */
+export async function confirmImportEmployeesExcel(rows) {
+  const res = await apiRequest('/users/import/confirm', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ rows }),
   });
   return res.data;
 }
@@ -137,7 +153,7 @@ export async function importEmployeesExcel(file) {
 // username/mật khẩu tạm cho hàng nghìn nhân viên cùng lúc.
 export function downloadImportResultsCsv(results) {
   const header = ['Dòng', 'Mã NV', 'Username', 'Họ tên', 'Phòng ban', 'Trạng thái', 'Mật khẩu tạm', 'Ghi chú'];
-  const statusLabel = { created: 'Tạo mới', updated: 'Cập nhật', error: 'Lỗi' };
+  const statusLabel = { created: 'Tạo mới', reused: 'Tái sử dụng', updated: 'Cập nhật', error: 'Lỗi' };
   const rows = results.map((r) => [
     r.row,
     r.employeeCode,
@@ -158,6 +174,135 @@ export function downloadImportResultsCsv(results) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `ket-qua-import-nhan-vien-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Xuất một bảng dữ liệu bất kỳ (mảng object) ra CSV (UTF-8 BOM) — dùng chung
+ * cho các nút "Xuất danh sách" trong dashboard admin, khác với
+ * downloadImportResultsCsv (chỉ dành riêng cho kết quả import Excel).
+ *
+ * @param {{ label: string, key: string }[]} columns
+ * @param {object[]} rows
+ * @param {string} filenamePrefix
+ */
+export function downloadTableCsv(columns, rows, filenamePrefix) {
+  const header = columns.map((c) => c.label);
+  const dataRows = rows.map((row) => columns.map((c) => row[c.key]));
+  const csvLines = [header, ...dataRows].map((row) =>
+    row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','),
+  );
+  const csvContent = '\uFEFF' + csvLines.join('\r\n'); // BOM để Excel đọc đúng UTF-8
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filenamePrefix}-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+/**
+ * MỚI: Xuất danh sách tài khoản NHÂN VIÊN (role candidate) ra file Excel kèm
+ * username + mật khẩu tạm — khác downloadTableCsv() (không có mật khẩu).
+ * Backend sẽ RESET mật khẩu tạm cho toàn bộ tài khoản candidate đang hoạt
+ * động trước khi trả file, nên không dùng apiRequest() (vốn parse JSON) mà
+ * tự fetch để nhận blob nhị phân — nhưng vẫn dùng chung API_BASE_URL và
+ * cùng cơ chế Bearer token với apiRequest() để đồng nhất.
+ *
+ * Không tự động refresh token khi 401 hết hạn (khác apiRequest) — vì đây là
+ * action hiếm khi dùng, không đáng thêm độ phức tạp retry cho 1 lần bấm nút;
+ * nếu gặp phiên hết hạn, báo lỗi rõ ràng để admin tự thao tác lại (lúc đó
+ * lần gọi apiRequest tiếp theo trong app sẽ tự refresh như bình thường).
+ */
+export async function exportCandidateCredentialsExcel() {
+  const headers = getAuthHeaders();
+  delete headers['Content-Type'];
+
+  const res = await fetch(`${API_BASE_URL}/users/export-credentials`, {
+    method: 'POST',
+    credentials: 'include',
+    headers,
+  });
+
+  if (!res.ok) {
+    let message = 'Xuất danh sách thất bại';
+    let code;
+    try {
+      const errBody = await res.json();
+      message = errBody?.message || message;
+      code = errBody?.code;
+    } catch {
+      // response không phải JSON
+    }
+    if (res.status === 401 && code === 'AUTH_ACCESS_EXPIRED') {
+      message = 'Phiên đăng nhập đã hết hạn, vui lòng thử lại thao tác này lần nữa.';
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] || `danh-sach-nhan-vien-${Date.now()}.xlsx`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Tải về thông tin đăng nhập của MỘT tài khoản (sau khi tạo mới hoặc reset
+ * mật khẩu) dưới dạng file text định dạng rõ ràng, dễ đọc — khác với CSV
+ * hàng loạt ở trên, dùng cho tempPasswordModal khi admin xử lý từng tài
+ * khoản một. Vì mật khẩu tạm chỉ được server trả về đúng 1 lần và không lưu
+ * lại được, nút này chỉ khả dụng ngay sau khi tạo/reset — không thể tải lại
+ * sau khi đã đóng modal.
+ *
+ * @param {{ title: string, username: string, password: string }} info
+ */
+export function downloadSingleAccountCredential({ title, username, password }) {
+  const now = new Date();
+  const formattedDate = now.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const line = '='.repeat(48);
+  const content = [
+    line,
+    '  THÔNG TIN TÀI KHOẢN — HỆ THỐNG THI NỘI BỘ Z176',
+    line,
+    '',
+    `  ${title}`,
+    '',
+    `  Tên đăng nhập   : ${username}`,
+    `  Mật khẩu tạm    : ${password}`,
+    `  Thời gian cấp   : ${formattedDate}`,
+    '',
+    line,
+    '  LƯU Ý',
+    line,
+    '  - Mật khẩu tạm này chỉ hiển thị và tải về được DUY NHẤT 1 LẦN.',
+    '  - Vui lòng gửi lại cho người dùng và không chia sẻ cho người khác.',
+    '  - Người dùng sẽ bắt buộc phải đổi mật khẩu ngay lần đăng nhập đầu tiên.',
+    '',
+  ].join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tai-khoan-${username || 'nguoi-dung'}-${Date.now()}.txt`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

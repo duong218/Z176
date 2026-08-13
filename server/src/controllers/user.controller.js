@@ -127,16 +127,51 @@ export const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
-export const importExcel = asyncHandler(async (req, res) => {
+export const exportCandidateCredentials = asyncHandler(async (req, res) => {
+  const { buffer, count } = await userService.exportCandidateCredentialsExcel({
+    adminId: req.auth.userId,
+    ipAddress: req.ip,
+  });
+
+  const filename = `danh-sach-nhan-vien-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  // Để client (fetch) đọc được tên file thật thay vì tên mặc định
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+  res.send(buffer);
+
+  // Không dùng writeAudit ở đây nữa vì exportCandidateCredentialsExcel() đã tự
+  // ghi audit bên trong service (khác với các action khác trong file này) —
+  // vì hàm cần biết chính xác số lượng tài khoản đã reset (count) tại thời
+  // điểm reset xong, trước khi trả buffer về controller.
+});
+
+export const previewImportExcel = asyncHandler(async (req, res) => {
   if (!req.file?.path) {
     throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');
   }
 
-  const data = await userService.importEmployeesFromExcelFile(
-    req.file.path,
-    req.auth.userId,
-    req.ip,
-  );
+  const data = await userService.previewEmployeesFromExcelFile(req.file.path);
+
+  res.json({
+    success: true,
+    message: `Xem trước: ${data.toCreate} tạo mới, ${data.toReuse} sẽ tái sử dụng tài khoản đã khóa, ${data.toUpdate} cập nhật, ${data.conflicts} trùng tài khoản đang hoạt động, ${data.duplicatesInFile} trùng mã trong cùng file, ${data.errors} lỗi`,
+    code: 'EMPLOYEE_IMPORT_PREVIEW_OK',
+    data,
+  });
+});
+
+export const confirmImportExcel = asyncHandler(async (req, res) => {
+  const { rows } = req.body ?? {};
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new ApiError(400, 'Thiếu dữ liệu các dòng cần import (rows)', 'MISSING_FIELDS');
+  }
+
+  const data = await userService.confirmEmployeeImportRows(rows, req.auth.userId, req.ip);
 
   res.json({
     success: true,

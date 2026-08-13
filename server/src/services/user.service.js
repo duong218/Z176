@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import fs from 'fs';
 import XLSX from 'xlsx';
+import ExcelJS from 'exceljs'; // MỚI — dùng để xuất Excel có định dạng (màu, border, độ rộng cột) cho export-credentials, khác với XLSX (chỉ dùng để ĐỌC file import ở dưới)
 import { User, Role, Employee } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import * as auditService from './audit.service.js';
@@ -383,6 +384,151 @@ export async function resetUserPassword({ adminId, userId, ipAddress }) {
   return { tempPassword };
 }
 
+/**
+ * MỚI: Xuất danh sách TÀI KHOẢN NHÂN VIÊN (role 'candidate' — KHÔNG bao gồm
+ * admin/examiner/leader) ra file Excel định dạng rõ ràng, kèm username +
+ * mật khẩu. Vì mật khẩu tạm không lưu dạng plain text trong DB (chỉ lưu
+ * hash), hành động xuất này BẮT BUỘC phải reset mật khẩu tạm cho từng tài
+ * khoản trước khi ghi vào file — đây là điểm khác biệt quan trọng so với
+ * resetUserPassword() (chỉ reset 1 tài khoản, không xuất file).
+ *
+ * Chỉ áp dụng cho tài khoản đang hoạt động (isActive: true) — tài khoản đã
+ * khóa bị bỏ qua vì không dùng được nên reset không có ý nghĩa.
+ *
+ * Trả về { buffer, count } — buffer là file .xlsx dạng Buffer, count là số
+ * tài khoản đã được reset + đưa vào file.
+ */
+export async function exportCandidateCredentialsExcel({ adminId, ipAddress }) {
+  const candidateRole = await Role.findOne({ code: 'candidate' });
+  if (!candidateRole) {
+    throw new ApiError(500, 'Không tìm thấy role "candidate" trong hệ thống', 'ROLE_NOT_FOUND');
+  }
+
+  const users = await User.find({ roleId: candidateRole._id, isActive: true }).sort({ username: 1 });
+  if (!users.length) {
+    throw new ApiError(404, 'Không có tài khoản nhân viên nào đang hoạt động để xuất', 'NO_CANDIDATE_USERS');
+  }
+
+  const employees = await Employee.find({ userId: { $in: users.map((u) => u._id) } })
+    .populate('departmentId', 'name')
+    .lean();
+  const employeeByUserId = new Map(employees.map((e) => [e.userId.toString(), e]));
+
+  // Reset mật khẩu tạm cho TỪNG tài khoản — dùng chung generateTempPassword()
+  // với resetUserPassword() để đồng nhất độ dài/độ khó mật khẩu.
+  const rows = [];
+  for (const user of users) {
+    const { tempPassword, passwordHash } = await generateTempPassword();
+    user.passwordHash = passwordHash;
+    user.mustChangePassword = true;
+    user.tokenVersion += 1; // vô hiệu hóa mọi phiên đăng nhập cũ
+    await user.save();
+
+    const emp = employeeByUserId.get(user._id.toString());
+    rows.push({
+      fullname: emp?.fullname ?? '',
+      employeeCode: emp?.employeeCode ?? '',
+      departmentName: emp?.departmentId?.name ?? '',
+      position: emp?.position ?? '',
+      username: user.username,
+      tempPassword,
+    });
+  }
+
+  const buffer = await buildCredentialsWorkbook(rows);
+
+  await auditService.writeAudit({
+    actorUserId: adminId,
+    action: 'EXPORT_CANDIDATE_CREDENTIALS',
+    resourceType: 'User',
+    resourceId: null,
+    metadata: { detail: `Xuất danh sách + reset mật khẩu tạm cho ${rows.length} tài khoản nhân viên` },
+    ipAddress,
+  });
+
+  return { buffer, count: rows.length };
+}
+
+/** Dựng workbook Excel định dạng rõ ràng cho danh sách username/mật khẩu tạm. */
+async function buildCredentialsWorkbook(rows) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Z176 - Hệ thống thi nội bộ';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Danh sách nhân viên', {
+    views: [{ state: 'frozen', ySplit: 1 }], // khóa dòng tiêu đề khi cuộn
+  });
+
+  sheet.columns = [
+    { header: 'STT', key: 'stt', width: 6 },
+    { header: 'Họ tên', key: 'fullname', width: 26 },
+    { header: 'Mã nhân viên', key: 'employeeCode', width: 16 },
+    { header: 'Phòng ban', key: 'departmentName', width: 24 },
+    { header: 'Chức vụ', key: 'position', width: 20 },
+    { header: 'Username', key: 'username', width: 18 },
+    { header: 'Mật khẩu tạm', key: 'tempPassword', width: 16 },
+  ];
+
+  rows.forEach((r, i) => sheet.addRow({ stt: i + 1, ...r }));
+
+  // Header: nền xanh đậm, chữ trắng, in đậm, căn giữa
+  const headerRow = sheet.getRow(1);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF008BC5' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+      bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+      left: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+      right: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    };
+  });
+  headerRow.height = 22;
+
+  // Dữ liệu: border mỏng + zebra stripe cho dễ đọc, cột mật khẩu tô vàng nhạt
+  // để nổi bật (đây là thông tin nhạy cảm, cần dễ nhìn thấy khi gửi/in).
+  for (let i = 2; i <= sheet.rowCount; i++) {
+    const row = sheet.getRow(i);
+    const isEven = i % 2 === 0;
+    row.eachCell((cell, colNumber) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+        left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+        right: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'center' : 'left' };
+      if (isEven) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F9FC' } };
+      }
+      const isPasswordCol = sheet.getColumn(colNumber).key === 'tempPassword';
+      const isUsernameCol = sheet.getColumn(colNumber).key === 'username';
+      if (isPasswordCol) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+        cell.font = { bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
+      if (isUsernameCol) {
+        cell.font = { bold: true };
+      }
+    });
+    row.height = 18;
+  }
+
+  sheet.autoFilter = { from: 'A1', to: `G1` };
+
+  // Ghi chú cảnh báo bảo mật ở cuối file
+  const noteRowIndex = sheet.rowCount + 2;
+  const note = sheet.getCell(`A${noteRowIndex}`);
+  note.value = 'Lưu ý: Mật khẩu tạm chỉ hiển thị được 1 lần duy nhất tại thời điểm xuất. Vui lòng gửi cho nhân viên và yêu cầu đổi mật khẩu ngay lần đăng nhập đầu tiên. Không chia sẻ file này cho người không liên quan.';
+  note.font = { italic: true, size: 10, color: { argb: 'FFB91C1C' } };
+  sheet.mergeCells(`A${noteRowIndex}:G${noteRowIndex}`);
+  sheet.getRow(noteRowIndex).alignment = { wrapText: true };
+
+  return workbook.xlsx.writeBuffer();
+}
+
 // ─── Import Excel danh sách nhân viên (bulk) ───────────────────────────────
 
 function normalizeKey(key) {
@@ -481,26 +627,212 @@ async function buildEmployeeImportRow(row, rowIndex) {
 }
 
 /**
- * Import hàng loạt nhân viên/tài khoản thí sinh từ Excel.
- * Quy tắc (đã chốt với người dùng):
- * - username = mã nhân viên đã bỏ dấu/ký tự đặc biệt, lowercase.
- * - phòng ban được xác định theo cột "Mã phòng ban" (khoá chính, không phân
- *   biệt hoa/thường/dấu) nếu có; nếu file không có cột mã thì fallback theo
- *   cột "Phòng ban" (tên, cũng không phân biệt dấu/hoa-thường). Không khớp
- *   phòng ban nào đã có thì TỰ ĐỘNG TẠO MỚI (không còn báo lỗi dòng).
- * - dòng có employeeCode đã tồn tại (Employee.employeeCode):
- *   + Nếu User gắn với employee đó đang HOẠT ĐỘNG -> chỉ CẬP NHẬT hồ sơ
- *     (fullname/phòng ban/...), giữ nguyên username & mật khẩu, KHÔNG tạo
- *     User mới (hành vi cũ).
- *   + Nếu User gắn với employee đó đang BỊ KHÓA (nhân viên cũ đã nghỉ) ->
- *     coi như "tái sử dụng": cập nhật hồ sơ, đổi username theo mã mới, mở
- *     khóa tài khoản và cấp mật khẩu tạm MỚI (status trả về là 'reused').
- * - dòng thiếu employeeCode -> tự sinh mã tạm TMP<rowIndex>.
- * - luôn gán role 'candidate'.
+ * Đọc file Excel và tách các dòng dữ liệu hợp lệ (bỏ dòng trống/chú thích).
+ * Dùng chung cho cả preview và (trước đây) import trực tiếp.
  */
-export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress) {
+function readImportRows(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new ApiError(400, 'Không đọc được file upload', 'IMPORT_FILE_MISSING');
+  }
+
+  const workbook = XLSX.readFile(filePath, { cellDates: false });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new ApiError(400, 'File Excel không có sheet', 'IMPORT_EMPTY');
+
+  const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+  if (!rawRows.length) throw new ApiError(400, 'Sheet trống', 'IMPORT_EMPTY');
+
+  const rows = [];
+  for (let i = 0; i < rawRows.length; i += 1) {
+    const rowIndex = i + 2; // dòng 1 là header
+
+    // Bỏ qua dòng trống hoặc dòng chú thích/hướng dẫn ở cuối file mẫu (vd
+    // "Ghi chú:", "- Cột màu xanh...") — các dòng này chỉ có nội dung ở 1
+    // cột duy nhất (thường là cột "Họ tên"), không phải dòng dữ liệu nhân
+    // viên thật, nên KHÔNG tính là lỗi thiếu phòng ban/họ tên.
+    const nonEmptyCellCount = Object.values(rawRows[i]).filter(
+      (v) => String(v ?? '').trim() !== '',
+    ).length;
+    if (nonEmptyCellCount <= 1) continue;
+
+    rows.push({ rowIndex, raw: rawRows[i] });
+  }
+  return rows;
+}
+
+/**
+ * MỚI: Phân loại 1 dòng đã parse (chưa ghi DB) — xác định sẽ 'create' (tạo
+ * mới), 'reuse' (trùng mã/username với tài khoản đã khóa -> tái sử dụng),
+ * 'update' (trùng với tài khoản đang hoạt động -> chỉ cập nhật hồ sơ), hay
+ * 'conflict' (trùng username thuộc 1 mã nhân viên KHÁC, không liên quan gì
+ * tới employeeCode của dòng này — không thể xử lý tự động, cần admin sửa
+ * lại file).
+ */
+async function classifyImportRow(parsed) {
+  const { existingUser, existingEmployee } = await findExistingAccountForReuse({
+    employeeCode: parsed.employeeCode,
+    username: parsed.username,
+  });
+
+  if (!existingUser) {
+    return { ...parsed, action: 'create' };
+  }
+
+  if (!existingUser.isActive) {
+    return {
+      ...parsed,
+      action: 'reuse',
+      reuseTarget: {
+        userId: existingUser._id.toString(),
+        username: existingUser.username,
+        fullname: existingEmployee?.fullname ?? '(không có hồ sơ)',
+        employeeCode: existingEmployee?.employeeCode ?? '',
+      },
+    };
+  }
+
+  // existingUser đang HOẠT ĐỘNG.
+  // Nếu tài khoản trùng đó chính là do khớp employeeCode với dòng này (tức
+  // employeeCode của dòng này khớp đúng employeeCode hiện có) -> coi là
+  // "update hồ sơ" (hành vi cũ: cùng 1 nhân viên, chỉ cập nhật lại thông tin).
+  const sameEmployeeCode =
+    parsed.employeeCode && existingEmployee?.employeeCode === parsed.employeeCode;
+  if (sameEmployeeCode || existingUser.username === parsed.username) {
+    return {
+      ...parsed,
+      action: 'update',
+      updateTarget: {
+        userId: existingUser._id.toString(),
+        username: existingUser.username,
+        fullname: existingEmployee?.fullname ?? '',
+      },
+    };
+  }
+
+  // Trường hợp hiếm: username sinh ra từ employeeCode của dòng này lại trùng
+  // với 1 tài khoản đang hoạt động KHÁC (không cùng employeeCode) -> xung đột
+  // thật sự, không thể tự xử lý.
+  return {
+    ...parsed,
+    action: 'conflict',
+    conflictWith: {
+      username: existingUser.username,
+      fullname: existingEmployee?.fullname ?? '',
+      employeeCode: existingEmployee?.employeeCode ?? '',
+    },
+  };
+}
+
+/**
+ * MỚI — BƯỚC 1/2: Xem trước kết quả import mà KHÔNG ghi gì vào DB.
+ * Trả về danh sách từng dòng kèm phân loại (create/reuse/update/conflict/
+ * duplicate_in_file/error) để admin xác nhận trước khi ghi thật — đặc biệt
+ * quan trọng với dòng 'reuse' (ghi đè lên tài khoản của nhân viên đã nghỉ),
+ * 'conflict' (trùng tài khoản đang hoạt động, cần biết rõ trùng với ai để
+ * admin tự sửa file/username), và 'duplicate_in_file' (nhiều dòng TRONG
+ * CÙNG file này lại có cùng mã nhân viên — nếu cứ để xử lý bình thường,
+ * các dòng này sẽ cùng trỏ vào 1 tài khoản đích và dòng xử lý sau sẽ ghi đè
+ * âm thầm lên dòng xử lý trước lúc confirm, mất dữ liệu mà không có cảnh
+ * báo nào).
+ */
+export async function previewEmployeesFromExcelFile(filePath) {
+  const rows = readImportRows(filePath);
+
+  // Vòng 1: parse riêng từng dòng (không phụ thuộc DB) để trước hết phát
+  // hiện trùng employeeCode NGAY TRONG FILE — phải làm trước khi đối chiếu
+  // DB, vì nếu 2 dòng cùng mã cùng được coi là "update" tài khoản đích, hệ
+  // thống sẽ không có cách nào biết dòng nào mới "đúng" hơn dòng nào.
+  const parsedRows = [];
+  const parseErrors = [];
+  for (const { rowIndex, raw } of rows) {
+    try {
+      const parsed = await buildEmployeeImportRow(raw, rowIndex);
+      parsedRows.push(parsed);
+    } catch (err) {
+      parseErrors.push({
+        rowIndex,
+        action: 'error',
+        message: err.message ?? 'Lỗi không xác định',
+      });
+    }
+  }
+
+  // Gom nhóm theo employeeCode để tìm mã nào xuất hiện > 1 lần trong file.
+  const rowIndexesByCode = new Map();
+  for (const p of parsedRows) {
+    const list = rowIndexesByCode.get(p.employeeCode) ?? [];
+    list.push(p.rowIndex);
+    rowIndexesByCode.set(p.employeeCode, list);
+  }
+
+  const preview = [];
+  let toCreate = 0;
+  let toReuse = 0;
+  let toUpdate = 0;
+  let conflicts = 0;
+  let duplicatesInFile = 0;
+  let errors = parseErrors.length;
+
+  for (const parsed of parsedRows) {
+    const duplicateRowIndexes = rowIndexesByCode
+      .get(parsed.employeeCode)
+      .filter((idx) => idx !== parsed.rowIndex);
+
+    if (duplicateRowIndexes.length > 0) {
+      duplicatesInFile += 1;
+      preview.push({
+        ...parsed,
+        action: 'duplicate_in_file',
+        duplicateRows: duplicateRowIndexes,
+        message: `Mã nhân viên "${parsed.employeeCode}" xuất hiện ở nhiều dòng trong cùng file (dòng ${[parsed.rowIndex, ...duplicateRowIndexes].sort((a, b) => a - b).join(', ')}) — hãy sửa file để mỗi mã chỉ còn 1 dòng rồi import lại`,
+      });
+      continue;
+    }
+
+    const classified = await classifyImportRow(parsed);
+    preview.push(classified);
+    if (classified.action === 'create') toCreate += 1;
+    else if (classified.action === 'reuse') toReuse += 1;
+    else if (classified.action === 'update') toUpdate += 1;
+    else if (classified.action === 'conflict') conflicts += 1;
+  }
+
+  // Gộp lại đúng thứ tự dòng gốc trong file cho preview dễ đọc.
+  const merged = [...preview, ...parseErrors].sort((a, b) => a.rowIndex - b.rowIndex);
+
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    /* ignore cleanup */
+  }
+
+  return {
+    total: rows.length,
+    toCreate,
+    toReuse,
+    toUpdate,
+    conflicts,
+    duplicatesInFile,
+    errors,
+    rows: merged,
+  };
+}
+
+
+/**
+ * MỚI — BƯỚC 2/2: Ghi thật vào DB, dựa trên danh sách dòng ĐÃ ĐƯỢC PHÂN LOẠI
+ * ở bước preview (client gửi lại nguyên payload `rows` từ preview — không
+ * đọc lại file Excel nữa, tránh phải giữ file tạm giữa 2 request và tránh
+ * parse lại tốn thời gian với file hàng chục nghìn dòng).
+ *
+ * Chỉ xử lý các dòng có action 'create' | 'reuse' | 'update' — dòng
+ * 'conflict' hoặc 'error' bị bỏ qua (không tính vào kết quả) vì admin chưa
+ * xác nhận cách xử lý cho các dòng đó (họ cần tự sửa lại file rồi import lại
+ * riêng các dòng đó ở lượt sau).
+ */
+export async function confirmEmployeeImportRows(rows, adminId, ipAddress) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new ApiError(400, 'Không có dòng nào để xác nhận import', 'IMPORT_EMPTY');
   }
 
   const candidateRole = await Role.findOne({ code: 'candidate' });
@@ -508,104 +840,97 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
     throw new ApiError(500, 'Chưa cấu hình role candidate trong hệ thống', 'ROLE_NOT_FOUND');
   }
 
-  const workbook = XLSX.readFile(filePath, { cellDates: false });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) throw new ApiError(400, 'File Excel không có sheet', 'IMPORT_EMPTY');
-
-  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
-  if (!rows.length) throw new ApiError(400, 'Sheet trống', 'IMPORT_EMPTY');
-
   const results = [];
-  let processedCount = 0;
   let createdCount = 0;
   let updatedCount = 0;
   let reusedCount = 0;
   let failedCount = 0;
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const rowIndex = i + 2; // dòng 1 là header
-
-    // Bỏ qua dòng trống hoặc dòng chú thích/hướng dẫn ở cuối file mẫu (vd
-    // "Ghi chú:", "- Cột màu xanh...") — các dòng này chỉ có nội dung ở 1
-    // cột duy nhất (thường là cột "Họ tên"), không phải dòng dữ liệu nhân
-    // viên thật, nên KHÔNG tính là lỗi thiếu phòng ban/họ tên.
-    const nonEmptyCellCount = Object.values(rows[i]).filter(
-      (v) => String(v ?? '').trim() !== '',
-    ).length;
-    if (nonEmptyCellCount <= 1) {
-      continue;
+  for (const row of rows) {
+    const { rowIndex, action } = row ?? {};
+    if (action !== 'create' && action !== 'reuse' && action !== 'update') {
+      continue; // bỏ qua conflict/error — admin chưa xác nhận cách xử lý
     }
 
-    processedCount += 1;
     try {
-      const parsed = await buildEmployeeImportRow(rows[i], rowIndex);
+      if (action === 'reuse' || action === 'update') {
+        // Re-fetch trực tiếp bằng userId đã xác định ở bước preview (đáng tin
+        // hơn là tìm lại theo employeeCode/username — dữ liệu có thể vừa đổi
+        // giữa lúc preview và lúc confirm, vd admin thao tác tay song song).
+        const targetUserId = row.reuseTarget?.userId ?? row.updateTarget?.userId;
+        const existingUser = await User.findById(targetUserId).select('+passwordHash');
+        if (!existingUser) {
+          throw new ApiError(
+            400,
+            `Dòng ${rowIndex}: tài khoản dự kiến ${action === 'reuse' ? 'tái sử dụng' : 'cập nhật'} không còn tồn tại — có thể đã bị xóa giữa lúc xem trước và xác nhận`,
+            'IMPORT_TARGET_MISSING',
+          );
+        }
+        const existingEmployee = await Employee.findOne({ userId: existingUser._id });
 
-      const { existingUser, existingEmployee } = await findExistingAccountForReuse({
-        employeeCode: parsed.employeeCode,
-        username: parsed.username,
-      });
-
-      if (existingUser) {
-        if (!existingUser.isActive) {
-          // Tài khoản của nhân viên cũ (đã nghỉ, bị khóa) -> tái sử dụng
-          // cho nhân viên mới cùng mã: đổi username, mở khóa, cấp mật khẩu mới.
+        if (action === 'reuse') {
+          if (existingUser.isActive) {
+            // Đã có ai đó mở khóa tài khoản này giữa lúc preview và confirm
+            // -> không tái sử dụng nữa để tránh ghi đè nhầm, báo lỗi rõ ràng.
+            throw new ApiError(
+              409,
+              `Dòng ${rowIndex}: tài khoản "${existingUser.username}" đã được mở khóa bởi thao tác khác — không thể tự động tái sử dụng nữa`,
+              'IMPORT_TARGET_NO_LONGER_LOCKED',
+            );
+          }
           const { user, tempPassword } = await reactivateLockedAccount({
             adminId,
             existingUser,
             existingEmployee,
-            newUsername: parsed.username,
-            employeeData: parsed,
+            newUsername: row.username,
+            employeeData: row,
             ipAddress,
           });
-
           results.push({
             row: rowIndex,
-            employeeCode: parsed.employeeCode,
+            employeeCode: row.employeeCode,
             username: user.username,
-            fullname: parsed.fullname,
-            department: parsed.departmentName,
+            fullname: row.fullname,
+            department: row.departmentName,
             status: 'reused',
             tempPassword,
-            message: 'Mã trùng với tài khoản đã bị khóa — đã tự động mở khóa và cấp lại cho nhân viên mới',
+            message: `Đã mở khóa và cấp lại tài khoản (trước đó thuộc về "${row.reuseTarget?.fullname || row.reuseTarget?.username}")`,
           });
           reusedCount += 1;
           continue;
         }
 
-        // User đang hoạt động -> chỉ update hồ sơ, không đổi username/mật khẩu.
-        // Nếu tài khoản trùng chưa có Employee (tài khoản kiểu cũ, khớp qua
-        // username) thì tạo mới Employee gắn vào User đó, thay vì bỏ qua.
+        // action === 'update'
         if (existingEmployee) {
-          existingEmployee.fullname = parsed.fullname;
-          existingEmployee.departmentId = parsed.departmentId;
-          existingEmployee.employeeCode = parsed.employeeCode || existingEmployee.employeeCode;
-          existingEmployee.dob = parsed.dob;
-          existingEmployee.gender = parsed.gender;
-          existingEmployee.phone = parsed.phone;
-          existingEmployee.address = parsed.address;
-          existingEmployee.position = parsed.position;
+          existingEmployee.fullname = row.fullname;
+          existingEmployee.departmentId = row.departmentId;
+          existingEmployee.employeeCode = row.employeeCode || existingEmployee.employeeCode;
+          existingEmployee.dob = row.dob;
+          existingEmployee.gender = row.gender;
+          existingEmployee.phone = row.phone;
+          existingEmployee.address = row.address;
+          existingEmployee.position = row.position;
           await existingEmployee.save();
         } else {
           await Employee.create({
-            fullname: parsed.fullname,
-            departmentId: parsed.departmentId,
+            fullname: row.fullname,
+            departmentId: row.departmentId,
             userId: existingUser._id,
-            employeeCode: parsed.employeeCode,
-            dob: parsed.dob,
-            gender: parsed.gender,
-            phone: parsed.phone,
-            address: parsed.address,
-            position: parsed.position,
+            employeeCode: row.employeeCode,
+            dob: row.dob,
+            gender: row.gender,
+            phone: row.phone,
+            address: row.address,
+            position: row.position,
             isActive: true,
           });
         }
-
         results.push({
           row: rowIndex,
-          employeeCode: parsed.employeeCode,
-          username: existingUser?.username ?? '',
-          fullname: parsed.fullname,
-          department: parsed.departmentName,
+          employeeCode: row.employeeCode,
+          username: existingUser.username,
+          fullname: row.fullname,
+          department: row.departmentName,
           status: 'updated',
           tempPassword: '',
           message: 'Đã cập nhật hồ sơ (không tạo tài khoản mới)',
@@ -614,19 +939,19 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
         continue;
       }
 
-      const usernameTaken = await User.findOne({ username: parsed.username });
+      // action === 'create'
+      const usernameTaken = await User.findOne({ username: row.username });
       if (usernameTaken) {
         throw new ApiError(
           400,
-          `Dòng ${rowIndex}: username "${parsed.username}" đã tồn tại (thuộc mã nhân viên khác) — kiểm tra lại dữ liệu`,
+          `Dòng ${rowIndex}: username "${row.username}" đã tồn tại — dữ liệu có thể vừa thay đổi giữa lúc xem trước và xác nhận, hãy import lại`,
           'IMPORT_USERNAME_CONFLICT',
         );
       }
 
       const { tempPassword, passwordHash } = await generateTempPassword();
-
       const newUser = await User.create({
-        username: parsed.username,
+        username: row.username,
         roleId: candidateRole._id,
         passwordHash,
         mustChangePassword: true,
@@ -635,15 +960,15 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
       let employee;
       try {
         employee = await Employee.create({
-          fullname: parsed.fullname,
-          departmentId: parsed.departmentId,
+          fullname: row.fullname,
+          departmentId: row.departmentId,
           userId: newUser._id,
-          employeeCode: parsed.employeeCode,
-          dob: parsed.dob,
-          gender: parsed.gender,
-          phone: parsed.phone,
-          address: parsed.address,
-          position: parsed.position,
+          employeeCode: row.employeeCode,
+          dob: row.dob,
+          gender: row.gender,
+          phone: row.phone,
+          address: row.address,
+          position: row.position,
           isActive: true,
         });
       } catch (err) {
@@ -655,15 +980,14 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
         );
       }
 
-      // Không chặn import nếu bước gán mã đề thất bại
       await assignEmployeeToActiveExamIfAny(employee).catch(() => {});
 
       results.push({
         row: rowIndex,
-        employeeCode: parsed.employeeCode,
-        username: parsed.username,
-        fullname: parsed.fullname,
-        department: parsed.departmentName,
+        employeeCode: row.employeeCode,
+        username: row.username,
+        fullname: row.fullname,
+        department: row.departmentName,
         status: 'created',
         tempPassword,
         message: 'Tạo tài khoản thành công',
@@ -673,21 +997,15 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
       failedCount += 1;
       results.push({
         row: rowIndex,
-        employeeCode: '',
+        employeeCode: row?.employeeCode ?? '',
         username: '',
-        fullname: '',
-        department: '',
+        fullname: row?.fullname ?? '',
+        department: row?.departmentName ?? '',
         status: 'error',
         tempPassword: '',
         message: err.message ?? 'Lỗi không xác định',
       });
     }
-  }
-
-  try {
-    fs.unlinkSync(filePath);
-  } catch {
-    /* ignore cleanup */
   }
 
   if (createdCount > 0 || updatedCount > 0 || reusedCount > 0) {
@@ -701,7 +1019,7 @@ export async function importEmployeesFromExcelFile(filePath, adminId, ipAddress)
   }
 
   return {
-    total: processedCount,
+    total: results.length,
     created: createdCount,
     updated: updatedCount,
     reused: reusedCount,
