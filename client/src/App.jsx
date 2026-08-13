@@ -74,6 +74,17 @@ function App() {
   // để người dùng tiếp tục thao tác trên phiên đã không còn hợp lệ.
   const [sessionRevokedMessage, setSessionRevokedMessage] = useState(null);
 
+  // Map roleCode -> tab dashboard tương ứng. Dùng chung cho cả auto-login
+  // (khôi phục phiên khi mở lại tab) và đăng nhập thủ công qua LoginModal,
+  // để 2 luồng này luôn nhất quán — tránh trường hợp chỉ đăng nhập thủ công
+  // mới được tự chuyển sang Dashboard còn auto-login thì không.
+  const dashboardTabByRole = {
+    admin: 'admin-dashboard',
+    examiner: 'examiner-dashboard',
+    leader: 'leader-dashboard',
+    candidate: 'candidate-dashboard',
+  };
+
   // Auto-login: kiểm tra accessToken khi mount
   useEffect(() => {
     const token = getAccessToken();
@@ -82,7 +93,15 @@ function App() {
       return;
     }
     fetchMe()
-      .then((user) => setCurrentUser(user))
+      .then((user) => {
+        setCurrentUser(user);
+        // Đã có phiên đăng nhập hợp lệ (token còn hạn) -> vào thẳng Dashboard
+        // theo role, thay vì hiện Trang chủ rồi bắt người dùng tự bấm lại.
+        const dashboardTab = dashboardTabByRole[user?.roleCode];
+        if (dashboardTab) {
+          setActiveTab(dashboardTab);
+        }
+      })
       .catch(() => {
         /* token hết hạn hoặc lỗi — bỏ qua, user sẽ thấy nút đăng nhập */
       })
