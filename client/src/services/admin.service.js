@@ -91,15 +91,30 @@ export async function resetUserPassword(userId) {
   return res.tempPassword;
 }
 
+/**
+ * @param {object} params
+ * @param {number} [params.page]
+ * @param {number} [params.limit]
+ * @param {string} [params.action] - 1 hoặc nhiều action, phân tách bởi dấu phẩy
+ * @param {string} [params.resourceType]
+ * @param {string} [params.from] - ngày bắt đầu, format 'YYYY-MM-DD'
+ * @param {string} [params.to] - ngày kết thúc, format 'YYYY-MM-DD'
+ * @param {string} [params.q] - từ khóa tìm theo họ tên / mã nhân viên / phòng ban
+ */
 export async function fetchAuditLogs(params = {}) {
   const query = new URLSearchParams();
   if (params.page) query.append('page', params.page);
   if (params.limit) query.append('limit', params.limit);
+  if (params.action) query.append('action', params.action);
+  if (params.resourceType) query.append('resourceType', params.resourceType);
+  if (params.from) query.append('from', params.from);
+  if (params.to) query.append('to', params.to);
+  if (params.q) query.append('q', params.q);
 
   const res = await apiRequest(`/audit-logs?${query.toString()}`, {
     headers: getAuthHeaders(),
   });
-  return res.data;
+  return res; // { data: items[], pagination: {...} }
 }
 
 export async function triggerBackup() {

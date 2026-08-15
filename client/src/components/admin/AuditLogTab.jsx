@@ -1,21 +1,208 @@
-import { useState, useEffect } from 'react';
-import { Activity } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Activity, Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { fetchAuditLogs } from '../../services/admin.service';
+
+// Nhãn tiếng Việt cho từng action — dựa trên các action thực tế đã thấy trong
+// audit.controller.js/service.js (user.controller.js) và danh sách do quản trị
+// dự án cung cấp (exam.controller.js/exam-attempt.controller.js). Nếu hệ thống
+// phát sinh thêm action mới chưa có trong danh sách, sẽ tự hiển thị nguyên mã
+// action (xem hàm getActionLabel bên dưới) để không bao giờ "mất" log.
+const ACTION_LABELS = {
+  // Tài khoản
+  CREATE_USER: 'Tạo tài khoản',
+  UPDATE_ROLE: 'Cập nhật phân quyền',
+  LOCK_USER: 'Khóa tài khoản',
+  UNLOCK_USER: 'Mở khóa tài khoản',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  CHANGE_PASSWORD: 'Đổi mật khẩu',
+  // Đề thi
+  CREATE_EXAM: 'Tạo đề thi',
+  SUBMIT_EXAM: 'Đệ trình đề thi',
+  APPROVE_EXAM: 'Duyệt đề thi',
+  REJECT_EXAM: 'Từ chối đề thi',
+  PUBLISH_EXAM: 'Phát hành đề thi',
+  ARCHIVE_EXAM: 'Lưu trữ đề thi',
+  // Lượt làm bài của thí sinh
+  START_EXAM_ATTEMPT: 'Bắt đầu làm bài',
+  SUBMIT_EXAM_ATTEMPT: 'Nộp bài thi',
+  AUTO_SUBMIT_EXAM_ATTEMPT: 'Tự động nộp bài (hết giờ)',
+  RESUME_EXAM_ATTEMPT: 'Tiếp tục làm bài',
+  GRANT_EXTRA_EXAM_ATTEMPT: 'Cấp thêm lượt thi',
+};
+
+// Các action mang tính cảnh báo/nhạy cảm — hiển thị nhấn mạnh bằng màu vàng-cam
+// (#F6AD37) theo design-system.md thay vì màu xám trung tính mặc định.
+// Có thể điều chỉnh danh sách này nếu cần nhấn mạnh thêm/bớt hành động khác.
+const EMPHASIZED_ACTIONS = new Set([
+  'LOCK_USER',
+  'RESET_PASSWORD',
+  'REJECT_EXAM',
+  'ARCHIVE_EXAM',
+  'AUTO_SUBMIT_EXAM_ATTEMPT',
+]);
+
+const RESOURCE_TYPE_OPTIONS = [
+  { value: 'User', label: 'Tài khoản' },
+  { value: 'Exam', label: 'Đề thi' },
+  { value: 'Question', label: 'Câu hỏi' },
+  { value: 'Topic', label: 'Chủ đề' },
+  { value: 'Department', label: 'Phòng ban' },
+];
+
+function getActionLabel(action) {
+  return ACTION_LABELS[action] || action;
+}
+
+function ActionBadge({ action }) {
+  const emphasized = EMPHASIZED_ACTIONS.has(action);
+  return (
+    <span
+      className="inline-block px-2 py-1 rounded text-sm font-semibold whitespace-nowrap"
+      style={
+        emphasized
+          ? { backgroundColor: '#FFF7E6', color: '#92600E', border: '1px solid #F6AD37' }
+          : { backgroundColor: '#F6F8FA', color: '#334155', border: '1px solid #E2E8F0' }
+      }
+    >
+      {getActionLabel(action)}
+    </span>
+  );
+}
+
+// Dropdown tự vẽ — thay cho thẻ <select> gốc của trình duyệt, vì <select> gốc
+// khi mở ra dùng màu highlight mặc định của hệ điều hành/trình duyệt (thường là
+// xanh dương khác tông), không đồng bộ được với màu #008BC5 của design system.
+// Component này tự kiểm soát toàn bộ màu/bo góc/trạng thái chọn.
+function FilterSelect({ label, value, options, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((o) => o.value === value);
+  const displayLabel = selectedOption ? selectedOption.label : placeholder;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-sm font-medium text-[#334155] mb-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full h-12 pl-3 pr-10 rounded-[10px] border text-base text-left bg-white relative focus:outline-none"
+        style={{
+          borderColor: open ? '#008BC5' : '#E2E8F0',
+          boxShadow: open ? '0 0 0 2px rgba(6,147,227,0.25)' : 'none',
+          color: value ? '#0F172A' : '#64748B',
+        }}
+      >
+        {displayLabel}
+        <ChevronDown
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#64748B] pointer-events-none transition-transform"
+          style={{ transform: open ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white rounded-[10px] border border-[#E2E8F0] py-1" style={{ boxShadow: '0px 1px 3px rgba(15,23,42,0.08)' }}>
+          <button
+            type="button"
+            onClick={() => { onChange(''); setOpen(false); }}
+            className="w-full text-left px-4 min-h-[44px] flex items-center text-base"
+            style={
+              !value
+                ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 }
+                : { color: '#0F172A' }
+            }
+          >
+            {placeholder}
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className="w-full text-left px-4 min-h-[44px] flex items-center text-base"
+              style={
+                value === opt.value
+                  ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 }
+                  : { color: '#0F172A' }
+              }
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEFAULT_LIMIT = 20;
+const EMPTY_FILTERS = { q: '', action: '', resourceType: '', from: '', to: '' };
 
 export const AuditLogTab = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [searchInput, setSearchInput] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const debounceRef = useRef(null);
 
-  useEffect(() => {
-    fetchAuditLogs({ limit: 100 }).then(data => {
-      const logsArray = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-      setLogs(logsArray);
-      setLoading(false);
-    }).catch(err => {
-      console.error(err);
-      setLoading(false);
-    });
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+  const loadLogs = useCallback((appliedFilters, page, append) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
+    fetchAuditLogs({ ...appliedFilters, page, limit: DEFAULT_LIMIT })
+      .then((res) => {
+        const items = Array.isArray(res?.data) ? res.data : [];
+        setLogs((prev) => (append ? [...prev, ...items] : items));
+        setPagination(res?.pagination || { page, totalPages: 1, total: items.length });
+      })
+      .catch((err) => console.error(err))
+      .finally(() => {
+        setLoading(false);
+        setLoadingMore(false);
+      });
   }, []);
+
+  // Tải lại danh sách mỗi khi bộ lọc thay đổi (reset về trang 1)
+  useEffect(() => {
+    loadLogs(filters, 1, false);
+  }, [filters, loadLogs]);
+
+  // Debounce ô tìm kiếm 500ms trước khi áp vào filters (tránh gọi API liên tục khi đang gõ)
+  const handleSearchChange = (value) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, q: value.trim() }));
+    }, 500);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetFilters = () => {
+    setSearchInput('');
+    setFilters(EMPTY_FILTERS);
+  };
+
+  const handleLoadMore = () => {
+    loadLogs(filters, pagination.page + 1, true);
+  };
 
   const formatDate = (isoString) => {
     const d = new Date(isoString);
@@ -25,92 +212,191 @@ export const AuditLogTab = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm animate-pulse flex flex-col gap-2">
-            <div className="h-4 w-1/4 bg-slate-200 rounded"></div>
-            <div className="h-4 w-1/2 bg-slate-200 rounded"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  const getActorDisplayName = (log) => {
+    const actor = log.actorUserId;
+    if (!actor) return 'Hệ thống';
+    return actor.fullname || actor.username || 'Không rõ';
+  };
 
-  if (logs.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-        <div className="flex flex-col items-center justify-center text-slate-500">
-          <Activity className="w-12 h-12 mb-3 text-slate-400" />
-          <p className="text-base font-medium text-slate-600">Chưa có nhật ký nào</p>
-          <p className="text-sm mt-1">Hệ thống chưa ghi nhận hoạt động nào hoặc không có dữ liệu phù hợp.</p>
-        </div>
-      </div>
-    );
-  }
+  const getActorSubInfo = (log) => {
+    const actor = log.actorUserId;
+    if (!actor) return null;
+    const parts = [actor.employeeCode, actor.departmentName].filter(Boolean);
+    return parts.length ? parts.join(' · ') : null;
+  };
+
+  const getDetailText = (log) => log.metadata?.detail || log.metadata?.questionId || '-';
 
   return (
     <div className="space-y-4">
-      {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden sm:block overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
-              <th className="p-4 font-semibold w-48">Thời gian</th>
-              <th className="p-4 font-semibold w-40">Người dùng</th>
-              <th className="p-4 font-semibold w-64">Hành động</th>
-              <th className="p-4 font-semibold">Chi tiết</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {logs.map(log => (
-              <tr key={log._id} className="hover:bg-slate-50/50">
-                <td className="p-4 text-sm text-slate-500 whitespace-nowrap">{formatDate(log.createdAt)}</td>
-                <td className="p-4 font-medium text-[#0F172A]">{log.actorUserId?.username || 'Hệ thống'}</td>
-                <td className="p-4 text-sm font-medium">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    log.resourceType === 'User' ? 'bg-purple-100 text-purple-700' :
-                    log.resourceType === 'Exam' ? 'bg-blue-100 text-blue-700' :
-                    log.resourceType === 'Question' ? 'bg-orange-100 text-orange-700' :
-                    log.resourceType === 'Topic' ? 'bg-emerald-100 text-emerald-700' :
-                    log.resourceType === 'Department' ? 'bg-amber-100 text-amber-700' :
-                    'bg-slate-100 text-slate-700'
-                  }`}>
-                    {log.action}
-                  </span>
-                </td>
-                <td className="p-4 text-sm text-slate-600">{log.metadata?.detail || log.metadata?.questionId || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Thanh tìm kiếm + nút mở bộ lọc */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#64748B]" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Tìm theo tên, mã nhân viên, phòng ban..."
+              className="w-full h-12 pl-10 pr-4 rounded-[10px] border border-[#E2E8F0] text-base text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="relative flex items-center justify-center gap-2 h-12 min-w-[48px] px-4 rounded-[10px] border border-[#E2E8F0] bg-white text-[#0F172A] font-semibold text-base"
+          >
+            <SlidersHorizontal className="w-5 h-5 text-[#008BC5]" />
+            <span className="hidden sm:inline">Bộ lọc</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 rounded-full bg-[#008BC5] text-white text-xs font-bold">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-4">
+            <FilterSelect
+              label="Hành động"
+              value={filters.action}
+              placeholder="Tất cả hành động"
+              options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
+              onChange={(v) => handleFilterChange('action', v)}
+            />
+
+            <FilterSelect
+              label="Loại đối tượng"
+              value={filters.resourceType}
+              placeholder="Tất cả loại"
+              options={RESOURCE_TYPE_OPTIONS}
+              onChange={(v) => handleFilterChange('resourceType', v)}
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-[#334155] mb-1">Từ ngày</label>
+                <input
+                  type="date"
+                  value={filters.from}
+                  onChange={(e) => handleFilterChange('from', e.target.value)}
+                  className="w-full h-12 px-3 rounded-[10px] border border-[#E2E8F0] text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0693E3]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#334155] mb-1">Đến ngày</label>
+                <input
+                  type="date"
+                  value={filters.to}
+                  onChange={(e) => handleFilterChange('to', e.target.value)}
+                  className="w-full h-12 px-3 rounded-[10px] border border-[#E2E8F0] text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0693E3]"
+                />
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="flex items-center justify-center gap-2 w-full h-12 rounded-[10px] border border-[#E2E8F0] text-[#334155] font-semibold text-base"
+              >
+                <X className="w-5 h-5" />
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Mobile List (Hidden on Desktop) */}
-      <div className="sm:hidden space-y-3">
-        {logs.map(log => (
-          <div key={log._id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
-            <div className="flex justify-between items-start gap-2">
-              <span className="text-xs text-slate-500 font-medium">{formatDate(log.createdAt)}</span>
-              <span className="font-bold text-[#0F172A] text-sm">{log.actorUserId?.username || 'Hệ thống'}</span>
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-[#E2E8F0] animate-pulse flex flex-col gap-2">
+              <div className="h-4 w-1/4 bg-[#E2E8F0] rounded"></div>
+              <div className="h-4 w-1/2 bg-[#E2E8F0] rounded"></div>
             </div>
-            <div>
-              <span className={`inline-block px-2 py-1 rounded text-xs font-semibold mb-1 ${
-                log.resourceType === 'User' ? 'bg-purple-100 text-purple-700' :
-                log.resourceType === 'Exam' ? 'bg-blue-100 text-blue-700' :
-                log.resourceType === 'Question' ? 'bg-orange-100 text-orange-700' :
-                log.resourceType === 'Topic' ? 'bg-emerald-100 text-emerald-700' :
-                log.resourceType === 'Department' ? 'bg-amber-100 text-amber-700' :
-                'bg-slate-100 text-slate-700'
-              }`}>
-                {log.action}
-              </span>
-              <p className="text-sm text-slate-600 mt-1">{log.metadata?.detail || log.metadata?.questionId || '-'}</p>
-            </div>
+          ))}
+        </div>
+      ) : logs.length === 0 ? (
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
+          <div className="flex flex-col items-center justify-center text-[#64748B]">
+            <Activity className="w-12 h-12 mb-3 text-[#64748B]" />
+            <p className="text-base font-medium text-[#334155]">
+              {activeFilterCount > 0 ? 'Không tìm thấy nhật ký phù hợp' : 'Chưa có nhật ký nào'}
+            </p>
+            <p className="text-base mt-1">
+              {activeFilterCount > 0
+                ? 'Thử đổi lại từ khóa hoặc bộ lọc đang chọn.'
+                : 'Hệ thống chưa ghi nhận hoạt động nào.'}
+            </p>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table (Hidden on Mobile) */}
+          <div className="hidden sm:block overflow-x-auto bg-white rounded-xl border border-[#E2E8F0]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#F6F8FA] border-b border-[#E2E8F0] text-base text-[#334155]">
+                  <th className="p-4 font-semibold w-48">Thời gian</th>
+                  <th className="p-4 font-semibold w-56">Người dùng</th>
+                  <th className="p-4 font-semibold w-56">Hành động</th>
+                  <th className="p-4 font-semibold">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E2E8F0]">
+                {logs.map(log => (
+                  <tr key={log._id} className="hover:bg-[#F6F8FA]">
+                    <td className="p-4 text-sm text-[#64748B] whitespace-nowrap align-top">{formatDate(log.createdAt)}</td>
+                    <td className="p-4 align-top">
+                      <div className="font-medium text-[#0F172A] text-base">{getActorDisplayName(log)}</div>
+                      {getActorSubInfo(log) && (
+                        <div className="text-sm text-[#64748B] mt-0.5">{getActorSubInfo(log)}</div>
+                      )}
+                    </td>
+                    <td className="p-4 align-top"><ActionBadge action={log.action} /></td>
+                    <td className="p-4 text-base text-[#334155] align-top">{getDetailText(log)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile List (Hidden on Desktop) */}
+          <div className="sm:hidden space-y-3">
+            {logs.map(log => (
+              <div key={log._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-2">
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <div className="font-bold text-[#0F172A] text-base">{getActorDisplayName(log)}</div>
+                    {getActorSubInfo(log) && (
+                      <div className="text-sm text-[#64748B]">{getActorSubInfo(log)}</div>
+                    )}
+                  </div>
+                  <span className="text-sm text-[#64748B] whitespace-nowrap">{formatDate(log.createdAt)}</span>
+                </div>
+                <div>
+                  <ActionBadge action={log.action} />
+                  <p className="text-base text-[#334155] mt-2">{getDetailText(log)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {pagination.page < pagination.totalPages && (
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="w-full h-12 rounded-[10px] border border-[#008BC5] text-[#008BC5] font-semibold text-base disabled:opacity-40"
+            >
+              {loadingMore ? 'Đang tải...' : `Xem thêm (đã tải ${logs.length}/${pagination.total})`}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };

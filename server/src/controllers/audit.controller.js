@@ -6,6 +6,11 @@ export const auditController = {
     const filters = {
       page: req.query.page,
       limit: req.query.limit,
+      action: req.query.action,
+      resourceType: req.query.resourceType,
+      from: req.query.from,
+      to: req.query.to,
+      q: req.query.q,
     };
     const data = await auditService.getAuditLogs(filters);
     res.json({
