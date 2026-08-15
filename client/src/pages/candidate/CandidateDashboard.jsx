@@ -25,6 +25,7 @@ import {
   Cell,
 } from 'recharts';
 import { fetchMyResults } from '../../services/report.service';
+import { fetchMyExam } from '../../services/exam-attempt.service';
 
 const formatDateTime = (value) => {
   if (!value) return '—';
@@ -36,15 +37,6 @@ const formatDateTime = (value) => {
     minute: '2-digit',
   });
 };
-
-// Mỗi thí sinh chỉ có 1 lượt thi chính thức CHO MỖI KỲ THI đang được đăng
-// (published) — không phải giới hạn 1 lượt duy nhất trong suốt lịch sử tài
-// khoản. Khi Người ra đề/Người duyệt đề đăng một kỳ thi mới (dù cùng chủ đề
-// cũ hay chủ đề mới), lượt thi phải được làm mới về MAX_ATTEMPTS, vì đây là
-// một exam._id khác — chỉ khi thí sinh đã nộp bài cho ĐÚNG kỳ thi đang active
-// hiện tại thì mới bị khoá nút "Vào thi chính thức". Muốn thi lại chính kỳ
-// thi đó thì vẫn cần Người duyệt đề cấp phép riêng (chưa có cơ chế ở backend).
-const MAX_ATTEMPTS = 1;
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -60,6 +52,18 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
   const [employee, setEmployee] = useState(null);
   const [results, setResults] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  // MỚI — Thay cho việc tự tính lượt thi ở client (hằng số cứng MAX_ATTEMPTS=1
+  // + đếm Result), lấy thẳng trạng thái lượt thi THẬT từ backend qua
+  // GET /api/exam-attempts/my-exam (examAttemptService.getMyExam). Đây là
+  // nguồn sự thật duy nhất biết về extraAttemptsGranted (lượt được Người
+  // duyệt đề cấp thêm) — tự tính lại ở client sẽ luôn lệch mỗi khi Leader cấp
+  // thêm lượt, vì client không có cách nào biết con số đó.
+  //   examStatus = { attemptsUsed, maxAttempts, canTake, attempt } | null
+  //   null nghĩa là: chưa tải xong, hoặc hiện không có kỳ thi nào đang active
+  //   (backend trả lỗi EXAM_NOT_ACTIVE — coi như chưa có gì để thi).
+  const [examStatus, setExamStatus] = useState(null);
+  const [examStatusLoading, setExamStatusLoading] = useState(true);
 
   // ExamModal được mở/đóng ở App.jsx (dùng chung cho cả trang chủ). Khi modal
   // vừa chuyển từ mở -> đóng (thí sinh vừa thi xong hoặc huỷ), tự fetch lại
@@ -98,6 +102,40 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
     };
   }, [refreshTick]);
 
+  // MỚI — Tải trạng thái lượt thi thật từ backend. Tách riêng useEffect khỏi
+  // fetchMyResults ở trên vì đây là 2 nguồn dữ liệu độc lập (Result đã nộp vs
+  // trạng thái lượt/quyền còn lại) và fetchMyExam có thể lỗi hợp lệ
+  // (EXAM_NOT_ACTIVE) mà không nên chặn phần hiển thị lịch sử kết quả.
+  useEffect(() => {
+    let cancelled = false;
+
+    setExamStatusLoading(true);
+
+    fetchMyExam()
+      .then((data) => {
+        if (cancelled) return;
+        setExamStatus({
+          attemptsUsed: data?.attemptsUsed ?? 0,
+          maxAttempts: data?.maxAttempts ?? 1,
+          canTake: Boolean(data?.canTake),
+          attempt: data?.attempt ?? null,
+        });
+      })
+      .catch(() => {
+        // EXAM_NOT_ACTIVE hoặc CANDIDATE_NOT_ASSIGNED — coi như chưa có kỳ thi
+        // nào để thi, không hiện lỗi (đã có UI riêng xử lý trường hợp !activeExam).
+        if (cancelled) return;
+        setExamStatus(null);
+      })
+      .finally(() => {
+        if (!cancelled) setExamStatusLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick, activeExam?._id]);
+
   // "Số lần đã thi" ở khối tổng quan Dashboard vẫn hiển thị TOÀN BỘ lịch sử
   // (thành tích chung của thí sinh qua các kỳ thi) — không liên quan tới việc
   // khoá/mở nút thi.
@@ -107,15 +145,16 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
     return r.score > best.score ? r : best;
   }, null);
 
-  // Lượt thi CHÍNH THỨC chỉ tính trên đúng kỳ thi đang active (activeExam._id)
-  // — đây là chỗ sửa lỗi: trước đây dùng totalAttempts (toàn bộ lịch sử) nên
-  // hễ thí sinh từng thi 1 kỳ thi cũ nào đó là bị khoá vĩnh viễn, kể cả khi
-  // Người duyệt đề đã đăng kỳ thi mới (dù cùng chủ đề cũ hay chủ đề khác).
-  // Không có kỳ thi nào đang active thì coi như chưa có gì để thi.
-  const attemptsForActiveExam = activeExam
-    ? results.filter((r) => String(r.examId) === String(activeExam._id)).length
-    : 0;
-  const attemptsLeft = activeExam ? Math.max(0, MAX_ATTEMPTS - attemptsForActiveExam) : 0;
+  // Lượt thi CHÍNH THỨC cho kỳ thi đang active — lấy thẳng từ examStatus
+  // (backend), đã tính đúng cả lượt được Người duyệt đề cấp thêm
+  // (extraAttemptsGranted). Không có kỳ thi active hoặc chưa tải xong thì coi
+  // như 0/1 và khoá nút, tránh nháy sai trạng thái trước khi tải xong.
+  const maxAttempts = examStatus?.maxAttempts ?? 1;
+  const attemptsForActiveExam = examStatus?.attemptsUsed ?? 0;
+  const attemptsLeft = examStatus ? Math.max(0, maxAttempts - attemptsForActiveExam) : 0;
+  // canTake đã tính cả trường hợp đang có lượt in_progress (được phép vào tiếp
+  // dù attemptsLeft có thể hiện 0 sau khi lượt đó tính vào finishedCount).
+  const canStartExam = Boolean(activeExam) && Boolean(examStatus?.canTake);
 
   const handleStartExam = () => {
     if (typeof onOpenExam === 'function') {
@@ -346,7 +385,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                       <div className="text-xs text-slate-500 mb-1">Số lượt đã thi (kỳ thi hiện tại)</div>
-                      <div className="text-xl font-bold text-[#0F172A]">{attemptsForActiveExam}/{MAX_ATTEMPTS}</div>
+                      <div className="text-xl font-bold text-[#0F172A]">{attemptsForActiveExam}/{maxAttempts}</div>
                     </div>
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
                       <div className="text-xs text-slate-500 mb-1">Lượt còn lại</div>
@@ -377,14 +416,14 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
 
                   <button
                     onClick={handleStartExam}
-                    disabled={attemptsLeft <= 0}
+                    disabled={examStatusLoading || !canStartExam}
                     className="w-full min-h-[56px] bg-[#008BC5] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
                   >
                     <ShieldCheck className="w-6 h-6" />
                     <span>VÀO THI CHÍNH THỨC</span>
                   </button>
 
-                  {activeExam && attemptsLeft <= 0 && (
+                  {activeExam && !examStatusLoading && !canStartExam && (
                     <p className="text-center text-sm text-slate-500">
                       Bạn đã hoàn thành lượt thi chính thức cho kỳ thi "{activeExam.title}". Nếu cần thi lại, vui lòng liên hệ
                       Người duyệt đề để được xem xét cấp phép cho lượt thi mới.

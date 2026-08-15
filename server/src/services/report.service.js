@@ -365,6 +365,9 @@ export const reportService = {
 
     const formattedData = data.map(item => ({
       _id: item._id,
+      // MỚI — cần để Leader gọi API cấp lại lượt thi (grant-attempt) cho đúng
+      // thí sinh + đúng kỳ thi. Không đổi các field khác để không phá vỡ FE cũ.
+      examCandidateId: item.candidate._id,
       employeeName: item.employee.fullname,
       departmentName: item.department.name,
       examTitle: item.exam.title,

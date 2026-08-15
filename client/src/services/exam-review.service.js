@@ -84,6 +84,19 @@ export async function archiveExam(id) {
   return res.data;
 }
 
+// MỚI — Cấp thêm 1 lượt thi chính thức cho 1 thí sinh cụ thể trong 1 kỳ thi
+// cụ thể. `examCandidateId` lấy từ field cùng tên trong kết quả
+// fetchDetailedResults() (report.service.js) — KHÔNG dùng employeeId hay
+// examId riêng lẻ vì 1 employee có thể có nhiều ExamCandidate ở các kỳ thi
+// khác nhau.
+export async function grantExtraAttempt(examCandidateId) {
+  const res = await apiRequest(`/exam-attempts/candidates/${examCandidateId}/grant-attempt`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return res.data;
+}
+
 // Public API
 export async function fetchActiveExam() {
   try {

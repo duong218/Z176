@@ -90,4 +90,22 @@ export const examAttemptController = {
 
     res.json({ success: true, message: 'OK', data });
   }),
+
+  // MỚI — Leader cấp thêm 1 lượt thi chính thức cho 1 thí sinh (theo examCandidateId).
+  grantExtraAttempt: asyncHandler(async (req, res) => {
+    const data = await examAttemptService.grantExtraAttempt(req.params.examCandidateId, req.auth.userId);
+
+    await writeAudit({
+      actorUserId: req.auth.userId,
+      action: 'GRANT_EXTRA_EXAM_ATTEMPT',
+      resourceType: 'ExamCandidate',
+      resourceId: data.examCandidateId,
+      metadata: {
+        detail: `Cấp thêm lượt thi cho ${data.employeeName ?? 'thí sinh'} — kỳ thi: ${data.examTitle} (tổng lượt được cấp thêm: ${data.extraAttemptsGranted})`,
+      },
+      ipAddress: clientIp(req),
+    });
+
+    res.json({ success: true, message: 'Đã cấp thêm lượt thi cho thí sinh', data });
+  }),
 };

@@ -15,9 +15,11 @@ import {
 } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
-// Mặc định mỗi thí sinh có 1 lượt thi CHÍNH THỨC cho 1 kỳ thi. Việc Người duyệt
-// đề cấp phép thêm lượt là tính năng chưa thiết kế schema (xem ghi chú dự án) —
-// KHÔNG tự bịa field ở đây, để nguyên hằng số này cho tới khi có quyết định.
+// Mặc định mỗi thí sinh có 1 lượt thi CHÍNH THỨC cho 1 kỳ thi. Người duyệt đề
+// có thể cấp thêm lượt qua grantExtraAttempt() bên dưới — khi đó giới hạn
+// thực tế cho thí sinh đó là MAX_OFFICIAL_ATTEMPTS + examCandidate.extraAttemptsGranted
+// (xem exam-candidate.model.js). KHÔNG sửa hằng số này để cấp lượt — luôn đi
+// qua field extraAttemptsGranted để giữ đúng lịch sử theo từng thí sinh.
 const MAX_OFFICIAL_ATTEMPTS = 1;
 
 /**
@@ -25,6 +27,11 @@ const MAX_OFFICIAL_ATTEMPTS = 1;
  * thì lượt thi đang in_progress sẽ bị hệ thống tự động nộp.
  */
 const INACTIVITY_TIMEOUT_MS = 60_000; // 1 phút
+
+/** Số lượt thi tối đa thực tế của 1 thí sinh cho 1 kỳ thi, gồm cả lượt được cấp thêm. */
+function resolveMaxAttempts(examCandidate) {
+  return MAX_OFFICIAL_ATTEMPTS + (examCandidate.extraAttemptsGranted ?? 0);
+}
 
 /** Trộn ngẫu nhiên mảng (Fisher–Yates), không sửa mảng gốc. */
 function shuffle(arr) {
@@ -191,6 +198,7 @@ export const examAttemptService = {
    */
   async getMyExam(userId) {
     const { exam, examCandidate } = await resolveCandidateContext(userId);
+    const maxAttempts = resolveMaxAttempts(examCandidate);
 
     let attempts = await getOfficialAttempts(examCandidate._id);
     for (const attempt of attempts) {
@@ -216,7 +224,7 @@ export const examAttemptService = {
     }
 
     const finishedCount = attempts.filter((a) => a.status !== ATTEMPT_STATUS.IN_PROGRESS).length;
-    const canTake = Boolean(inProgress) || finishedCount < MAX_OFFICIAL_ATTEMPTS;
+    const canTake = Boolean(inProgress) || finishedCount < maxAttempts;
 
     let questions = [];
     let savedAnswers = [];
@@ -279,7 +287,7 @@ export const examAttemptService = {
           }
         : null,
       attemptsUsed: finishedCount,
-      maxAttempts: MAX_OFFICIAL_ATTEMPTS,
+      maxAttempts,
       canTake,
       questions,
       savedAnswers,
@@ -298,6 +306,7 @@ export const examAttemptService = {
    */
   async startAttempt(userId) {
     const { exam, examCandidate } = await resolveCandidateContext(userId);
+    const maxAttempts = resolveMaxAttempts(examCandidate);
 
     const attempts = await getOfficialAttempts(examCandidate._id);
     for (const attempt of attempts) {
@@ -317,7 +326,7 @@ export const examAttemptService = {
     }
 
     const finishedCount = attempts.filter((a) => a.status !== ATTEMPT_STATUS.IN_PROGRESS).length;
-    if (finishedCount >= MAX_OFFICIAL_ATTEMPTS) {
+    if (finishedCount >= maxAttempts) {
       throw new ApiError(
         400,
         'Bạn đã sử dụng hết lượt thi chính thức. Nếu cần thi lại, vui lòng liên hệ Người duyệt đề để được cấp phép.',
@@ -547,6 +556,52 @@ export const examAttemptService = {
       totalQuestions: result.totalQuestions,
       passed: result.passed,
       autoSubmitReason: attempt.autoSubmitReason ?? null,
+    };
+  },
+
+  /**
+   * MỚI — Người duyệt đề (leader) cấp thêm 1 lượt thi chính thức cho 1 thí
+   * sinh cụ thể trong 1 kỳ thi cụ thể (xác định qua examCandidateId, KHÔNG
+   * phải employeeId hay examId riêng lẻ — vì 1 employee có thể có nhiều
+   * ExamCandidate ở các kỳ thi khác nhau).
+   *
+   * Đây chỉ là CẤP QUYỀN — không tự tạo ExamAttempt mới. Thí sinh vẫn phải tự
+   * đăng nhập và bấm "Bắt đầu thi" (startAttempt) như bình thường; khi đó
+   * finishedCount < maxAttempts (đã tăng thêm 1) sẽ cho phép tạo lượt mới.
+   *
+   * Không giới hạn số lần cấp — Leader có thể gọi nhiều lần để cấp nhiều lượt
+   * liên tiếp nếu cần. Không cho cấp nếu kỳ thi không còn ở trạng thái
+   * published (không còn ý nghĩa cấp thêm lượt cho kỳ thi đã lưu trữ/chưa mở).
+   */
+  async grantExtraAttempt(examCandidateId, leaderUserId) {
+    const examCandidate = await ExamCandidate.findById(examCandidateId).populate('employeeId', 'fullname');
+    if (!examCandidate) {
+      throw new ApiError(404, 'Không tìm thấy thí sinh trong kỳ thi này', 'CANDIDATE_NOT_FOUND');
+    }
+
+    const exam = await Exam.findById(examCandidate.examId);
+    if (!exam) {
+      throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+    }
+    if (exam.status !== EXAM_STATUS.PUBLISHED) {
+      throw new ApiError(
+        400,
+        'Chỉ có thể cấp lại lượt thi cho kỳ thi đang được đăng chính thức (published)',
+        'EXAM_INVALID_STATUS',
+      );
+    }
+
+    examCandidate.extraAttemptsGranted = (examCandidate.extraAttemptsGranted ?? 0) + 1;
+    await examCandidate.save();
+
+    return {
+      examCandidateId: examCandidate._id,
+      employeeName: examCandidate.employeeId?.fullname ?? null,
+      examId: exam._id,
+      examTitle: exam.title,
+      extraAttemptsGranted: examCandidate.extraAttemptsGranted,
+      maxAttempts: resolveMaxAttempts(examCandidate),
+      grantedBy: leaderUserId,
     };
   },
 };

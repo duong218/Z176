@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
-import { FileText, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, Filter, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { fetchDetailedResults, exportReport } from '../../services/report.service';
+import { grantExtraAttempt } from '../../services/exam-review.service';
 import { useToast } from '../ToastContext';
+import { useConfirm } from '../ConfirmDialog';
 
 export const DetailedResultsTab = () => {
   const { showToast } = useToast();
+  const confirmAction = useConfirm();
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [grantingId, setGrantingId] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -61,6 +65,31 @@ export const DetailedResultsTab = () => {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       loadData(newPage);
+    }
+  };
+
+  // MỚI — Cấp thêm 1 lượt thi chính thức cho thí sinh đã thi (mở lại lượt thi
+  // để họ thi lại). Không xóa/reset kết quả cũ, chỉ cấp thêm quyền làm 1 lượt
+  // mới; thí sinh tự đăng nhập và bấm "Bắt đầu thi" như bình thường.
+  const handleGrantExtraAttempt = async (item) => {
+    if (!item.examCandidateId) {
+      showToast('Thiếu thông tin thí sinh, không thể cấp lại lượt thi.', 'error');
+      return;
+    }
+    const ok = await confirmAction(
+      `Cấp thêm 1 lượt thi chính thức cho "${item.employeeName}" (bài thi: ${item.examTitle})? Thí sinh sẽ có thể đăng nhập và làm lại bài thi này.`,
+      { title: 'Cấp lại lượt thi', confirmLabel: 'Cấp lượt thi', danger: false }
+    );
+    if (!ok) return;
+
+    setGrantingId(item._id);
+    try {
+      await grantExtraAttempt(item.examCandidateId);
+      showToast(`Đã cấp thêm lượt thi cho ${item.employeeName}.`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Lỗi khi cấp lại lượt thi', 'error');
+    } finally {
+      setGrantingId(null);
     }
   };
 
@@ -153,12 +182,13 @@ export const DetailedResultsTab = () => {
                     <th className="px-6 py-4 font-medium text-center">Điểm</th>
                     <th className="px-6 py-4 font-medium text-center">Kết quả</th>
                     <th className="px-6 py-4 font-medium">Ngày nộp</th>
+                    <th className="px-6 py-4 font-medium text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
                   {data.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={7} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center justify-center text-slate-500">
                           <FileText className="w-12 h-12 mb-3 text-slate-600" />
                           <p className="text-base font-medium text-slate-400">Chưa có kết quả thi nào</p>
@@ -182,6 +212,17 @@ export const DetailedResultsTab = () => {
                         </td>
                         <td className="px-6 py-4">
                           {item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleGrantExtraAttempt(item)}
+                            disabled={grantingId === item._id}
+                            title="Mở lại lượt thi cho thí sinh này"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#008BC5]/10 hover:bg-[#008BC5]/20 text-[#008BC5] font-medium rounded-lg transition-colors text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            {grantingId === item._id ? 'Đang cấp...' : 'Cấp lại lượt thi'}
+                          </button>
                         </td>
                       </tr>
                     ))
