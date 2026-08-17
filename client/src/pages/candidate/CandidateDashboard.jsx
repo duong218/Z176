@@ -347,14 +347,14 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                 )}
 
                 {/* Lối tắt vào thi ngay từ Dashboard */}
-                <div className="bg-[#0F172A] rounded-xl shadow-z176 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="bg-white rounded-xl shadow-z176 border border-[#E2E8F0] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-lg bg-[#008BC5]/20 flex items-center justify-center shrink-0">
-                      <ShieldCheck className="w-6 h-6 text-[#38BDF8]" />
+                    <div className="w-11 h-11 rounded-lg bg-[#EAF6FF] flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-6 h-6 text-[#008BC5]" />
                     </div>
                     <div>
-                      <div className="font-bold text-white">Sẵn sàng thi trực tuyến?</div>
-                      <div className="text-sm text-slate-400">
+                      <div className="font-bold text-[#0F172A] text-base">Sẵn sàng thi trực tuyến?</div>
+                      <div className="text-base text-[#334155]">
                         {activeExam
                           ? `Bạn còn ${attemptsLeft} lượt thi cho kỳ thi đang diễn ra. Chuyển sang mục "Thi trực tuyến" để bắt đầu.`
                           : 'Hiện chưa có kỳ thi nào đang diễn ra. Vui lòng quay lại sau.'}
@@ -363,7 +363,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   </div>
                   <button
                     onClick={() => setActiveSection('exam')}
-                    className="w-full sm:w-auto px-5 py-3 bg-[#008BC5] text-white font-bold text-sm rounded-lg hover:bg-[#007ba1] transition-colors shrink-0 min-touch-target"
+                    className="w-full sm:w-auto px-5 py-3 bg-[#008BC5] text-white font-bold text-base rounded-lg hover:bg-[#0693E3] transition-colors shrink-0 min-touch-target"
                   >
                     Đi tới mục thi
                   </button>
