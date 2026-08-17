@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown } from 'lucide-react';
+import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown, Info, Download } from 'lucide-react';
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, previewImportEmployeesExcel, confirmImportEmployeesExcel, downloadImportResultsCsv, downloadSingleAccountCredential, exportCandidateCredentialsExcel } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
 import { getAuthHeaders } from '../../services/auth.service';
@@ -22,6 +22,21 @@ const ACCOUNT_COLUMNS = [
 ];
 
 const ACCOUNT_COLUMNS_STORAGE_KEY = 'z176_account_table_columns';
+
+// File mẫu import nhân viên (tiếng Việt, có sheet hướng dẫn) — đặt sẵn tại
+// public/templates để nút tải dùng static path, giống quy ước file mẫu
+// import câu hỏi (Mau_Import_Cau_Hoi_Z176.xlsx) bên QuestionBankTab.
+const IMPORT_EMPLOYEE_TEMPLATE_PATH = '/templates/Mau_Import_Nhan_Vien_Z176.xlsx';
+
+// Cột file Excel import nhân viên mà hệ thống hiện chấp nhận (khớp đúng
+// alias trong buildEmployeeImportRow @ server/src/services/user.service.js)
+// — dùng để hiển thị panel "Xem nhanh" ngay trong toolbar, cạnh nút Import.
+const IMPORT_EMPLOYEE_COLUMNS_GUIDE = [
+  { label: 'Họ tên', required: true, note: 'Bắt buộc.' },
+  { label: 'Mã phòng ban / Phòng ban', required: true, note: 'Bắt buộc có ít nhất 1 trong 2 — nếu có Mã phòng ban, hệ thống ưu tiên dùng mã này.' },
+  { label: 'Mã nhân viên', required: false, note: 'Không bắt buộc — để trống sẽ tự sinh mã tạm dạng TMP<số dòng>.' },
+  { label: 'Ngày sinh / Giới tính / SĐT / Địa chỉ / Chức vụ', required: false, note: 'Không bắt buộc — chỉ lưu làm hồ sơ tham khảo.' },
+];
 
 // TODO: nếu dự án đã có department.service.js riêng, thay hàm tạm này bằng
 // import fetchDepartments từ đó để đồng nhất convention thay vì gọi apiRequest trực tiếp ở đây.
@@ -57,6 +72,11 @@ export const AccountTab = ({ currentUser }) => {
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
   const columnMenuRef = useRef(null);
 
+  // Panel "Xem nhanh: file Excel cần có cột gì?" — cạnh nút Import Excel,
+  // cùng kiểu accordion/popover với menu Cột hiển thị ở trên.
+  const [isImportGuideOpen, setIsImportGuideOpen] = useState(false);
+  const importGuideRef = useRef(null);
+
   useEffect(() => {
     localStorage.setItem(ACCOUNT_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns));
   }, [visibleColumns]);
@@ -71,6 +91,17 @@ export const AccountTab = ({ currentUser }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isColumnMenuOpen]);
+
+  useEffect(() => {
+    if (!isImportGuideOpen) return;
+    const handleClickOutside = (e) => {
+      if (importGuideRef.current && !importGuideRef.current.contains(e.target)) {
+        setIsImportGuideOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isImportGuideOpen]);
 
   const toggleColumn = (key) => {
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -410,6 +441,56 @@ export const AccountTab = ({ currentUser }) => {
             {importLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
             <span>Import Excel</span>
           </button>
+
+          {/* "Xem nhanh": file Excel cần có cột gì? — tải file mẫu tiếng Việt
+              kèm sheet hướng dẫn, hoặc xem nhanh bảng cột ngay tại đây mà
+              không cần mở file. */}
+          <div className="relative" ref={importGuideRef}>
+            <button
+              type="button"
+              onClick={() => setIsImportGuideOpen((v) => !v)}
+              className="flex items-center justify-center gap-2 w-full sm:w-auto h-12 px-4 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+            >
+              <Info className="w-5 h-5" />
+              <span>Xem nhanh: file cần cột gì?</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {isImportGuideOpen && (
+              <div className="absolute z-20 mt-2 w-full sm:w-[26rem] left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-4 space-y-3">
+                <a
+                  href={IMPORT_EMPLOYEE_TEMPLATE_PATH}
+                  download
+                  className="flex items-center justify-center gap-2 w-full h-10 px-3 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải file Excel mẫu (kèm hướng dẫn)</span>
+                </a>
+                <div className="space-y-2">
+                  {IMPORT_EMPLOYEE_COLUMNS_GUIDE.map((col) => (
+                    <div key={col.label} className="text-xs border border-slate-100 rounded-lg p-2.5 bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                            col.required ? 'bg-[#22C55E]' : 'bg-[#94A3B8]'
+                          }`}
+                        />
+                        <span className="font-semibold text-slate-700">{col.label}</span>
+                        {col.required && (
+                          <span className="text-[10px] font-medium text-[#22C55E] bg-[#F0FDF4] px-1.5 py-0.5 rounded">
+                            Bắt buộc
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-500 mt-1 pl-4">{col.note}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Thiếu Mã nhân viên sẽ tự sinh mã tạm TMP&lt;số dòng&gt;. Username đăng nhập tự sinh từ Mã nhân viên.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
