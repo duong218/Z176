@@ -13,6 +13,9 @@ import {
   BookOpen,
   Clock,
   ShieldCheck,
+  FileText,
+  Eye,
+  Download,
 } from 'lucide-react';
 import {
   BarChart,
@@ -26,6 +29,11 @@ import {
 } from 'recharts';
 import { fetchMyResults } from '../../services/report.service';
 import { fetchMyExam } from '../../services/exam-attempt.service';
+import {
+  fetchMyStudyDocuments,
+  previewStudyDocument,
+  downloadStudyDocument,
+} from '../../services/study-document.service';
 
 const formatDateTime = (value) => {
   if (!value) return '—';
@@ -37,6 +45,9 @@ const formatDateTime = (value) => {
     minute: '2-digit',
   });
 };
+
+const isPdf = (doc) =>
+  doc.mimeType === 'application/pdf' || doc.originalFileName?.toLowerCase().endsWith('.pdf');
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -64,6 +75,17 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
   //   (backend trả lỗi EXAM_NOT_ACTIVE — coi như chưa có gì để thi).
   const [examStatus, setExamStatus] = useState(null);
   const [examStatusLoading, setExamStatusLoading] = useState(true);
+
+  // MỚI — Tài liệu ôn tập: 2 danh sách riêng — theo kỳ thi đang active (lọc
+  // theo topicId) và toàn bộ tài liệu cũ đã đăng (không lọc topicId). Tải lười
+  // (lazy) khi người dùng mở mục "Tài liệu ôn tập" lần đầu, tránh gọi API
+  // thừa cho những ai không bao giờ xem mục này.
+  const [activeDocs, setActiveDocs] = useState([]);
+  const [allDocs, setAllDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState(null);
+  const [docsLoadedOnce, setDocsLoadedOnce] = useState(false);
+  const [busyDocId, setBusyDocId] = useState(null);
 
   // ExamModal được mở/đóng ở App.jsx (dùng chung cho cả trang chủ). Khi modal
   // vừa chuyển từ mở -> đóng (thí sinh vừa thi xong hoặc huỷ), tự fetch lại
@@ -136,6 +158,69 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
     };
   }, [refreshTick, activeExam?._id]);
 
+  // MỚI — Tải tài liệu ôn tập khi mở mục "materials" lần đầu, hoặc khi kỳ thi
+  // active thay đổi (topicId đổi -> danh sách "tài liệu kỳ thi hiện tại" phải
+  // tải lại theo topic mới).
+  useEffect(() => {
+    if (activeSection !== 'materials') return;
+
+    let cancelled = false;
+    setDocsLoading(true);
+    setDocsError(null);
+
+    const activeTopicId = activeExam?.topicId?._id || activeExam?.topicId;
+
+    const requests = [
+      activeTopicId
+        ? fetchMyStudyDocuments({ topicId: activeTopicId })
+        : Promise.resolve([]),
+      fetchMyStudyDocuments(),
+    ];
+
+    Promise.all(requests)
+      .then(([activeList, allList]) => {
+        if (cancelled) return;
+        setActiveDocs(Array.isArray(activeList) ? activeList : []);
+        setAllDocs(Array.isArray(allList) ? allList : []);
+        setDocsLoadedOnce(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setDocsError(err?.message || 'Không thể tải tài liệu ôn tập.');
+      })
+      .finally(() => {
+        if (!cancelled) setDocsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, activeExam?.topicId?._id, activeExam?.topicId]);
+
+  const handlePreviewDoc = async (doc) => {
+    setBusyDocId(doc._id);
+    setDocsError(null);
+    try {
+      await previewStudyDocument(doc._id);
+    } catch (err) {
+      setDocsError(err?.message || 'Không thể mở tài liệu.');
+    } finally {
+      setBusyDocId(null);
+    }
+  };
+
+  const handleDownloadDoc = async (doc) => {
+    setBusyDocId(doc._id);
+    setDocsError(null);
+    try {
+      await downloadStudyDocument(doc._id, doc.originalFileName || doc.title);
+    } catch (err) {
+      setDocsError(err?.message || 'Không thể tải tài liệu.');
+    } finally {
+      setBusyDocId(null);
+    }
+  };
+
   // "Số lần đã thi" ở khối tổng quan Dashboard vẫn hiển thị TOÀN BỘ lịch sử
   // (thành tích chung của thí sinh qua các kỳ thi) — không liên quan tới việc
   // khoá/mở nút thi.
@@ -161,6 +246,11 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
       onOpenExam();
     }
   };
+
+  // Tài liệu cũ = toàn bộ tài liệu TRỪ những tài liệu đã hiện trong danh sách
+  // "kỳ thi hiện tại", tránh hiển thị trùng lặp 2 lần trong cùng 1 mục.
+  const activeDocIds = new Set(activeDocs.map((d) => d._id));
+  const olderDocs = allDocs.filter((d) => !activeDocIds.has(d._id));
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 mt-16 min-h-screen">
@@ -524,18 +614,88 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
               </div>
             )}
 
-            {/* ── Mục: Tài liệu ôn tập (placeholder — chưa có nguồn dữ liệu thật) ── */}
+            {/* ── Mục: Tài liệu ôn tập ── */}
             {activeSection === 'materials' && (
-              <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                  <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-[#008BC5]" />
-                    Tài liệu ôn tập
-                  </h2>
-                </div>
-                <div className="p-8 text-center text-slate-500">
-                  Chức năng đang được xây dựng. Tài liệu ôn tập sẽ được cập nhật tại đây trong thời gian tới.
-                </div>
+              <div className="space-y-6">
+                {docsError && (
+                  <div className="p-4 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-xl flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <span>{docsError}</span>
+                  </div>
+                )}
+
+                {docsLoading && !docsLoadedOnce ? (
+                  <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Đang tải tài liệu...</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Tài liệu của kỳ thi hiện tại */}
+                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
+                          <BookOpen className="w-5 h-5 text-[#008BC5]" />
+                          Tài liệu kỳ thi hiện tại
+                        </h2>
+                        {activeExam && (
+                          <p className="text-sm text-slate-500 mt-0.5">Chủ đề: {activeExam.title}</p>
+                        )}
+                      </div>
+
+                      {!activeExam ? (
+                        <div className="p-8 text-center text-slate-500 text-base">
+                          Hiện không có kỳ thi nào đang diễn ra nên chưa có tài liệu để hiển thị ở mục này.
+                        </div>
+                      ) : activeDocs.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-base">
+                          Chưa có tài liệu ôn tập nào cho kỳ thi hiện tại.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {activeDocs.map((doc) => (
+                            <DocumentRow
+                              key={doc._id}
+                              doc={doc}
+                              busy={busyDocId === doc._id}
+                              onPreview={handlePreviewDoc}
+                              onDownload={handleDownloadDoc}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tất cả tài liệu đã đăng (bao gồm tài liệu cũ) */}
+                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-[#008BC5]" />
+                          Tất cả tài liệu
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-0.5">Bao gồm tài liệu của các kỳ thi trước đây.</p>
+                      </div>
+
+                      {olderDocs.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-base">
+                          Không có tài liệu nào khác ngoài danh sách ở trên.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {olderDocs.map((doc) => (
+                            <DocumentRow
+                              key={doc._id}
+                              doc={doc}
+                              busy={busyDocId === doc._id}
+                              onPreview={handlePreviewDoc}
+                              onDownload={handleDownloadDoc}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -544,3 +704,43 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
     </div>
   );
 };
+
+// Dòng hiển thị 1 tài liệu — dùng chung cho cả 2 danh sách ở mục "Tài liệu ôn tập".
+const DocumentRow = ({ doc, busy, onPreview, onDownload }) => (
+  <div className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+    <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="w-10 h-10 rounded-lg bg-[#EAF6FF] flex items-center justify-center shrink-0">
+        <FileText className="w-5 h-5 text-[#008BC5]" />
+      </div>
+      <div className="min-w-0">
+        <div className="font-semibold text-[#0F172A] text-base truncate">{doc.title}</div>
+        <div className="text-sm text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span>{doc.topicId?.name || '—'}</span>
+          <span>·</span>
+          <span>Cập nhật: {formatDateTime(doc.createdAt)}</span>
+        </div>
+      </div>
+    </div>
+
+    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+      {isPdf(doc) && (
+        <button
+          onClick={() => onPreview(doc)}
+          disabled={busy}
+          className="min-h-[44px] px-3 flex items-center gap-1.5 text-sm font-semibold text-[#008BC5] border border-[#008BC5]/40 rounded-lg hover:bg-[#EAF6FF] disabled:opacity-50 transition-colors"
+        >
+          <Eye className="w-4 h-4" />
+          <span>Xem</span>
+        </button>
+      )}
+      <button
+        onClick={() => onDownload(doc)}
+        disabled={busy}
+        className="min-h-[44px] px-3 flex items-center gap-1.5 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+      >
+        <Download className="w-4 h-4" />
+        <span>Tải về</span>
+      </button>
+    </div>
+  </div>
+);

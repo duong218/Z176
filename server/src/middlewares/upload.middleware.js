@@ -5,6 +5,7 @@ import { env } from '../config/env.js';
 import { ApiError } from '../utils/api-error.js';
 
 const MAX_EXCEL_BYTES = 5 * 1024 * 1024;
+const MAX_STUDY_DOCUMENT_BYTES = 20 * 1024 * 1024; // 20MB
 
 function ensureUploadDir() {
   const dir = path.resolve(env.uploadDir);
@@ -42,4 +43,43 @@ export const uploadExcel = multer({
   storage,
   limits: { fileSize: MAX_EXCEL_BYTES },
   fileFilter: excelFilter,
+}).single('file');
+
+// MỚI — Upload tài liệu ôn tập: PDF/Word/Excel, tối đa 20MB. Dùng chung
+// `storage` (diskStorage vào env.uploadDir) với uploadExcel — tên file được
+// đặt tiền tố timestamp nên không đụng nhau dù cùng thư mục.
+const STUDY_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+function studyDocumentFilter(_req, file, cb) {
+  const nameLower = file.originalname.toLowerCase();
+  const ok =
+    STUDY_DOCUMENT_MIME_TYPES.has(file.mimetype) ||
+    nameLower.endsWith('.pdf') ||
+    nameLower.endsWith('.doc') ||
+    nameLower.endsWith('.docx') ||
+    nameLower.endsWith('.xls') ||
+    nameLower.endsWith('.xlsx');
+  if (!ok) {
+    cb(
+      new ApiError(
+        400,
+        'Chỉ chấp nhận file PDF, Word (.doc, .docx) hoặc Excel (.xls, .xlsx)',
+        'DOCUMENT_FILE_TYPE',
+      ),
+    );
+    return;
+  }
+  cb(null, true);
+}
+
+export const uploadStudyDocument = multer({
+  storage,
+  limits: { fileSize: MAX_STUDY_DOCUMENT_BYTES },
+  fileFilter: studyDocumentFilter,
 }).single('file');

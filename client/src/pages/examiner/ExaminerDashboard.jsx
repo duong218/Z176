@@ -4,7 +4,8 @@ import { TopicTab } from '../../components/examiner/TopicTab';
 import { DepartmentTab } from '../../components/examiner/DepartmentTab';
 import { ExamProposalTab } from '../../components/examiner/ExamProposalTab';
 import { OverviewTab } from '../../components/examiner/OverviewTab';
-import { LayoutDashboard, BookOpen, FolderOpen, Building, FileSignature } from 'lucide-react';
+import { StudyDocumentTab } from '../../components/examiner/StudyDocumentTab';
+import { LayoutDashboard, BookOpen, FolderOpen, Building, FileSignature, Library } from 'lucide-react';
 
 export const ExaminerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -26,6 +27,7 @@ export const ExaminerDashboard = () => {
     { id: 'topics', label: 'Chủ đề', icon: <FolderOpen className="w-5 h-5" /> },
     { id: 'departments', label: 'Bộ phận / Phòng ban', icon: <Building className="w-5 h-5" /> },
     { id: 'proposals', label: 'Đề xuất kỳ thi', icon: <FileSignature className="w-5 h-5" /> },
+    { id: 'materials', label: 'Tài liệu ôn tập', icon: <Library className="w-5 h-5" /> },
   ];
 
   return (
@@ -62,6 +64,7 @@ export const ExaminerDashboard = () => {
           {activeTab === 'topics' && <TopicTab onViewQuestions={handleViewQuestionsByTopic} />}
           {activeTab === 'departments' && <DepartmentTab />}
           {activeTab === 'proposals' && <ExamProposalTab />}
+          {activeTab === 'materials' && <StudyDocumentTab />}
         </div>
       </div>
     </div>

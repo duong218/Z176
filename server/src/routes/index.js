@@ -10,6 +10,7 @@ import auditRoutes from './audit.routes.js';
 import examRoutes from './exam.routes.js';
 import examAttemptRoutes from './exam-attempt.routes.js';
 import notificationRoutes from './notification.routes.js';
+import studyDocumentRoutes from './study-document.routes.js';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/audit-logs', auditRoutes);
 router.use('/exams', examRoutes);
 router.use('/exam-attempts', examAttemptRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/study-documents', studyDocumentRoutes);
 
 export default router;
