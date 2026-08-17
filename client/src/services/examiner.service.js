@@ -61,6 +61,18 @@ export async function importQuestions(file) {
   return res.data;
 }
 
+export async function uploadQuestionImage(file) {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await apiRequest('/questions/upload-image', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+  return res.data; // { imageUrl, imageCloudinaryId }
+}
+
 export async function bulkDeleteQuestions({ ids, filters }) {
   const res = await apiRequest('/questions/bulk-delete', {
     method: 'POST',

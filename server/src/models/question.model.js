@@ -43,6 +43,13 @@ const questionSchema = new mongoose.Schema(
     },
     /** Cloudinary public id / URL — DEMO-ONLY upload */
     imageUrl: { type: String, trim: true },
+    /**
+     * public_id thật trên Cloudinary tương ứng với imageUrl (= hash SHA-256
+     * nội dung file ảnh, xem uploadQuestionImageBuffer trong
+     * question.service.js). Dùng để gọi Cloudinary destroy khi thay ảnh
+     * khác hoặc xoá asset không còn dùng nữa. Không tự sinh ngẫu nhiên.
+     */
+    imageCloudinaryId: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },

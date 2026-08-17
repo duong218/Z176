@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, CheckSquare, Square } from 'lucide-react';
-import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions } from '../../services/examiner.service';
+import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, CheckSquare, Square, Image as ImageIcon } from 'lucide-react';
+import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions, uploadQuestionImage } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 
@@ -44,6 +44,10 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   const [scope, setScope] = useState('Common');
   const [topicId, setTopicId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageCloudinaryId, setImageCloudinaryId] = useState('');
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [answers, setAnswers] = useState([
     { content: '', isCorrect: false },
     { content: '', isCorrect: false },
@@ -110,6 +114,9 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     setScope('Common');
     setTopicId('');
     setDepartmentId('');
+    setImageUrl('');
+    setImageCloudinaryId('');
+    setImagePreviewUrl('');
     setAnswers([
       { content: '', isCorrect: false },
       { content: '', isCorrect: false },
@@ -128,6 +135,9 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     setScope(q.scope || 'Common');
     setTopicId(q.topicId || '');
     setDepartmentId(q.departmentId || '');
+    setImageUrl(q.imageUrl || '');
+    setImageCloudinaryId(q.imageCloudinaryId || '');
+    setImagePreviewUrl(q.imageUrl || '');
     // Mapping option responses to form structure
     const mappedAnswers = q.answers.map(a => ({
       id: a.id,
@@ -153,6 +163,35 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       nextAnswers[index][field] = value;
     }
     setAnswers(nextAnswers);
+  };
+
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const localPreview = URL.createObjectURL(file);
+    setImagePreviewUrl(localPreview);
+    setImageUploading(true);
+    setError('');
+    try {
+      const res = await uploadQuestionImage(file);
+      setImageUrl(res.imageUrl);
+      setImageCloudinaryId(res.imageCloudinaryId);
+      setImagePreviewUrl(res.imageUrl);
+    } catch (err) {
+      setError(err.message || 'Lỗi khi tải ảnh lên');
+      setImagePreviewUrl(imageUrl || '');
+    } finally {
+      setImageUploading(false);
+      URL.revokeObjectURL(localPreview);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageUrl('');
+    setImageCloudinaryId('');
+    setImagePreviewUrl('');
   };
 
   const addAnswerField = () => {
@@ -204,6 +243,20 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       departmentId: scope === 'DepartmentSpecific' ? departmentId : undefined,
       answers: filteredAnswers
     };
+
+    if (editingQuestion) {
+      // Chỉ gửi imageUrl/imageCloudinaryId khi có thay đổi so với câu hỏi
+      // gốc — gửi null nghĩa là "gỡ/thay ảnh, xoá ảnh cũ trên Cloudinary",
+      // không gửi nghĩa là "giữ nguyên ảnh hiện có" (backend không đụng field).
+      const originalCloudinaryId = editingQuestion.imageCloudinaryId || '';
+      if (imageCloudinaryId !== originalCloudinaryId) {
+        payload.imageUrl = imageUrl || null;
+        payload.imageCloudinaryId = imageCloudinaryId || null;
+      }
+    } else {
+      payload.imageUrl = imageUrl || undefined;
+      payload.imageCloudinaryId = imageCloudinaryId || undefined;
+    }
 
     try {
       if (editingQuestion) {
@@ -502,6 +555,15 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                     <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-semibold">
                       {q.scope === 'Common' ? 'Chung' : 'Riêng bộ phận'}
                     </span>
+                    {q.imageUrl && (
+                      <span
+                        title="Câu hỏi này có ảnh minh hoạ đề bài"
+                        className="px-2 py-0.5 bg-sky-50 text-[#008BC5] rounded text-xs font-semibold flex items-center gap-1"
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        Có ảnh
+                      </span>
+                    )}
                   </div>
                   <h4 className="font-bold text-slate-800 text-[15px] sm:text-base leading-snug break-words">{q.content}</h4>
                   </div>
@@ -673,6 +735,39 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                     <option value="">-- Chọn bộ phận --</option>
                     {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Ảnh minh hoạ đề bài (không bắt buộc)</label>
+                <div className="flex items-start gap-3">
+                  {imagePreviewUrl && (
+                    <div className="relative shrink-0">
+                      <img src={imagePreviewUrl} alt="Xem trước ảnh câu hỏi" className="w-24 h-24 object-cover rounded-lg border border-slate-200" />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-2 -right-2 bg-white border border-slate-300 rounded-full p-1 text-slate-500 hover:text-red-500"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg"
+                      onChange={handleImageFileChange}
+                      disabled={imageUploading}
+                      className="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 file:text-sm file:font-medium hover:file:bg-slate-200"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">JPG hoặc PNG, tối đa 10MB. Ảnh chỉ gắn ở đề bài, không gắn theo từng lựa chọn.</p>
+                    {imageUploading && (
+                      <p className="text-xs text-[#008BC5] mt-1 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Đang tải ảnh lên...
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 

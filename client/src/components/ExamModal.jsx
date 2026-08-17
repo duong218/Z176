@@ -102,6 +102,11 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const [examSecondsLeft, setExamSecondsLeft] = useState(0);
   const [submitError, setSubmitError] = useState(null);
 
+  // Ảnh minh hoạ đề bài (currentQ.imageUrl) bị lỗi tải (link hỏng, mất mạng...)
+  // — reset về false mỗi khi chuyển câu, KHÔNG chặn thí sinh làm bài, chỉ ẩn
+  // ảnh và hiện chú thích thay thế.
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
   // Chế độ xem: khi bật, thay TOÀN BỘ vùng nội dung câu hỏi bằng màn hình danh
   // sách câu hỏi full-height (thay vì chèn 1 khung nhỏ phía trên như trước) —
   // để thoải mái cuộn/chọn khi đề có 30-50 câu, đặc biệt trên điện thoại.
@@ -249,6 +254,12 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   useEffect(() => {
     attemptIdRef.current = attemptId;
   }, [attemptId]);
+
+  // Reset trạng thái "ảnh lỗi tải" mỗi khi chuyển sang câu khác — tránh 1 ảnh
+  // lỗi ở câu trước làm ẩn nhầm ảnh hợp lệ của câu sau.
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [currentQuestionIndex]);
 
   // ── Heartbeat định kỳ trong lúc đang làm bài ─────────────────────────────
   // Chỉ gửi khi tab đang thực sự hiển thị (document.visibilityState==='visible')
@@ -630,6 +641,27 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                       <span className="block text-xs font-semibold text-[#008BC5] mt-1">(Chọn nhiều đáp án đúng)</span>
                     )}
                   </div>
+
+                  {/* Ảnh minh hoạ đề bài (nếu câu hỏi có gắn ảnh) — key theo
+                      currentQ.id để reset trạng thái lỗi tải mỗi khi chuyển câu. */}
+                  {currentQ.imageUrl && !imageLoadFailed && (
+                    <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex justify-center">
+                      <img
+                        key={currentQ.id}
+                        src={currentQ.imageUrl}
+                        alt={`Hình minh hoạ câu ${currentQuestionIndex + 1}`}
+                        loading="lazy"
+                        onError={() => setImageLoadFailed(true)}
+                        className="max-h-72 w-auto object-contain"
+                      />
+                    </div>
+                  )}
+                  {currentQ.imageUrl && imageLoadFailed && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Không tải được hình minh hoạ cho câu này — vẫn có thể tiếp tục làm bài bình thường.</span>
+                    </div>
+                  )}
 
                   {/* Options list */}
                   <div className="space-y-2.5">

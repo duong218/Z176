@@ -23,6 +23,7 @@ function parseCreateBody(body) {
     topicId,
     departmentId,
     imageUrl,
+    imageCloudinaryId,
     answers,
   } = body ?? {};
 
@@ -47,6 +48,7 @@ function parseCreateBody(body) {
     topicId,
     departmentId,
     imageUrl,
+    imageCloudinaryId,
     answers,
   };
 }
@@ -89,6 +91,19 @@ export const create = asyncHandler(async (req, res) => {
     success: true,
     message: 'Tạo câu hỏi thành công',
     code: 'QUESTION_CREATED',
+    data,
+  });
+});
+
+export const uploadImage = asyncHandler(async (req, res) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'Thiếu file ảnh (field: image)', 'IMAGE_FILE_MISSING');
+  }
+  const data = await questionService.uploadQuestionImageBuffer(req.file.buffer);
+  res.json({
+    success: true,
+    message: 'Tải ảnh lên thành công',
+    code: 'QUESTION_IMAGE_UPLOADED',
     data,
   });
 });

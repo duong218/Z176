@@ -83,3 +83,29 @@ export const uploadStudyDocument = multer({
   limits: { fileSize: MAX_STUDY_DOCUMENT_BYTES },
   fileFilter: studyDocumentFilter,
 }).single('file');
+
+// MỚI — Upload ảnh câu hỏi (đề bài). memoryStorage (KHÔNG diskStorage như
+// Excel/tài liệu) vì cần buffer trong RAM để hash SHA-256 làm public_id
+// Cloudinary rồi upload thẳng lên, không lưu file tạm trên đĩa server.
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+const MAX_QUESTION_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
+
+function questionImageFilter(_req, file, cb) {
+  const nameLower = file.originalname.toLowerCase();
+  const ok =
+    IMAGE_MIME_TYPES.has(file.mimetype) ||
+    nameLower.endsWith('.jpg') ||
+    nameLower.endsWith('.jpeg') ||
+    nameLower.endsWith('.png');
+  if (!ok) {
+    cb(new ApiError(400, 'Chỉ chấp nhận ảnh JPG hoặc PNG', 'IMAGE_FILE_TYPE'));
+    return;
+  }
+  cb(null, true);
+}
+
+export const uploadQuestionImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_QUESTION_IMAGE_BYTES },
+  fileFilter: questionImageFilter,
+}).single('image');

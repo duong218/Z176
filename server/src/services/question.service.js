@@ -1,6 +1,8 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import XLSX from 'xlsx';
+import { v2 as cloudinary } from 'cloudinary';
 import {
   ANSWER_TYPE,
   DIFFICULTY,
@@ -14,6 +16,52 @@ import { ApiError, assertFound } from '../utils/api-error.js';
 import { findDepartmentByName } from './department.service.js';
 import { findOrCreateTopicByName } from './topic.service.js';
 import { writeAudit } from './audit.service.js';
+import { env } from '../config/env.js';
+
+cloudinary.config({
+  cloud_name: env.cloudinary.cloudName,
+  api_key: env.cloudinary.apiKey,
+  api_secret: env.cloudinary.apiSecret,
+});
+
+const CLOUDINARY_QUESTION_FOLDER = 'z176/questions';
+
+function uploadBufferToCloudinary(buffer, publicId) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { public_id: publicId, overwrite: true, resource_type: 'image' },
+      (err, result) => (err ? reject(err) : resolve(result)),
+    );
+    stream.end(buffer);
+  });
+}
+
+/**
+ * Upload 1 ảnh câu hỏi lên Cloudinary. public_id = hash SHA-256 nội dung
+ * file (không để Cloudinary tự sinh ID) + overwrite:true — 2 câu hỏi dùng
+ * chung ảnh giống hệt nhau sẽ tự dùng chung 1 asset, import/upload lại đúng
+ * ảnh cũ sẽ ghi đè thay vì tạo bản sao.
+ */
+export async function uploadQuestionImageBuffer(buffer) {
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+  const publicId = `${CLOUDINARY_QUESTION_FOLDER}/${hash}`;
+  const result = await uploadBufferToCloudinary(buffer, publicId);
+  return { imageUrl: result.secure_url, imageCloudinaryId: result.public_id };
+}
+
+/**
+ * Xoá 1 asset ảnh câu hỏi trên Cloudinary theo public_id. Không throw nếu
+ * xoá lỗi (vd asset đã bị xoá tay từ trước) — lỗi Cloudinary không được
+ * chặn luồng cập nhật câu hỏi trong DB.
+ */
+async function deleteQuestionImage(publicId) {
+  if (!publicId) return;
+  try {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+  } catch (err) {
+    console.error('Cloudinary destroy thất bại:', publicId, err.message);
+  }
+}
 
 function normalizeKey(key) {
   return String(key ?? '')
@@ -110,6 +158,7 @@ function serializeQuestion(doc, answers) {
     topicId: doc.topicId?.toString(),
     departmentId: doc.departmentId?.toString(),
     imageUrl: doc.imageUrl,
+    imageCloudinaryId: doc.imageCloudinaryId,
     isActive: doc.isActive,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -199,6 +248,7 @@ export async function createQuestion(payload, createdBy) {
     topicId,
     departmentId,
     imageUrl,
+    imageCloudinaryId,
     answers,
   } = payload;
 
@@ -220,6 +270,7 @@ export async function createQuestion(payload, createdBy) {
     topicId,
     departmentId: scope === QUESTION_SCOPE.DEPARTMENT_SPECIFIC ? departmentId : undefined,
     imageUrl,
+    imageCloudinaryId,
     createdBy,
   });
 
@@ -231,6 +282,8 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
   const question = await Question.findById(id);
   assertFound(question, 'Không tìm thấy câu hỏi', 'QUESTION_NOT_FOUND');
 
+  const previousCloudinaryId = question.imageCloudinaryId;
+
   const fields = [
     'content',
     'questionKind',
@@ -240,6 +293,7 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
     'topicId',
     'departmentId',
     'imageUrl',
+    'imageCloudinaryId',
     'isActive',
   ];
   for (const f of fields) {
@@ -257,6 +311,18 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
 
   if (payload.answers) {
     await replaceAnswers(question._id, payload.answers);
+  }
+
+  // Chỉ xoá asset Cloudinary CŨ khi client thực sự gửi imageCloudinaryId
+  // MỚI khác với ảnh đang lưu (đổi sang ảnh khác, hoặc gỡ ảnh = gửi null).
+  // Xoá mềm câu hỏi (deactivateQuestion) KHÔNG đụng nhánh này — theo yêu
+  // cầu giữ nguyên ảnh trên Cloudinary phòng khi cần khôi phục dữ liệu.
+  if (
+    payload.imageCloudinaryId !== undefined &&
+    previousCloudinaryId &&
+    previousCloudinaryId !== question.imageCloudinaryId
+  ) {
+    await deleteQuestionImage(previousCloudinaryId);
   }
 
   await writeAudit({
