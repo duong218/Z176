@@ -14,11 +14,6 @@ import { fetchOverviewStats } from '../../services/report.service';
 // (report.service.js -> fetchOverviewStats), trả về:
 // { totalSubmissions, totalCandidates, passedCount, failedCount, passRate, avgScore }
 // — khớp đúng reportService.getOverviewStats() ở server, không bịa field nào khác.
-//
-// SỬA LỖI: file này trước đây bị copy nhầm nội dung của
-// components/examiner/OverviewTab.jsx (gọi fetchQuestions/fetchTopics/
-// fetchDepartments/fetchMyExamProposals từ examiner.service.js), khiến
-// Leader dashboard gọi nhầm các API chỉ dành cho role examiner -> 403.
 
 const PASS_COLOR = '#22C55E';
 const FAIL_COLOR = '#E53E3E';
@@ -72,13 +67,13 @@ export const OverviewTab = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-6 w-40 bg-slate-700 rounded animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-slate-800 p-5 rounded-xl border border-slate-700 animate-pulse">
-              <div className="h-10 w-10 bg-slate-700 rounded-lg mb-3" />
-              <div className="h-4 w-24 bg-slate-700 rounded mb-2" />
-              <div className="h-8 w-16 bg-slate-700 rounded" />
+            <div key={i} className="bg-white p-5 rounded-xl border border-[#E2E8F0] animate-pulse">
+              <div className="h-10 w-10 bg-slate-200 rounded-xl mb-3" />
+              <div className="h-4 w-24 bg-slate-200 rounded mb-2" />
+              <div className="h-8 w-16 bg-slate-200 rounded" />
             </div>
           ))}
         </div>
@@ -88,14 +83,14 @@ export const OverviewTab = () => {
 
   if (error || !stats) {
     return (
-      <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
+      <div className="p-6 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-xl text-[#C53030]">
         <div className="flex items-center gap-3">
           <ServerCrash className="w-5 h-5 shrink-0" />
-          <p className="font-medium">Không tải được dữ liệu tổng quan. Vui lòng thử lại.</p>
+          <p className="font-medium text-base">Không tải được dữ liệu tổng quan. Vui lòng thử lại.</p>
         </div>
         <button
           onClick={loadData}
-          className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg"
+          className="mt-4 px-4 py-2.5 bg-[#334155] hover:bg-[#1e293b] text-white rounded-lg text-base font-semibold min-touch-target"
         >
           Thử lại
         </button>
@@ -109,35 +104,37 @@ export const OverviewTab = () => {
     { name: 'Không đạt', value: stats.failedCount, color: FAIL_COLOR },
   ];
 
+  // Chỉ dùng đúng 5 màu chức năng của design system (xanh dương/xanh lá/đỏ/vàng-cam/xám)
+  // — bỏ purple-400 ở bản trước (ngoài bảng màu quy định).
   const summaryCards = [
-    { label: 'Tổng số thí sinh', value: stats.totalCandidates, icon: Users, color: 'bg-[#008BC5]/10 text-[#008BC5]' },
-    { label: 'Tổng lượt nộp bài', value: stats.totalSubmissions, icon: FileCheck2, color: 'bg-purple-500/10 text-purple-400' },
-    { label: 'Số lượt Đạt', value: stats.passedCount, icon: CheckCircle2, color: 'bg-[#22C55E]/10 text-[#22C55E]' },
-    { label: 'Số lượt Không đạt', value: stats.failedCount, icon: XCircle, color: 'bg-[#E53E3E]/10 text-[#E53E3E]' },
+    { label: 'Tổng số thí sinh', value: stats.totalCandidates, icon: Users, iconBg: '#EAF6FF', iconColor: '#008BC5' },
+    { label: 'Tổng lượt nộp bài', value: stats.totalSubmissions, icon: FileCheck2, iconBg: '#F6F8FA', iconColor: '#334155' },
+    { label: 'Số lượt Đạt', value: stats.passedCount, icon: CheckCircle2, iconBg: '#F0FDF4', iconColor: '#22C55E' },
+    { label: 'Số lượt Không đạt', value: stats.failedCount, icon: XCircle, iconBg: '#FEECEC', iconColor: '#E53E3E' },
   ];
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-bold text-white">Thống kê nhanh</h3>
+      <h3 className="text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-slate-800 p-5 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${color}`}>
-              <Icon className="w-5 h-5" />
+        {summaryCards.map(({ label, value, icon: Icon, iconBg, iconColor }) => (
+          <div key={label} className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-z176">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: iconBg }}>
+              <Icon className="w-5 h-5" style={{ color: iconColor }} />
             </div>
-            <p className="text-xs text-slate-400 font-medium">{label}</p>
-            <p className="text-xl font-bold text-white mt-1">{value}</p>
+            <p className="text-sm text-[#334155] font-medium">{label}</p>
+            <p className="text-2xl font-bold text-[#0F172A] mt-1">{value}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Biểu đồ tròn Đạt/Không đạt */}
-        <div className="lg:col-span-2 bg-slate-800 p-5 rounded-xl border border-slate-700">
-          <p className="text-sm font-medium text-slate-400 mb-3">Tỷ lệ Đạt / Không đạt</p>
+        <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-z176">
+          <p className="text-base font-semibold text-[#334155] mb-3">Tỷ lệ Đạt / Không đạt</p>
           {!hasSubmissions ? (
-            <div className="py-10 text-center text-slate-500 text-sm">Chưa có dữ liệu kết quả thi.</div>
+            <div className="py-10 text-center text-[#64748B] text-base">Chưa có dữ liệu kết quả thi.</div>
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -155,10 +152,10 @@ export const OverviewTab = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ background: '#1E293B', border: '1px solid #334155', borderRadius: 8, color: '#E2E8F0' }}
+                    contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, color: '#0F172A' }}
                     formatter={(value, name) => [`${value} lượt`, name]}
                   />
-                  <Legend wrapperStyle={{ color: '#CBD5E1', fontSize: 13 }} />
+                  <Legend wrapperStyle={{ color: '#334155', fontSize: 14 }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -166,13 +163,13 @@ export const OverviewTab = () => {
         </div>
 
         {/* Chỉ số phụ: tỷ lệ đạt % + điểm trung bình */}
-        <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col justify-center gap-6">
+        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-z176 flex flex-col justify-center gap-6">
           <div>
-            <p className="text-xs text-slate-400 font-medium">Tỷ lệ Đạt</p>
+            <p className="text-sm text-[#334155] font-medium">Tỷ lệ Đạt</p>
             <p className="text-3xl font-bold text-[#22C55E] mt-1">{stats.passRate}%</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-medium">Điểm trung bình</p>
+            <p className="text-sm text-[#334155] font-medium">Điểm trung bình</p>
             <p className="text-3xl font-bold text-[#F6AD37] mt-1">{stats.avgScore}</p>
           </div>
         </div>

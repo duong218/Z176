@@ -50,7 +50,7 @@ export const LeaderDashboard = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="p-6 bg-slate-800 text-slate-300">
+        <div className="p-4 md:p-6 bg-slate-50/50 min-h-[400px]">
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'department' && <DepartmentReportTab />}
           {activeTab === 'exam' && <ExamReportTab />}

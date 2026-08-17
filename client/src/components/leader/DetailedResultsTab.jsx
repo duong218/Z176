@@ -97,29 +97,30 @@ export const DetailedResultsTab = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Kết quả chi tiết</h2>
-          <p className="text-sm text-slate-400">Danh sách các bài thi đã nộp</p>
+          <h2 className="text-lg font-bold text-[#0F172A]">Kết quả chi tiết</h2>
+          <p className="text-base text-[#334155]">Danh sách các bài thi đã nộp</p>
         </div>
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] hover:bg-[#007AB0] text-white font-medium rounded-lg transition-colors min-touch-target"
+          className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-3 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold text-base rounded-[10px] transition-colors min-touch-target"
         >
           <FileText className="w-5 h-5" />
           <span>Xuất Excel theo bộ lọc</span>
         </button>
       </div>
 
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <form onSubmit={applyFilters} className="flex flex-col md:flex-row gap-4">
+      {/* Bộ lọc — xếp cột đơn trên mobile, đủ chiều cao 48px cho mỗi ô theo design system */}
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+        <form onSubmit={applyFilters} className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-5 h-5 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               name="search"
               value={filters.search}
               onChange={handleFilterChange}
-              placeholder="Tìm kiếm theo họ tên thí sinh..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#008BC5] transition-colors"
+              placeholder="Tìm theo họ tên thí sinh..."
+              className="w-full h-12 pl-10 pr-4 bg-white border border-[#E2E8F0] rounded-[10px] text-base text-[#0F172A] placeholder:text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
             />
           </div>
           <div className="w-full md:w-48">
@@ -127,136 +128,177 @@ export const DetailedResultsTab = () => {
               name="passed"
               value={filters.passed}
               onChange={handleFilterChange}
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-[#008BC5] transition-colors"
+              className="w-full h-12 px-4 bg-white border border-[#E2E8F0] rounded-[10px] text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
             >
               <option value="">Tất cả kết quả</option>
               <option value="true">Đạt</option>
               <option value="false">Không đạt</option>
             </select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <input
               type="date"
               name="startDate"
               value={filters.startDate}
               onChange={handleFilterChange}
-              className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-[#008BC5]"
+              className="h-12 px-3 bg-white border border-[#E2E8F0] rounded-[10px] text-base text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
             />
-            <span className="text-slate-500">-</span>
+            <span className="hidden sm:inline text-[#64748B]">-</span>
             <input
               type="date"
               name="endDate"
               value={filters.endDate}
               onChange={handleFilterChange}
-              className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-[#008BC5]"
+              className="h-12 px-3 bg-white border border-[#E2E8F0] rounded-[10px] text-base text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
             />
           </div>
           <button
             type="submit"
-            className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="h-12 px-6 bg-[#334155] hover:bg-[#1e293b] text-white font-semibold text-base rounded-[10px] transition-colors flex items-center justify-center gap-2 min-touch-target"
           >
-            <Filter className="w-4 h-4" />
+            <Filter className="w-5 h-5" />
             Lọc
           </button>
         </form>
       </div>
 
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center p-12">
-            <div className="w-8 h-8 border-4 border-slate-700 border-t-[#008BC5] rounded-full animate-spin" />
+      {loading ? (
+        <div className="flex items-center justify-center p-12">
+          <div className="w-8 h-8 border-4 border-[#E2E8F0] border-t-[#008BC5] rounded-full animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="p-6 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-xl text-[#C53030] text-base">
+          <p>Lỗi: {error}</p>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
+          <div className="flex flex-col items-center justify-center text-[#64748B]">
+            <FileText className="w-12 h-12 mb-3" />
+            <p className="text-base font-medium text-[#334155]">Chưa có kết quả thi nào</p>
+            <p className="text-base mt-1">Hệ thống chưa ghi nhận bài làm nào phù hợp với bộ lọc hiện tại.</p>
           </div>
-        ) : error ? (
-          <div className="p-12 text-center text-red-400">
-            <p>Lỗi: {error}</p>
-          </div>
-        ) : (
-          <>
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table */}
+          <div className="hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-700">
+              <table className="w-full text-left">
+                <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Họ và tên</th>
-                    <th className="px-6 py-4 font-medium">Phòng ban</th>
-                    <th className="px-6 py-4 font-medium">Bài thi</th>
-                    <th className="px-6 py-4 font-medium text-center">Điểm</th>
-                    <th className="px-6 py-4 font-medium text-center">Kết quả</th>
-                    <th className="px-6 py-4 font-medium">Ngày nộp</th>
-                    <th className="px-6 py-4 font-medium text-right">Thao tác</th>
+                    <th className="px-6 py-4 font-semibold">Họ và tên</th>
+                    <th className="px-6 py-4 font-semibold">Phòng ban</th>
+                    <th className="px-6 py-4 font-semibold">Bài thi</th>
+                    <th className="px-6 py-4 font-semibold text-center">Điểm</th>
+                    <th className="px-6 py-4 font-semibold text-center">Kết quả</th>
+                    <th className="px-6 py-4 font-semibold">Ngày nộp</th>
+                    <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/50">
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center justify-center text-slate-500">
-                          <FileText className="w-12 h-12 mb-3 text-slate-600" />
-                          <p className="text-base font-medium text-slate-400">Chưa có kết quả thi nào</p>
-                          <p className="text-sm mt-1">Hệ thống chưa ghi nhận bài làm nào phù hợp với bộ lọc hiện tại.</p>
-                        </div>
+                <tbody className="divide-y divide-[#E2E8F0]">
+                  {data.map((item) => (
+                    <tr key={item._id} className="hover:bg-[#F6F8FA] transition-colors">
+                      <td className="px-6 py-4 font-medium text-[#0F172A] text-base">{item.employeeName}</td>
+                      <td className="px-6 py-4 text-[#334155] text-base">{item.departmentName}</td>
+                      <td className="px-6 py-4 text-[#334155] text-base">{item.examTitle}</td>
+                      <td className="px-6 py-4 text-center font-bold text-[#F6AD37] text-base">{item.score}</td>
+                      <td className="px-6 py-4 text-center">
+                        {item.passed ? (
+                          <span className="px-3 py-1 bg-[#F0FDF4] text-[#166534] rounded-lg text-sm font-semibold">ĐẠT</span>
+                        ) : (
+                          <span className="px-3 py-1 bg-[#FEECEC] text-[#C53030] rounded-lg text-sm font-semibold">KHÔNG ĐẠT</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-[#334155] text-base">
+                        {item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleGrantExtraAttempt(item)}
+                          disabled={grantingId === item._id}
+                          title="Mở lại lượt thi cho thí sinh này"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#EAF6FF] hover:bg-[#008BC5]/20 text-[#008BC5] font-semibold rounded-lg transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          {grantingId === item._id ? 'Đang cấp...' : 'Cấp lại lượt thi'}
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    data.map((item) => (
-                      <tr key={item._id} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="px-6 py-4 font-medium text-white">{item.employeeName}</td>
-                        <td className="px-6 py-4">{item.departmentName}</td>
-                        <td className="px-6 py-4">{item.examTitle}</td>
-                        <td className="px-6 py-4 text-center font-bold text-[#F6AD37]">{item.score}</td>
-                        <td className="px-6 py-4 text-center">
-                          {item.passed ? (
-                            <span className="px-2 py-1 bg-[#22C55E]/10 text-[#22C55E] rounded-md text-xs font-semibold">ĐẠT</span>
-                          ) : (
-                            <span className="px-2 py-1 bg-[#E53E3E]/10 text-[#E53E3E] rounded-md text-xs font-semibold">KHÔNG ĐẠT</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleGrantExtraAttempt(item)}
-                            disabled={grantingId === item._id}
-                            title="Mở lại lượt thi cho thí sinh này"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#008BC5]/10 hover:bg-[#008BC5]/20 text-[#008BC5] font-medium rounded-lg transition-colors text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            {grantingId === item._id ? 'Đang cấp...' : 'Cấp lại lượt thi'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
+          </div>
 
-            {pagination.totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-slate-700 flex items-center justify-between">
-                <p className="text-sm text-slate-400">
-                  Trang {pagination.page} / {pagination.totalPages} (Tổng số {pagination.total} bản ghi)
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                    className="p-2 bg-slate-900 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page === pagination.totalPages}
-                    className="p-2 bg-slate-900 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
+          {/* Mobile Card List */}
+          <div className="sm:hidden space-y-3">
+            {data.map((item) => (
+              <div key={item._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-[#0F172A] text-base">{item.employeeName}</div>
+                    <div className="text-base text-[#64748B]">{item.departmentName}</div>
+                  </div>
+                  {item.passed ? (
+                    <span className="px-3 py-1 bg-[#F0FDF4] text-[#166534] rounded-lg text-sm font-semibold shrink-0">ĐẠT</span>
+                  ) : (
+                    <span className="px-3 py-1 bg-[#FEECEC] text-[#C53030] rounded-lg text-sm font-semibold shrink-0">KHÔNG ĐẠT</span>
+                  )}
                 </div>
+
+                <div className="text-base text-[#334155]">
+                  Bài thi: <span className="font-medium text-[#0F172A]">{item.examTitle}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-base">
+                  <div>
+                    <span className="text-[#64748B]">Điểm: </span>
+                    <span className="font-bold text-[#F6AD37]">{item.score}</span>
+                  </div>
+                  <div className="text-[#64748B] text-sm">
+                    {item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : '-'}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleGrantExtraAttempt(item)}
+                  disabled={grantingId === item._id}
+                  className="w-full h-12 flex items-center justify-center gap-2 bg-[#EAF6FF] hover:bg-[#008BC5]/20 text-[#008BC5] font-semibold text-base rounded-[10px] transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {grantingId === item._id ? 'Đang cấp...' : 'Cấp lại lượt thi'}
+                </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            ))}
+          </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="bg-white rounded-xl border border-[#E2E8F0] px-4 py-3 flex items-center justify-between gap-2">
+              <p className="text-sm text-[#334155]">
+                Trang {pagination.page}/{pagination.totalPages} (Tổng {pagination.total})
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="w-11 h-11 flex items-center justify-center bg-white border border-[#E2E8F0] text-[#334155] rounded-lg hover:bg-[#F6F8FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-touch-target"
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="w-11 h-11 flex items-center justify-center bg-white border border-[#E2E8F0] text-[#334155] rounded-lg hover:bg-[#F6F8FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-touch-target"
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

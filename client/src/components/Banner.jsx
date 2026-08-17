@@ -21,9 +21,11 @@ export const Banner = ({ unitLogo, activeExam }) => {
           {Z176_COMPANY_INFO.contestTitle}
         </h1>
 
-        {/* Subtitle "Lần thứ ..., năm ..." or Topic Name */}
+        {/* Subtitle: ưu tiên hiển thị đúng tên kỳ thi (activeExam.title) — trước
+            đây lấy nhầm activeExam.topicId.name (tên chủ đề liên kết), khiến
+            tên kỳ thi người tạo gõ vào không hề xuất hiện ở trang chủ. */}
         <h3 className="text-base sm:text-xl font-semibold text-slate-100 mb-2 sm:mb-4 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-          {activeExam?.topicId?.name || Z176_COMPANY_INFO.contestEdition}
+          {activeExam?.title || Z176_COMPANY_INFO.contestEdition}
         </h3>
 
         {/* Chip/Tag description - hidden on mobile to fit above the fold */}
