@@ -194,7 +194,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
           {/* Sidebar bên trái */}
           <aside className="md:w-60 shrink-0">
             <nav
-              className="bg-white rounded-xl shadow-z176 border border-slate-200 p-2 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible md:sticky md:top-20"
+              className="bg-white rounded-xl shadow-z176 border border-slate-200 p-2 grid grid-cols-2 gap-2 md:flex md:flex-col md:gap-1 md:sticky md:top-20"
               aria-label="Menu chức năng thí sinh"
             >
               {SIDEBAR_ITEMS.map((item) => {
@@ -204,14 +204,14 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   <button
                     key={item.id}
                     onClick={() => setActiveSection(item.id)}
-                    className={`flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors text-left min-touch-target ${
+                    className={`flex flex-col md:flex-row items-center md:items-center gap-1.5 md:gap-2.5 px-2 py-3 md:px-4 md:py-3 rounded-lg text-base font-semibold text-center md:text-left transition-colors min-touch-target ${
                       isActive
                         ? 'bg-[#008BC5]/10 text-[#008BC5] border border-[#008BC5]/30'
                         : 'text-slate-500 hover:text-[#0F172A] hover:bg-slate-100 border border-transparent'
                     }`}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
-                    <span>{item.label}</span>
+                    <span className="leading-tight">{item.label}</span>
                   </button>
                 );
               })}
