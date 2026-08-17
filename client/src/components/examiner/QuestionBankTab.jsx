@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
@@ -34,6 +34,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
   // Import State
   const [importFile, setImportFile] = useState(null);
+  const [showImportGuide, setShowImportGuide] = useState(false);
 
   // Form State
   const [content, setContent] = useState('');
@@ -316,6 +317,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       showToast(`Import thành công! Đã nhập: ${res.imported} câu hỏi, Thất bại: ${res.failed} câu hỏi.`, res.failed > 0 ? 'warning' : 'success');
       setIsImportOpen(false);
       setImportFile(null);
+      setShowImportGuide(false);
       await loadData(1);
     } catch (err) {
       setError(err.message || 'Lỗi khi import file Excel');
@@ -766,6 +768,83 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 Tải file mẫu Excel (đúng định dạng cột)
               </a>
 
+              {/* Panel xem nhanh cột bắt buộc — không cần mở file Excel cũng
+                  biết được cấu trúc file cần có, hữu ích cho người dùng lần
+                  đầu import (vd người kế nhiệm sau này không quen hệ thống). */}
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowImportGuide((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-sm font-semibold text-slate-700"
+                >
+                  <span>Xem nhanh: file Excel cần có cột gì?</span>
+                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${showImportGuide ? 'rotate-180' : ''}`} />
+                </button>
+                {showImportGuide && (
+                  <div className="p-4 space-y-3 text-xs text-slate-600 bg-white">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="py-1.5 pr-2 font-semibold text-slate-700">Tên cột</th>
+                          <th className="py-1.5 pr-2 font-semibold text-slate-700">Bắt buộc?</th>
+                          <th className="py-1.5 font-semibold text-slate-700">Giá trị hợp lệ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Chủ đề</td>
+                          <td className="py-1.5 pr-2 text-red-600 font-semibold">Có</td>
+                          <td className="py-1.5">Tên chủ đề (tự tạo mới nếu chưa có)</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Nội dung</td>
+                          <td className="py-1.5 pr-2 text-red-600 font-semibold">Có</td>
+                          <td className="py-1.5">Nội dung câu hỏi</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Phạm vi</td>
+                          <td className="py-1.5 pr-2 text-slate-400">Không</td>
+                          <td className="py-1.5">chung — hoặc — riêng (mặc định: chung)</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Bộ phận</td>
+                          <td className="py-1.5 pr-2 text-amber-600 font-semibold">Nếu Phạm vi = riêng</td>
+                          <td className="py-1.5">Đúng tên 1 bộ phận đang có trong hệ thống</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Loại</td>
+                          <td className="py-1.5 pr-2 text-slate-400">Không</td>
+                          <td className="py-1.5">lý thuyết — hoặc — bài tập (mặc định: lý thuyết)</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Đáp án</td>
+                          <td className="py-1.5 pr-2 text-slate-400">Không</td>
+                          <td className="py-1.5">chọn 1 — hoặc — chọn nhiều (mặc định: chọn 1)</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Độ khó</td>
+                          <td className="py-1.5 pr-2 text-slate-400">Không</td>
+                          <td className="py-1.5">dễ, trung bình, khó (mặc định: trung bình)</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Lựa chọn 1…8</td>
+                          <td className="py-1.5 pr-2 text-red-600 font-semibold">Ít nhất 2</td>
+                          <td className="py-1.5">Nội dung từng phương án trả lời</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 pr-2 font-semibold">Đáp án đúng</td>
+                          <td className="py-1.5 pr-2 text-red-600 font-semibold">Có</td>
+                          <td className="py-1.5">Số thứ tự đáp án đúng, vd: 1 hoặc 1,3</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p className="text-slate-400 italic">
+                      Điền tên cột đúng như trên (có dấu). Tải file mẫu ở trên để xem đầy đủ giải thích (sheet "HuongDan") kèm 2 dòng ví dụ thật.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 cursor-pointer relative">
                 <input
                   type="file"
@@ -783,7 +862,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               </div>
 
               <p className="text-xs text-slate-500">
-                Xem sheet "HuongDan" trong file mẫu để biết chi tiết từng cột (Chủ đề, Nội dung, Loại, Độ khó, Đáp án, Phạm vi, Bộ phận, Lựa chọn 1–8, Đáp án đúng).
+                Xem sheet "HuongDan" trong file mẫu để biết chi tiết từng cột: Chủ đề, Nội dung, Phạm vi, Bộ phận, Loại, Đáp án, Độ khó, Lựa chọn 1–8, Đáp án đúng.
               </p>
 
               <div className="pt-2 flex gap-3 pb-1">
