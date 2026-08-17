@@ -8,6 +8,14 @@ export const Z176_COMPANY_INFO = {
   endDate: '15/09/2026',
   supportHotline: '024.3883.2176',
   supportEmail: 'hotro.thi@z176.vn',
+  // Thông tin công ty chính thức (theo z76.vn/lien-he.html) — khác với
+  // supportHotline/supportEmail ở trên (đó là kênh hỗ trợ riêng cho hệ
+  // thống thi nội bộ, không phải số liên hệ chung của công ty).
+  officialAddress: 'Xã Kiêu Kỵ, Huyện Gia Lâm, TP. Hà Nội',
+  foundedDate: '09/03/1971',
+  officialPhone: '(024) 38276386',
+  officialEmail: 'info@z76.vn',
+  officialWebsite: 'z76.vn',
   departments: [
     'Xưởng Dệt may 1',
     'Xưởng Dệt may 2',
