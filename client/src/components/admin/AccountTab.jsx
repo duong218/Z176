@@ -330,42 +330,54 @@ export const AccountTab = ({ currentUser }) => {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* Toolbar — mobile: xếp dọc, mỗi nút full-width cao 48px, luôn có nhãn chữ.
+          Desktop (sm:): quay lại bố cục 1 hàng như cũ. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div className="relative w-full sm:w-80">
           <input
             type="text"
             placeholder="Tìm kiếm username..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+            className="w-full h-12 pl-10 pr-4 bg-white border border-slate-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
           />
-          <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+
+        {/* Nút thêm tài khoản — hành động chính, luôn full-width & nổi bật trên mobile */}
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="flex items-center justify-center gap-2 w-full h-12 sm:w-auto sm:order-3 px-4 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Thêm tài khoản</span>
+        </button>
+
+        {/* Các hành động phụ — xếp dọc, mỗi nút full-width trên mobile */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:order-2">
           <div className="relative" ref={columnMenuRef}>
             <button
               type="button"
               onClick={() => setIsColumnMenuOpen((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors justify-center"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto h-12 px-4 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
             >
               <Columns3 className="w-5 h-5" />
-              <span className="hidden sm:inline">Cột hiển thị</span>
+              <span>Cột hiển thị</span>
               <ChevronDown className="w-4 h-4" />
             </button>
             {isColumnMenuOpen && (
-              <div className="absolute z-20 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-2 right-0">
+              <div className="absolute z-20 mt-2 w-full sm:w-56 left-0 sm:left-auto sm:right-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase px-2 pb-1">Hiện/ẩn cột</p>
                 {ACCOUNT_COLUMNS.map((col) => (
                   <label
                     key={col.key}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer text-sm text-slate-700"
+                    className="flex items-center gap-3 px-2 py-2.5 rounded-md hover:bg-slate-50 cursor-pointer text-base text-slate-700 min-h-[44px]"
                   >
                     <input
                       type="checkbox"
                       checked={!!visibleColumns[col.key]}
                       onChange={() => toggleColumn(col.key)}
-                      className="rounded border-slate-300 text-[#008BC5] focus:ring-[#008BC5]"
+                      className="w-5 h-5 rounded border-slate-300 text-[#008BC5] focus:ring-[#008BC5]"
                     />
                     {col.label}
                   </label>
@@ -378,10 +390,10 @@ export const AccountTab = ({ currentUser }) => {
             onClick={handleExportCandidateCredentials}
             disabled={exportCredentialsLoading}
             title="Xuất danh sách nhân viên kèm username/mật khẩu — sẽ reset mật khẩu tất cả"
-            className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition-colors flex-1 sm:flex-none justify-center disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto h-12 px-4 bg-amber-50 border border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition-colors disabled:opacity-50"
           >
             {exportCredentialsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <KeyRound className="w-5 h-5" />}
-            <span className="hidden sm:inline">Xuất DS nhân viên (kèm mật khẩu)</span>
+            <span>Xuất DS nhân viên (kèm mật khẩu)</span>
           </button>
           <input
             type="file"
@@ -393,17 +405,10 @@ export const AccountTab = ({ currentUser }) => {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors flex-1 sm:flex-none justify-center disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto h-12 px-4 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             {importLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
             <span>Import Excel</span>
-          </button>
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors flex-1 sm:flex-none justify-center"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Thêm tài khoản</span>
           </button>
         </div>
       </div>
@@ -506,7 +511,7 @@ export const AccountTab = ({ currentUser }) => {
               <span className="font-bold text-[#0F172A]">
                 {user.username} {isSelf(user) && <span className="text-xs text-slate-400 font-normal italic">(Bạn)</span>}
               </span>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+              <span className={`px-2.5 py-1 rounded-full text-sm font-medium ${
                 user.roleCode === 'admin' ? 'bg-purple-100 text-purple-700' :
                 user.roleCode === 'examiner' ? 'bg-blue-100 text-blue-700' :
                 'bg-slate-100 text-slate-700'
@@ -524,7 +529,7 @@ export const AccountTab = ({ currentUser }) => {
             </div>
 
             {activeColumns.some((col) => user[col.key]) && (
-              <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-500 pt-1">
+              <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 pt-1">
                 {activeColumns
                   .filter((col) => user[col.key])
                   .map((col) => (
@@ -544,21 +549,21 @@ export const AccountTab = ({ currentUser }) => {
                   setEditingRoleId(user.roleId);
                   setIsEditRoleOpen(true);
                 }}
-                className="flex-1 py-2 text-sm font-medium text-[#008BC5] bg-blue-50 rounded-lg disabled:opacity-30"
+                className="flex-1 min-h-[44px] text-sm font-medium text-[#008BC5] bg-blue-50 rounded-lg disabled:opacity-30"
               >
                 Sửa quyền
               </button>
               <button
                 disabled={actionLoading}
                 onClick={() => handleResetPassword(user)}
-                className="flex-1 py-2 text-sm font-medium text-[#F6AD37] bg-[#FFFBEB] rounded-lg disabled:opacity-30"
+                className="flex-1 min-h-[44px] text-sm font-medium text-[#F6AD37] bg-[#FFFBEB] rounded-lg disabled:opacity-30"
               >
                 Mật khẩu
               </button>
               <button
                 disabled={isSelf(user) || actionLoading}
                 onClick={() => handleToggleLock(user)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg disabled:opacity-30 ${user.isActive ? 'text-[#E53E3E] bg-red-50' : 'text-[#22C55E] bg-green-50'}`}
+                className={`flex-1 min-h-[44px] text-sm font-medium rounded-lg disabled:opacity-30 ${user.isActive ? 'text-[#E53E3E] bg-red-50' : 'text-[#22C55E] bg-green-50'}`}
               >
                 {user.isActive ? 'Khóa' : 'Mở khóa'}
               </button>
@@ -802,30 +807,30 @@ export const AccountTab = ({ currentUser }) => {
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
-                <div className="bg-[#F0FDF4] rounded-lg p-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center">
+                <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#22C55E]">{importPreview.toCreate}</div>
-                  <div className="text-[11px] text-slate-500">Tạo mới</div>
+                  <div className="text-sm text-slate-500">Tạo mới</div>
                 </div>
-                <div className="bg-[#FFF7ED] rounded-lg p-2.5">
+                <div className="bg-[#FFF7ED] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#F6AD37]">{importPreview.toReuse}</div>
-                  <div className="text-[11px] text-slate-500">Tái sử dụng</div>
+                  <div className="text-sm text-slate-500">Tái sử dụng</div>
                 </div>
-                <div className="bg-[#EAF6FF] rounded-lg p-2.5">
+                <div className="bg-[#EAF6FF] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#008BC5]">{importPreview.toUpdate}</div>
-                  <div className="text-[11px] text-slate-500">Cập nhật</div>
+                  <div className="text-sm text-slate-500">Cập nhật</div>
                 </div>
-                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                <div className="bg-[#FEECEC] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#E53E3E]">{importPreview.conflicts}</div>
-                  <div className="text-[11px] text-slate-500">Trùng t.khoản</div>
+                  <div className="text-sm text-slate-500">Trùng t.khoản</div>
                 </div>
-                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                <div className="bg-[#FEECEC] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#E53E3E]">{importPreview.duplicatesInFile}</div>
-                  <div className="text-[11px] text-slate-500">Trùng trong file</div>
+                  <div className="text-sm text-slate-500">Trùng trong file</div>
                 </div>
-                <div className="bg-[#FEECEC] rounded-lg p-2.5">
+                <div className="bg-[#FEECEC] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#E53E3E]">{importPreview.errors}</div>
-                  <div className="text-[11px] text-slate-500">Lỗi dữ liệu</div>
+                  <div className="text-sm text-slate-500">Lỗi dữ liệu</div>
                 </div>
               </div>
 
@@ -849,8 +854,8 @@ export const AccountTab = ({ currentUser }) => {
 
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {importPreview.rows.map((r) => (
-                  <div key={r.rowIndex} className="p-2.5 text-xs flex items-start gap-2">
-                    <span className="text-slate-400 w-10 shrink-0">Dòng {r.rowIndex}</span>
+                  <div key={r.rowIndex} className="p-3 text-sm flex items-start gap-2">
+                    <span className="text-slate-400 w-14 shrink-0">Dòng {r.rowIndex}</span>
                     <div className="flex-1 min-w-0">
                       {r.action === 'create' && (
                         <span className="text-[#22C55E] font-medium">Tạo mới — {r.fullname} ({r.employeeCode})</span>
@@ -920,22 +925,22 @@ export const AccountTab = ({ currentUser }) => {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-4 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#22C55E]">{importResult.created}</div>
-                  <div className="text-xs text-slate-500">Tạo mới</div>
+                  <div className="text-sm text-slate-500">Tạo mới</div>
                 </div>
                 <div className="bg-[#FFF7ED] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#F6AD37]">{importResult.reused}</div>
-                  <div className="text-xs text-slate-500">Tái sử dụng</div>
+                  <div className="text-sm text-slate-500">Tái sử dụng</div>
                 </div>
                 <div className="bg-[#EAF6FF] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#008BC5]">{importResult.updated}</div>
-                  <div className="text-xs text-slate-500">Cập nhật</div>
+                  <div className="text-sm text-slate-500">Cập nhật</div>
                 </div>
                 <div className="bg-[#FEECEC] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#E53E3E]">{importResult.failed}</div>
-                  <div className="text-xs text-slate-500">Lỗi</div>
+                  <div className="text-sm text-slate-500">Lỗi</div>
                 </div>
               </div>
 

@@ -139,102 +139,156 @@ export const ExamProposalTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-lg font-bold text-[#0F172A]">Danh sách đề xuất kỳ thi</h2>
+          <h2 className="text-base sm:text-lg font-bold text-[#0F172A]">Danh sách đề xuất kỳ thi</h2>
           <p className="text-sm text-slate-500">Tạo cấu trúc đề thi và trình Người duyệt đề phê duyệt</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#008BC5] hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-[#008BC5] hover:bg-sky-600 active:bg-sky-600 text-white rounded-lg font-medium transition-colors w-full sm:w-auto"
         >
           <FilePlus className="w-4 h-4" /> Tạo đề xuất mới
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
-                <th className="p-4 font-semibold">Tên kỳ thi</th>
-                <th className="p-4 font-semibold">Chủ đề</th>
-                <th className="p-4 font-semibold">Cấu trúc</th>
-                <th className="p-4 font-semibold">Trạng thái</th>
-                <th className="p-4 font-semibold">Ghi chú</th>
-                <th className="p-4 font-semibold text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-500">Đang tải...</td></tr>
-              ) : exams.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-12 text-center text-slate-500">
-                    <FilePlus className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="font-medium text-slate-600 text-base">Chưa có đề xuất nào</p>
-                    <p className="text-sm mt-1">Bấm "Tạo đề xuất mới" để bắt đầu</p>
-                  </td>
-                </tr>
-              ) : (
-                exams.map(exam => (
-                  <tr key={exam._id} className="hover:bg-slate-50">
-                    <td className="p-4 font-medium text-slate-800">{exam.title}</td>
-                    <td className="p-4 text-slate-600">{exam.topicId?.name}</td>
-                    <td className="p-4 text-slate-600 text-xs">
-                      <div>Thời gian: {exam.durationMinutes}p</div>
-                      <div>Tổng câu: {exam.totalQuestions}</div>
-                      <div>Chung: {exam.commonQuestionCount} / Riêng: {exam.departmentQuestionCount}</div>
-                    </td>
-                    <td className="p-4">{getStatusBadge(exam.status)}</td>
-                    <td className="p-4 text-slate-600">
-                      {exam.status === 'rejected' && (
-                        <div className="flex items-start gap-1 text-[#C53030] text-xs bg-[#FEECEC] p-2 rounded">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>{exam.rejectionReason}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      {(exam.status === 'draft' || exam.status === 'rejected') && (
-                        <button
-                          onClick={() => handleSubmitReview(exam._id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFBEB] hover:bg-[#FDECC8] text-[#92400E] rounded font-medium transition-colors"
-                        >
-                          <Send className="w-4 h-4" /> Gửi duyệt
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Trên mobile dùng danh sách dạng thẻ (dễ đọc, không phải cuộn ngang);
+          từ md trở lên vẫn dùng bảng như cũ vì màn hình đủ rộng. */}
+      {loading ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-slate-500 text-sm">
+          Đang tải...
         </div>
-      </div>
+      ) : exams.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-10 sm:p-12 text-center text-slate-500">
+          <FilePlus className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+          <p className="font-medium text-slate-600 text-base">Chưa có đề xuất nào</p>
+          <p className="text-sm mt-1">Bấm "Tạo đề xuất mới" để bắt đầu</p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile card list */}
+          <div className="md:hidden space-y-3">
+            {exams.map(exam => (
+              <div key={exam._id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-800 text-base leading-snug break-words">{exam.title}</h3>
+                    <p className="text-sm text-slate-500 mt-0.5 break-words">{exam.topicId?.name}</p>
+                  </div>
+                  <div className="shrink-0">{getStatusBadge(exam.status)}</div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 rounded-lg p-2.5 text-xs text-slate-600">
+                  <div>
+                    <div className="font-semibold text-slate-800">{exam.durationMinutes}p</div>
+                    <div>Thời gian</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-800">{exam.totalQuestions}</div>
+                    <div>Tổng câu</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-800">{exam.commonQuestionCount}/{exam.departmentQuestionCount}</div>
+                    <div>Chung/Riêng</div>
+                  </div>
+                </div>
+
+                {exam.status === 'rejected' && exam.rejectionReason && (
+                  <div className="flex items-start gap-1.5 text-[#C53030] text-xs bg-[#FEECEC] p-2.5 rounded-lg">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{exam.rejectionReason}</span>
+                  </div>
+                )}
+
+                {(exam.status === 'draft' || exam.status === 'rejected') && (
+                  <button
+                    onClick={() => handleSubmitReview(exam._id)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-[#FFFBEB] hover:bg-[#FDECC8] active:bg-[#FDECC8] text-[#92400E] rounded-lg font-medium transition-colors"
+                  >
+                    <Send className="w-4 h-4" /> Gửi duyệt
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop / tablet table */}
+          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
+                    <th className="p-4 font-semibold">Tên kỳ thi</th>
+                    <th className="p-4 font-semibold">Chủ đề</th>
+                    <th className="p-4 font-semibold">Cấu trúc</th>
+                    <th className="p-4 font-semibold">Trạng thái</th>
+                    <th className="p-4 font-semibold">Ghi chú</th>
+                    <th className="p-4 font-semibold text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {exams.map(exam => (
+                    <tr key={exam._id} className="hover:bg-slate-50">
+                      <td className="p-4 font-medium text-slate-800">{exam.title}</td>
+                      <td className="p-4 text-slate-600">{exam.topicId?.name}</td>
+                      <td className="p-4 text-slate-600 text-xs">
+                        <div>Thời gian: {exam.durationMinutes}p</div>
+                        <div>Tổng câu: {exam.totalQuestions}</div>
+                        <div>Chung: {exam.commonQuestionCount} / Riêng: {exam.departmentQuestionCount}</div>
+                      </td>
+                      <td className="p-4">{getStatusBadge(exam.status)}</td>
+                      <td className="p-4 text-slate-600">
+                        {exam.status === 'rejected' && (
+                          <div className="flex items-start gap-1 text-[#C53030] text-xs bg-[#FEECEC] p-2 rounded">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            <span>{exam.rejectionReason}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        {(exam.status === 'draft' || exam.status === 'rejected') && (
+                          <button
+                            onClick={() => handleSubmitReview(exam._id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFBEB] hover:bg-[#FDECC8] text-[#92400E] rounded font-medium transition-colors"
+                          >
+                            <Send className="w-4 h-4" /> Gửi duyệt
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 md:p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-800">Tạo đề xuất kỳ thi mới</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800">Tạo đề xuất kỳ thi mới</h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-4 md:p-6 overflow-y-auto">
+            <div className="p-4 sm:p-6 overflow-y-auto">
               <form id="createExamForm" onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên kỳ thi</label>
-                  <input required type="text" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                  <input required type="text" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                     value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                     placeholder="VD: Hội thi chuyên môn tháng 10" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Chủ đề liên kết</label>
-                  <select required className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                  <select required className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none bg-white"
                     value={formData.topicId} onChange={e => setFormData({ ...formData, topicId: e.target.value })}>
                     <option value="">-- Chọn chủ đề --</option>
                     {topics.map(t => (
@@ -270,15 +324,15 @@ export const ExamProposalTab = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian (phút)</label>
-                    <input required type="number" min="1" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                    <input required type="number" min="1" inputMode="numeric" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                       value={formData.durationMinutes} onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tổng số câu hỏi</label>
-                    <input required type="number" min="1" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                    <input required type="number" min="1" inputMode="numeric" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                       value={formData.totalQuestions} onChange={e => setFormData({ ...formData, totalQuestions: e.target.value })} />
                   </div>
                 </div>
@@ -289,15 +343,15 @@ export const ExamProposalTab = () => {
                   </p>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số câu hỏi chung</label>
-                    <input required type="number" min="0" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                    <input required type="number" min="0" inputMode="numeric" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                       value={formData.commonQuestionCount} onChange={e => setFormData({ ...formData, commonQuestionCount: e.target.value })} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số câu bộ phận</label>
-                    <input required type="number" min="0" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                    <input required type="number" min="0" inputMode="numeric" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                       value={formData.departmentQuestionCount} onChange={e => setFormData({ ...formData, departmentQuestionCount: e.target.value })} />
                   </div>
                 </div>
@@ -328,18 +382,18 @@ export const ExamProposalTab = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Điểm đạt tối thiểu (%)</label>
-                  <input required type="number" min="0" max="100" className="w-full p-2 border border-slate-300 rounded focus:border-[#008BC5] outline-none"
+                  <input required type="number" min="0" max="100" inputMode="numeric" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
                     value={formData.passThresholdPercent} onChange={e => setFormData({ ...formData, passThresholdPercent: e.target.value })} />
                 </div>
               </form>
             </div>
 
-            <div className="p-4 md:p-6 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-3 shrink-0">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-3 min-h-[46px] bg-slate-200 hover:bg-slate-300 active:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
                 Hủy
               </button>
               <button type="submit" form="createExamForm" disabled={hasBlockingError}
-                className="px-4 py-2 bg-[#008BC5] hover:bg-sky-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#008BC5]">
+                className="px-4 py-3 min-h-[46px] bg-[#008BC5] hover:bg-sky-600 active:bg-sky-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#008BC5]">
                 Lưu đề xuất
               </button>
             </div>

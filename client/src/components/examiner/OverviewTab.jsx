@@ -125,16 +125,16 @@ export const OverviewTab = () => {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
+      <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {summaryCards.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${color}`}>
+          <div key={label} className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+            <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center mb-2.5 sm:mb-3 ${color}`}>
               <Icon className="w-5 h-5" />
             </div>
-            <p className="text-xs text-slate-500 font-medium">{label}</p>
-            <p className="text-xl font-bold text-[#0F172A] mt-1">{value}</p>
+            <p className="text-xs sm:text-xs text-slate-500 font-medium leading-snug">{label}</p>
+            <p className="text-lg sm:text-xl font-bold text-[#0F172A] mt-1">{value}</p>
           </div>
         ))}
       </div>
@@ -142,26 +142,31 @@ export const OverviewTab = () => {
       {/* MỚI — Biểu đồ đề xuất kỳ thi theo trạng thái, giúp Người ra đề thấy
           ngay có bao nhiêu đề xuất đang chờ duyệt / đã duyệt / bị từ chối mà
           không cần mở tab "Đề xuất kỳ thi" để đếm thủ công. */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <p className="text-sm font-medium text-slate-500 mb-3">Đề xuất kỳ thi theo trạng thái</p>
+      <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
+        <p className="text-sm font-medium text-slate-500 mb-3 px-1">Đề xuất kỳ thi theo trạng thái</p>
         {!hasProposals ? (
           <div className="py-10 text-center text-slate-400 text-sm">Bạn chưa tạo đề xuất kỳ thi nào.</div>
         ) : (
-          <div className="h-64">
+          <div className="h-56 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: '#334155', fontSize: 13 }}
+                  tick={{ fill: '#334155', fontSize: 11 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
+                  interval={0}
+                  angle={-20}
+                  textAnchor="end"
+                  height={46}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fill: '#334155', fontSize: 13 }}
+                  tick={{ fill: '#334155', fontSize: 12 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
+                  width={28}
                 />
                 <Tooltip
                   contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}

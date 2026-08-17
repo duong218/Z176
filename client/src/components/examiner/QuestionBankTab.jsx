@@ -342,20 +342,22 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               placeholder="Tìm kiếm nội dung câu hỏi..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+              className="w-full pl-10 pr-4 py-2.5 min-h-[44px] text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
             />
-            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
-          <button type="submit" className="px-5 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors">
+          <button type="submit" className="px-5 py-2.5 min-h-[44px] bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors">
             Tìm kiếm
           </button>
         </form>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* Bộ lọc — 2 cột trên mobile để mỗi ô chọn còn đủ rộng, có thể cuộn
+            ngang danh sách khi mở dropdown; enlarge padding cho dễ chạm. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
           <select
             value={selectedTopic}
             onChange={(e) => setSelectedTopic(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
           >
             <option value="">-- Tất cả chủ đề --</option>
             {topics.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
@@ -364,7 +366,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
           <select
             value={selectedScope}
             onChange={(e) => setSelectedScope(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
           >
             <option value="">-- Phạm vi --</option>
             <option value="Common">Chung</option>
@@ -375,7 +377,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
             disabled={selectedScope !== 'DepartmentSpecific'}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm disabled:bg-slate-50 disabled:text-slate-400"
+            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm disabled:bg-slate-50 disabled:text-slate-400"
           >
             <option value="">-- Bộ phận --</option>
             {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
@@ -384,7 +386,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
           <select
             value={selectedDifficulty}
             onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
           >
             <option value="">-- Độ khó --</option>
             <option value="easy">Dễ</option>
@@ -395,7 +397,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
           <select
             value={selectedAnswerType}
             onChange={(e) => setSelectedAnswerType(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+            className="col-span-2 md:col-span-1 px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
           >
             <option value="">-- Hình thức đáp án --</option>
             <option value="single">Một đáp án (Single)</option>
@@ -408,14 +410,14 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
           <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={() => setIsImportOpen(true)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 active:bg-slate-100 transition-colors"
             >
               <Upload className="w-4 h-4" />
               <span>Import Excel</span>
             </button>
             <button
               onClick={handleOpenAdd}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] transition-colors"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-[#008BC5] text-white rounded-lg font-medium hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Thêm câu hỏi</span>
@@ -426,22 +428,22 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* Bulk actions bar */}
       {questions.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 text-sm">
           <button
             type="button"
             onClick={toggleSelectAllOnPage}
-            className="flex items-center gap-2 text-slate-600 hover:text-[#008BC5] font-medium"
+            className="flex items-center gap-2 text-slate-600 hover:text-[#008BC5] font-medium py-1.5 min-h-[40px]"
           >
             {allOnPageSelected ? <CheckSquare className="w-4 h-4 text-[#008BC5]" /> : <Square className="w-4 h-4" />}
             {allOnPageSelected ? 'Bỏ chọn tất cả trang này' : 'Chọn tất cả trang này'}
             {selectedIds.length > 0 && <span className="text-slate-400 font-normal">({selectedIds.length} đã chọn)</span>}
           </button>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
               onClick={handleBulkDeleteSelected}
               disabled={selectedIds.length === 0 || actionLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E53E3E]/40 text-[#E53E3E] rounded-lg font-medium hover:bg-[#FEECEC] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] border border-[#E53E3E]/40 text-[#E53E3E] rounded-lg font-medium hover:bg-[#FEECEC] active:bg-[#FEECEC] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-4 h-4" />
               Xóa {selectedIds.length > 0 ? `${selectedIds.length} câu đã chọn` : 'đã chọn'}
@@ -450,7 +452,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               type="button"
               onClick={handleDeleteAllByFilter}
               disabled={actionLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E53E3E] text-white rounded-lg font-medium hover:bg-[#C53030] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-[#E53E3E] text-white rounded-lg font-medium hover:bg-[#C53030] active:bg-[#C53030] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               title="Xóa toàn bộ câu hỏi khớp bộ lọc hiện tại, không chỉ trang này"
             >
               <Trash2 className="w-4 h-4" />
@@ -473,19 +475,19 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       ) : (
         <div className="space-y-4">
           {questions.map((q) => (
-            <div key={q.id} className={`bg-white p-5 rounded-xl border shadow-sm space-y-4 hover:shadow-md transition-shadow ${selectedIds.includes(q.id) ? 'border-[#008BC5] ring-1 ring-[#008BC5]/30' : 'border-slate-200'}`}>
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex items-start gap-3">
+            <div key={q.id} className={`bg-white p-3.5 sm:p-5 rounded-xl border shadow-sm space-y-3.5 sm:space-y-4 hover:shadow-md transition-shadow ${selectedIds.includes(q.id) ? 'border-[#008BC5] ring-1 ring-[#008BC5]/30' : 'border-slate-200'}`}>
+              <div className="flex justify-between items-start gap-2 sm:gap-4">
+                <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
                   <button
                     type="button"
                     onClick={() => toggleSelectId(q.id)}
-                    className="mt-1 shrink-0 text-slate-400 hover:text-[#008BC5]"
+                    className="shrink-0 text-slate-400 hover:text-[#008BC5] p-1.5 -m-1.5 min-h-[38px] min-w-[38px] flex items-center justify-center"
                     title="Chọn câu hỏi này"
                   >
                     {selectedIds.includes(q.id) ? <CheckSquare className="w-5 h-5 text-[#008BC5]" /> : <Square className="w-5 h-5" />}
                   </button>
-                  <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2 items-center">
+                  <div className="space-y-2 min-w-0">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${q.difficulty === 'easy' ? 'bg-[#F0FDF4] text-[#16A34A]' :
                         q.difficulty === 'medium' ? 'bg-[#FFFBEB] text-[#B45309]' :
                           'bg-[#FEECEC] text-[#C53030]'
@@ -499,19 +501,19 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                       {q.scope === 'Common' ? 'Chung' : 'Riêng bộ phận'}
                     </span>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-base leading-snug">{q.content}</h4>
+                  <h4 className="font-bold text-slate-800 text-[15px] sm:text-base leading-snug break-words">{q.content}</h4>
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button
                     onClick={() => handleOpenEdit(q)}
-                    className="p-2 text-slate-500 hover:text-[#008BC5] hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-500 hover:text-[#008BC5] hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(q.id)}
-                    className="p-2 text-slate-500 hover:text-[#E53E3E] hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-500 hover:text-[#E53E3E] hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -519,11 +521,11 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               </div>
 
               {/* Answers list */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:pl-2">
                 {q.answers.map((ans, idx) => (
                   <div key={ans.id || idx} className={`p-2.5 rounded-lg border text-sm flex items-start gap-2.5 ${ans.isCorrect ? 'bg-[#F0FDF4] border-[#22C55E]/40 text-[#0F172A]' : 'bg-slate-50/50 border-slate-100 text-slate-700'}`}>
                     <span className="font-semibold">{String.fromCharCode(65 + idx)}.</span>
-                    <span className="flex-1">{ans.content}</span>
+                    <span className="flex-1 break-words">{ans.content}</span>
                   </div>
                 ))}
               </div>
@@ -538,11 +540,11 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
           {/* Pagination */}
           {pagination.total > pagination.limit && (
-            <div className="flex justify-between items-center pt-4">
+            <div className="flex justify-between items-center pt-2">
               <button
                 disabled={pagination.page <= 1}
                 onClick={() => loadData(pagination.page - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm font-medium"
+                className="flex items-center gap-1 px-3.5 py-2.5 min-h-[44px] border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 text-sm font-medium"
               >
                 <ChevronLeft className="w-4 h-4" /> Trước
               </button>
@@ -550,7 +552,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               <button
                 disabled={pagination.page * pagination.limit >= pagination.total}
                 onClick={() => loadData(pagination.page + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm font-medium"
+                className="flex items-center gap-1 px-3.5 py-2.5 min-h-[44px] border border-slate-300 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 text-sm font-medium"
               >
                 Sau <ChevronRight className="w-4 h-4" />
               </button>
@@ -561,17 +563,20 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* QUESTION FORM MODAL */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8 overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl sm:my-8 max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-slate-100 flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">
                 {editingQuestion ? 'Chỉnh sửa câu hỏi' : 'Thêm câu hỏi mới'}
               </h3>
-              <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Nội dung câu hỏi</label>
                 <textarea
@@ -580,17 +585,17 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                   rows="3"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                  className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Loại nội dung</label>
                   <select
                     value={questionKind}
                     onChange={(e) => setQuestionKind(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                   >
                     <option value="theory">Lý thuyết</option>
                     <option value="practice">Bài tập thực hành</option>
@@ -601,7 +606,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                   >
                     <option value="easy">Dễ</option>
                     <option value="medium">Trung bình</option>
@@ -610,7 +615,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Hình thức đáp án</label>
                   <select
@@ -622,7 +627,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                         setAnswers(prev => prev.map((ans, idx) => ({ ...ans, isCorrect: idx === 0 })));
                       }
                     }}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                   >
                     <option value="single">Một đáp án đúng (Single Choice)</option>
                     <option value="multiple">Nhiều đáp án đúng (Multiple Choice)</option>
@@ -634,7 +639,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                     required
                     value={topicId}
                     onChange={(e) => setTopicId(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                   >
                     <option value="">-- Chọn chủ đề --</option>
                     {topics.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
@@ -642,13 +647,13 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Phạm vi câu hỏi</label>
                   <select
                     value={scope}
                     onChange={(e) => setScope(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                   >
                     <option value="Common">Chung (Toàn nhà máy)</option>
                     <option value="DepartmentSpecific">Riêng bộ phận</option>
@@ -661,7 +666,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                     disabled={scope !== 'DepartmentSpecific'}
                     value={departmentId}
                     onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white disabled:bg-slate-50 disabled:text-slate-400"
                   >
                     <option value="">-- Chọn bộ phận --</option>
                     {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
@@ -684,7 +689,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {answers.map((ans, idx) => (
                     <div key={idx} className="flex gap-2 items-center">
                       <input
@@ -692,21 +697,21 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                         name="correct_answer"
                         checked={ans.isCorrect}
                         onChange={(e) => handleAnswerChange(idx, 'isCorrect', e.target.checked)}
-                        className="w-4 h-4 text-[#008BC5] focus:ring-[#008BC5]"
+                        className="w-5 h-5 shrink-0 text-[#008BC5] focus:ring-[#008BC5]"
                       />
-                      <span className="font-bold text-sm text-slate-500 w-5">{String.fromCharCode(65 + idx)}.</span>
+                      <span className="font-bold text-sm text-slate-500 w-4 shrink-0">{String.fromCharCode(65 + idx)}.</span>
                       <input
                         type="text"
                         placeholder={`Nhập phương án ${String.fromCharCode(65 + idx)}...`}
                         value={ans.content}
                         onChange={(e) => handleAnswerChange(idx, 'content', e.target.value)}
-                        className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                        className="flex-1 min-w-0 px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
                       />
                       {answers.length > 2 && (
                         <button
                           type="button"
                           onClick={() => removeAnswerField(idx)}
-                          className="text-slate-400 hover:text-red-500 p-1"
+                          className="text-slate-400 hover:text-red-500 p-2 -m-1 min-h-[38px] min-w-[38px] flex items-center justify-center shrink-0"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -716,18 +721,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-3">
+              <div className="pt-4 flex gap-3 pb-1">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Lưu câu hỏi
@@ -740,19 +745,22 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* IMPORT EXCEL MODAL */}
       {isImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto border border-slate-100">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 sticky top-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Nhập câu hỏi từ file Excel</h3>
-              <button onClick={() => setIsImportOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleImportSubmit} className="p-5 space-y-4">
+            <form onSubmit={handleImportSubmit} className="p-4 sm:p-5 space-y-4">
               <a
                 href="/templates/Mau_Import_Cau_Hoi_Z176.xlsx"
                 download
-                className="flex items-center justify-center gap-2 w-full py-2.5 border border-[#008BC5]/30 bg-[#EAF6FF] text-[#008BC5] rounded-lg font-semibold text-sm hover:bg-[#008BC5]/10 transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-3 min-h-[46px] border border-[#008BC5]/30 bg-[#EAF6FF] text-[#008BC5] rounded-lg font-semibold text-sm hover:bg-[#008BC5]/10 active:bg-[#008BC5]/10 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Tải file mẫu Excel (đúng định dạng cột)
@@ -770,7 +778,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 <p className="text-sm font-semibold text-slate-700">Tải file Excel câu hỏi lên đây</p>
                 <p className="text-xs text-slate-400 mt-1">Định dạng hỗ trợ: .xlsx, .xls (Tối đa 5MB)</p>
                 {importFile && (
-                  <p className="mt-2 text-sm text-[#008BC5] font-semibold">Tệp đã chọn: {importFile.name}</p>
+                  <p className="mt-2 text-sm text-[#008BC5] font-semibold break-words">Tệp đã chọn: {importFile.name}</p>
                 )}
               </div>
 
@@ -778,18 +786,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 Xem sheet "HuongDan" trong file mẫu để biết chi tiết từng cột (Chủ đề, Nội dung, Loại, Độ khó, Đáp án, Phạm vi, Bộ phận, Lựa chọn 1–8, Đáp án đúng).
               </p>
 
-              <div className="pt-2 flex gap-3">
+              <div className="pt-2 flex gap-3 pb-1">
                 <button
                   type="button"
                   onClick={() => setIsImportOpen(false)}
-                  className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={!importFile || actionLoading}
-                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Tải lên & Import
