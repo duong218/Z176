@@ -232,14 +232,14 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     <div className="flex items-start gap-3">
                       <UserCircle2 className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                       <div>
-                        <div className="text-xs text-slate-500">Họ và tên</div>
+                        <div className="text-sm text-slate-500">Họ và tên</div>
                         <div className="font-semibold text-[#0F172A]">{employee.fullname}</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <BadgeCheck className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                       <div>
-                        <div className="text-xs text-slate-500">Mã nhân viên</div>
+                        <div className="text-sm text-slate-500">Mã nhân viên</div>
                         <div className="font-semibold text-[#0F172A] font-mono">
                           {employee.employeeCode || '—'}
                         </div>
@@ -248,7 +248,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     <div className="flex items-start gap-3">
                       <Building2 className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                       <div>
-                        <div className="text-xs text-slate-500">Phòng ban</div>
+                        <div className="text-sm text-slate-500">Phòng ban</div>
                         <div className="font-semibold text-[#0F172A]">
                           {employee.departmentName || '—'}
                         </div>
@@ -263,7 +263,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                       <History className="w-6 h-6 text-[#008BC5]" />
                     </div>
                     <div>
-                      <div className="text-xs text-slate-500">Số lần đã thi</div>
+                      <div className="text-sm text-slate-500">Số lần đã thi</div>
                       <div className="text-xl font-bold text-[#0F172A]">{totalAttempts}</div>
                     </div>
                   </div>
@@ -276,7 +276,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                       <Award className={`w-6 h-6 ${bestResult?.passed ? 'text-[#22C55E]' : 'text-slate-400'}`} />
                     </div>
                     <div>
-                      <div className="text-xs text-slate-500">Điểm cao nhất</div>
+                      <div className="text-sm text-slate-500">Điểm cao nhất</div>
                       <div className="text-xl font-bold text-[#0F172A]">
                         {bestResult ? `${bestResult.score} điểm` : '—'}
                       </div>
@@ -384,15 +384,15 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                 <div className="p-6 space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                      <div className="text-xs text-slate-500 mb-1">Số lượt đã thi (kỳ thi hiện tại)</div>
+                      <div className="text-sm text-slate-500 mb-1">Số lượt đã thi (kỳ thi hiện tại)</div>
                       <div className="text-xl font-bold text-[#0F172A]">{attemptsForActiveExam}/{maxAttempts}</div>
                     </div>
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                      <div className="text-xs text-slate-500 mb-1">Lượt còn lại</div>
+                      <div className="text-sm text-slate-500 mb-1">Lượt còn lại</div>
                       <div className="text-xl font-bold text-[#0F172A]">{attemptsLeft}</div>
                     </div>
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                      <div className="text-xs text-slate-500 mb-1">Điểm cao nhất</div>
+                      <div className="text-sm text-slate-500 mb-1">Điểm cao nhất</div>
                       <div className="text-xl font-bold text-[#0F172A]">
                         {bestResult ? `${bestResult.score} điểm` : '—'}
                       </div>
@@ -448,42 +448,78 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     Bạn chưa có lượt thi nào được ghi nhận.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 text-xs uppercase">
-                          <th className="px-4 py-3 text-left font-semibold">Bài thi</th>
-                          <th className="px-4 py-3 text-left font-semibold">Thời gian nộp</th>
-                          <th className="px-4 py-3 text-center font-semibold">Điểm</th>
-                          <th className="px-4 py-3 text-center font-semibold">Số câu đúng</th>
-                          <th className="px-4 py-3 text-center font-semibold">Kết quả</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {results.map((r) => (
-                          <tr key={r._id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-medium text-[#0F172A]">{r.examTitle}</td>
-                            <td className="px-4 py-3 text-slate-500">{formatDateTime(r.submittedAt)}</td>
-                            <td className="px-4 py-3 text-center font-bold text-[#0F172A]">{r.score}</td>
-                            <td className="px-4 py-3 text-center text-slate-500">
-                              {r.correctCount}/{r.totalQuestions}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {r.passed ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#22C55E]/10 text-[#22C55E] font-semibold text-xs">
-                                  <Award className="w-3.5 h-3.5" /> Đạt
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FEECEC] text-[#C53030] font-semibold text-xs">
-                                  <XCircle className="w-3.5 h-3.5" /> Chưa đạt
-                                </span>
-                              )}
-                            </td>
+                  <>
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full text-base">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-sm uppercase">
+                            <th className="px-4 py-3 text-left font-semibold">Bài thi</th>
+                            <th className="px-4 py-3 text-left font-semibold">Thời gian nộp</th>
+                            <th className="px-4 py-3 text-center font-semibold">Điểm</th>
+                            <th className="px-4 py-3 text-center font-semibold">Số câu đúng</th>
+                            <th className="px-4 py-3 text-center font-semibold">Kết quả</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {results.map((r) => (
+                            <tr key={r._id} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 font-medium text-[#0F172A]">{r.examTitle}</td>
+                              <td className="px-4 py-3 text-slate-500">{formatDateTime(r.submittedAt)}</td>
+                              <td className="px-4 py-3 text-center font-bold text-[#0F172A]">{r.score}</td>
+                              <td className="px-4 py-3 text-center text-slate-500">
+                                {r.correctCount}/{r.totalQuestions}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {r.passed ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F0FDF4] text-[#166534] font-semibold text-sm">
+                                    <Award className="w-3.5 h-3.5" /> Đạt
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FEECEC] text-[#C53030] font-semibold text-sm">
+                                    <XCircle className="w-3.5 h-3.5" /> Chưa đạt
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Card List */}
+                    <div className="sm:hidden p-4 space-y-3">
+                      {results.map((r) => (
+                        <div key={r._id} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-bold text-[#0F172A] text-base leading-snug">{r.examTitle}</span>
+                            {r.passed ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F0FDF4] text-[#166534] font-semibold text-sm shrink-0">
+                                <Award className="w-3.5 h-3.5" /> Đạt
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FEECEC] text-[#C53030] font-semibold text-sm shrink-0">
+                                <XCircle className="w-3.5 h-3.5" /> Chưa đạt
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-base">
+                            <span className="text-slate-500">Nộp lúc: {formatDateTime(r.submittedAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-base pt-1 border-t border-slate-100">
+                            <span>
+                              <span className="text-slate-500">Điểm: </span>
+                              <span className="font-bold text-[#0F172A]">{r.score}</span>
+                            </span>
+                            <span>
+                              <span className="text-slate-500">Số câu đúng: </span>
+                              <span className="font-semibold text-[#0F172A]">{r.correctCount}/{r.totalQuestions}</span>
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}
