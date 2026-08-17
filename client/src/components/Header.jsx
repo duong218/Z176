@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X, LogOut, Shield, LayoutDashboard, KeyRound } from 'lucide-react';
 import { UnitLogoDisplay } from './UnitLogoDisplay';
+import { NotificationBell } from './NotificationBell';
 
 const ROLE_LABELS = {
   admin: 'Quản trị viên',
@@ -105,6 +106,9 @@ export const Header = ({
             <div className="w-6 h-6 border-2 border-slate-600 border-t-[#008BC5] rounded-full animate-spin" />
           ) : currentUser ? (
             <div className="flex items-center gap-3">
+              {/* Chuông thông báo */}
+              <NotificationBell currentUser={currentUser} />
+
               {/* User info pill */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="w-7 h-7 rounded-full bg-[#008BC5]/20 flex items-center justify-center">
@@ -144,8 +148,9 @@ export const Header = ({
           )}
         </div>
 
-        {/* Mobile Hamburger Toggle Button (<640px) */}
-        <div className="flex items-center gap-2 md:hidden">
+        {/* Mobile Right Area: Chuông (nếu đăng nhập) + Hamburger Toggle (<640px) */}
+        <div className="flex items-center gap-1 md:hidden">
+          {!authLoading && currentUser && <NotificationBell currentUser={currentUser} />}
           <button
             onClick={() => setDrawerOpen(true)}
             className="p-2.5 text-white hover:bg-[#334155] rounded-lg min-touch-target flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#008BC5]"

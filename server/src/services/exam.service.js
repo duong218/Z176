@@ -2,6 +2,7 @@ import { Exam, Topic } from '../models/index.js';
 import { EXAM_STATUS } from '../models/constants.js';
 import { ApiError } from '../utils/api-error.js';
 import { generateExamCodesAndAssignCandidates } from './exam-code-generation.service.js';
+import { notificationService } from './notification.service.js';
 
 export const examService = {
   async listExams(filters = {}) {
@@ -52,6 +53,14 @@ export const examService = {
 
     exam.status = EXAM_STATUS.PENDING_REVIEW;
     await exam.save();
+
+    // Báo cho mọi Leader biết có đề mới đang chờ duyệt.
+    try {
+      await notificationService.notifyExamSubmitted(exam);
+    } catch (err) {
+      console.error('notifyExamSubmitted failed:', err);
+    }
+
     return exam;
   },
 
@@ -77,6 +86,16 @@ export const examService = {
     exam.approvedBy = leaderId;
     exam.approvedAt = new Date();
     await exam.save();
+
+    // Báo cho Examiner đã tạo đề xuất rằng đề của họ đã được duyệt. Không để
+    // lỗi tạo thông báo (vd DB tạm thời lag) làm hỏng luồng duyệt đề chính —
+    // duyệt đề đã ghi nhận thành công ở trên rồi.
+    try {
+      await notificationService.notifyExamApproved(exam);
+    } catch (err) {
+      console.error('notifyExamApproved failed:', err);
+    }
+
     return exam;
   },
 
@@ -95,6 +114,14 @@ export const examService = {
     exam.rejectionReason = rejectionReason;
     exam.approvedBy = leaderId; // record who rejected it
     await exam.save();
+
+    // Báo cho Examiner đã tạo đề xuất rằng đề của họ bị từ chối (kèm lý do).
+    try {
+      await notificationService.notifyExamRejected(exam);
+    } catch (err) {
+      console.error('notifyExamRejected failed:', err);
+    }
+
     return exam;
   },
 
@@ -119,6 +146,14 @@ export const examService = {
     exam.status = EXAM_STATUS.PUBLISHED;
     exam.publishedAt = new Date();
     await exam.save();
+
+    // Báo cho MỌI role, TRỪ chính người bấm đăng (leaderId) và role 'admin'.
+    try {
+      await notificationService.notifyExamPublished(exam, leaderId);
+    } catch (err) {
+      console.error('notifyExamPublished failed:', err);
+    }
+
     return exam;
   },
 

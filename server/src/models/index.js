@@ -16,4 +16,5 @@ export { Result } from './result.model.js';
 export { StudyDocument } from './study-document.model.js';
 export { Schedule } from './schedule.model.js';
 export { AuditLog } from './audit-log.model.js';
+export { Notification } from './notification.model.js';
 export * from './constants.js';
