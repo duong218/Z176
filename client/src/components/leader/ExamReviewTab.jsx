@@ -36,6 +36,7 @@ export const ExamReviewTab = () => {
   const [historyExams, setHistoryExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [archivingId, setArchivingId] = useState(null);
+  const [publishingId, setPublishingId] = useState(null);
 
   // Reject Modal
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -103,12 +104,26 @@ export const ExamReviewTab = () => {
       { title: 'Đăng chính thức kỳ thi', confirmLabel: 'Đăng chính thức', danger: false }
     );
     if (!ok) return;
+    setPublishingId(id);
     try {
       await publishExam(id);
       showToast('Đã đăng chính thức kỳ thi.', 'success');
       loadData();
     } catch (error) {
-      showToast(error.message || 'Lỗi khi đăng chính thức', 'error');
+      // Publish có thể đã xử lý được MỘT PHẦN trước khi lỗi xảy ra (vd mất
+      // mạng giữa chừng lúc đang sinh mã đề/gán thí sinh) — kỳ thi khi đó vẫn
+      // ở trạng thái "approved" (chưa published), an toàn để bấm lại. Ghi rõ
+      // hướng xử lý ngay trong thông báo lỗi, tránh Leader hiểu nhầm là chưa
+      // làm gì và bỏ qua không xử lý tiếp.
+      showToast(
+        `${error.message || 'Lỗi khi đăng chính thức'} — Vui lòng bấm "Đăng chính thức" lại để đảm bảo đầy đủ dữ liệu.`,
+        'error',
+      );
+      // Load lại danh sách để Leader thấy đúng trạng thái mới nhất từ server,
+      // tránh thao tác dựa trên dữ liệu cũ hiển thị trên màn hình.
+      loadData();
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -263,13 +278,18 @@ export const ExamReviewTab = () => {
                           <div className="flex gap-2 justify-end items-center">
                             <button
                               onClick={() => handleArchive(exam._id)}
-                              disabled={archivingId === exam._id}
+                              disabled={archivingId === exam._id || publishingId === exam._id}
                               className="px-3 py-2 bg-[#F6F8FA] hover:bg-[#E2E8F0] text-[#334155] font-semibold rounded-lg transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
                             >
                               {archivingId === exam._id ? 'Đang xử lý...' : 'Bỏ qua'}
                             </button>
-                            <button onClick={() => handlePublish(exam._id)} className="px-3 py-2 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-sm min-touch-target">
-                              <Globe className="w-4 h-4" /> Đăng chính thức
+                            <button
+                              onClick={() => handlePublish(exam._id)}
+                              disabled={publishingId === exam._id || archivingId === exam._id}
+                              className="px-3 py-2 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
+                            >
+                              <Globe className="w-4 h-4" />
+                              {publishingId === exam._id ? 'Đang đăng...' : 'Đăng chính thức'}
                             </button>
                           </div>
                         </td>
@@ -295,13 +315,18 @@ export const ExamReviewTab = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleArchive(exam._id)}
-                      disabled={archivingId === exam._id}
+                      disabled={archivingId === exam._id || publishingId === exam._id}
                       className="flex-1 h-11 bg-[#F6F8FA] hover:bg-[#E2E8F0] text-[#334155] font-semibold rounded-lg transition-colors text-base disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
                     >
                       {archivingId === exam._id ? 'Đang xử lý...' : 'Bỏ qua'}
                     </button>
-                    <button onClick={() => handlePublish(exam._id)} className="flex-1 h-11 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 text-base min-touch-target">
-                      <Globe className="w-4 h-4" /> Đăng chính thức
+                    <button
+                      onClick={() => handlePublish(exam._id)}
+                      disabled={publishingId === exam._id || archivingId === exam._id}
+                      className="flex-1 h-11 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 text-base disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
+                    >
+                      <Globe className="w-4 h-4" />
+                      {publishingId === exam._id ? 'Đang đăng...' : 'Đăng chính thức'}
                     </button>
                   </div>
                 </div>

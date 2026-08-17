@@ -115,13 +115,16 @@ async function createExamCodeForDepartment(exam, department, commonQuestions, de
  * Đảm bảo có ExamCode cho (exam, department) — trả về mã đề đã có sẵn nếu
  * tồn tại, hoặc tạo mới nếu chưa. Dùng cho trường hợp gán đề cho 1 nhân viên
  * đơn lẻ (vd nhân viên mới tạo sau khi kỳ thi đã publish, hoặc phòng ban lúc
- * publish chưa có ai nên chưa được sinh mã đề).
+ * publish chưa có ai nên chưa được sinh mã đề), VÀ cho publish (xem
+ * generateExamCodesAndAssignCandidates bên dưới — nay idempotent theo TỪNG
+ * phòng ban thay vì theo cả kỳ thi).
  */
-async function ensureExamCodeForDepartment(exam, department) {
+async function ensureExamCodeForDepartment(exam, department, precomputedPool) {
   const existing = await ExamCode.findOne({ examId: exam._id, departmentId: department._id });
   if (existing) return existing;
 
-  const { commonQuestions, deptQuestions, plan } = await validateQuestionAvailability(exam, department);
+  const { commonQuestions, deptQuestions, plan } =
+    precomputedPool ?? (await validateQuestionAvailability(exam, department));
 
   try {
     return await createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions, plan);
@@ -139,16 +142,25 @@ async function ensureExamCodeForDepartment(exam, department) {
 
 /**
  * Sinh mã đề cho TỪNG phòng ban đang có nhân viên active, rồi gán toàn bộ
- * nhân viên active của phòng ban đó vào đúng mã đề. Chạy 1 lần khi kỳ thi
- * được Publish. Kiểm tra đủ câu hỏi cho TẤT CẢ phòng ban trước khi tạo bất kỳ
- * mã đề nào — thiếu ở bất kỳ đâu sẽ chặn hẳn (không publish dở dang).
+ * nhân viên active của phòng ban đó vào đúng mã đề. Chạy khi kỳ thi được
+ * Publish. Kiểm tra đủ câu hỏi cho TẤT CẢ phòng ban trước khi tạo bất kỳ mã
+ * đề nào — thiếu ở bất kỳ đâu sẽ chặn hẳn (không publish dở dang).
+ *
+ * IDEMPOTENT THEO TỪNG PHÒNG BAN + TỪNG NHÂN VIÊN (không phải theo "cả kỳ
+ * thi đã có mã đề hay chưa" như bản cũ). Lý do: nếu lần publish trước bị lỗi
+ * giữa chừng (vd ExamCode đã tạo xong cho vài phòng ban, nhưng
+ * ExamCandidate.insertMany bị lỗi một phần), publishExam() sẽ throw và
+ * exam.status KHÔNG được set thành 'published' — Leader thấy publish thất
+ * bại và có thể bấm publish lại. Với bản cũ, early-return theo
+ * "ExamCode.countDocuments > 0" sẽ khiến lần gọi lại bỏ qua HOÀN TOÀN, kể cả
+ * những nhân viên chưa từng được gán ExamCandidate ở lần trước — họ sẽ vĩnh
+ * viễn không có đề để thi mà không ai biết. Bản này thay vào đó: với mỗi
+ * phòng ban, dùng lại ExamCode đã có (nếu có) hoặc tạo mới; với mỗi nhân
+ * viên, chỉ gán nếu họ CHƯA có ExamCandidate cho kỳ thi này — nên gọi lại
+ * bao nhiêu lần cũng chỉ bổ sung đúng phần còn thiếu, không tạo trùng,
+ * không bỏ sót ai.
  */
 export async function generateExamCodesAndAssignCandidates(exam) {
-  const existingCodesCount = await ExamCode.countDocuments({ examId: exam._id });
-  if (existingCodesCount > 0) {
-    return; // đã sinh mã đề cho kỳ thi này rồi (vd gọi lại do retry)
-  }
-
   const employees = await Employee.find({ isActive: true }).select('_id departmentId');
   const employeesByDept = new Map();
   for (const emp of employees) {
@@ -167,25 +179,56 @@ export async function generateExamCodesAndAssignCandidates(exam) {
   });
 
   // Validate hết trước (fail-fast), giữ nguyên pool + plan đã tính để tạo ở bước sau.
+  // Chỉ cần validate cho phòng ban CHƯA có ExamCode — phòng ban đã có mã đề từ
+  // lần publish trước (dù có thể lỗi ở bước gán candidate) thì không cần tính
+  // lại pool, dùng thẳng ExamCode cũ để đảm bảo toàn bộ nhân viên trong cùng
+  // phòng ban luôn nhận đúng 1 mã đề duy nhất, không bị sinh lệch pool giữa
+  // các lần gọi.
+  const existingCodes = await ExamCode.find({
+    examId: exam._id,
+    departmentId: { $in: departments.map((d) => d._id) },
+  });
+  const existingCodeByDept = new Map(existingCodes.map((c) => [c.departmentId.toString(), c]));
+
   const pools = new Map();
   for (const dept of departments) {
+    if (existingCodeByDept.has(dept._id.toString())) continue; // đã có mã đề, không cần tính pool lại
     const { commonQuestions, deptQuestions, plan } = await validateQuestionAvailability(exam, dept);
     pools.set(dept._id.toString(), { commonQuestions, deptQuestions, plan });
   }
 
-  const candidateDocs = [];
   for (const dept of departments) {
-    const { commonQuestions, deptQuestions, plan } = pools.get(dept._id.toString());
-    const examCode = await createExamCodeForDepartment(exam, dept, commonQuestions, deptQuestions, plan);
+    const deptKey = dept._id.toString();
 
-    const deptEmployees = employeesByDept.get(dept._id.toString()) || [];
-    for (const emp of deptEmployees) {
-      candidateDocs.push({ examId: exam._id, employeeId: emp._id, examCodeId: examCode._id });
+    const examCode = existingCodeByDept.has(deptKey)
+      ? existingCodeByDept.get(deptKey)
+      : await createExamCodeForDepartment(
+          exam,
+          dept,
+          pools.get(deptKey).commonQuestions,
+          pools.get(deptKey).deptQuestions,
+          pools.get(deptKey).plan,
+        );
+
+    const deptEmployees = employeesByDept.get(deptKey) || [];
+    if (deptEmployees.length === 0) continue;
+
+    // Chỉ gán những nhân viên CHƯA có ExamCandidate cho kỳ thi này — an toàn
+    // khi generateExamCodesAndAssignCandidates được gọi lại nhiều lần do lần
+    // publish trước bị lỗi giữa chừng.
+    const existingCandidates = await ExamCandidate.find({
+      examId: exam._id,
+      employeeId: { $in: deptEmployees.map((e) => e._id) },
+    }).select('employeeId');
+    const alreadyAssignedIds = new Set(existingCandidates.map((c) => c.employeeId.toString()));
+
+    const candidateDocs = deptEmployees
+      .filter((emp) => !alreadyAssignedIds.has(emp._id.toString()))
+      .map((emp) => ({ examId: exam._id, employeeId: emp._id, examCodeId: examCode._id }));
+
+    if (candidateDocs.length > 0) {
+      await ExamCandidate.insertMany(candidateDocs, { ordered: false });
     }
-  }
-
-  if (candidateDocs.length > 0) {
-    await ExamCandidate.insertMany(candidateDocs, { ordered: false });
   }
 }
 
