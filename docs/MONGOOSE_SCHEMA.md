@@ -1,12 +1,10 @@
-# Đề xuất schema Mongoose (bước 4 — chờ review trước API)
+# Mô hình cơ sở dữ liệu (Mongoose Schema)
 
-**Nguồn:** `UML/usecase.mdj` (ưu tiên tên field) + BRS Bước 9 + FR-001/002.  
-**Code:** `server/src/models/*.model.js` (chưa có route/controller).  
-**Skill tham chiếu:** `mongodb-schema-design` (LIBRARY.md mục 5) — **reference** qua `ExamCodeQuestion`, không embed `Question` trong `ExamCode`.
+Hệ thống Z176 sử dụng MongoDB làm cơ sở dữ liệu chính. Mối quan hệ giữa các collection được quản lý chặt chẽ thông qua Mongoose ODM để phục vụ các nghiệp vụ sinh đề thi ngẫu nhiên và giám sát realtime.
 
 ---
 
-## Sơ đồ quan hệ (tóm tắt)
+## 1. Sơ đồ quan hệ thực thể (ERD)
 
 ```mermaid
 erDiagram
@@ -18,76 +16,59 @@ erDiagram
   Question ||--o{ Answer : questionId
   Topic ||--o{ Exam : topicId
   Exam ||--o{ ExamCode : examId
-  Department ||--o{ ExamCode : departmentId
   ExamCode ||--o{ ExamCodeQuestion : examCodeId
   Question ||--o{ ExamCodeQuestion : questionId
   Exam ||--o{ ExamCandidate : examId
-  Employee ||--o{ ExamCandidate : employeeId
+  User ||--o{ ExamCandidate : userId
   ExamCode ||--o{ ExamCandidate : examCodeId
   ExamCandidate ||--o{ ExamAttempt : examCandidateId
   ExamAttempt ||--o{ CandidateAnswer : examAttemptId
   ExamAttempt ||--o| Result : examAttemptId
   Exam ||--o{ Schedule : examId
   Topic ||--o{ StudyDocument : topicId
+  Department ||--o{ StudyDocument : departmentId
+  User ||--o{ StudyDocument : createdBy
+  User ||--o{ Notification : recipientId
+  User ||--o{ AuditLog : actorId
 ```
 
 ---
 
-## Bảng collection
+## 2. Danh sách các Collections
 
-| Model (Mongoose) | Collection | StarUML / BRS | Ghi chú |
-|---|---|---|---|
-| `Role` | `roles` | `role` | `code` (admin/examiner/candidate/leader…) lưu DB |
-| `User` | `users` | `user` | `passwordHash`, khóa đăng nhập sai |
-| `Department` | `departments` | `department` | Bộ phận = “chức vụ” trên diagram |
-| `Employee` | `employees` | `Employee` | `departmentId`, `userId` |
-| `Topic` | `topics` | `topic` | Chủ đề lớn |
-| `Question` | `questions` | `Question` | `scope`, `questionKind`, `answerType`, `difficulty` |
-| `Answer` | `answers` | `Answer` | Tách collection, không embed |
-| `Exam` | `exams` | `Exam` | `commonQuestionCount`, `departmentQuestionCount`, `durationMinutes` |
-| `ExamCode` | `examcodes` | `ExamCode` | + `departmentId`, `questionSetFingerprint` |
-| `ExamCodeQuestion` | `examcodequestions` | `ExamCodeQuestion` | + `orderIndex` |
-| `ExamCandidate` | `examcandidates` | `ExamCandidate` | Unique `(examId, employeeId)` |
-| `ExamAttempt` | `examattempts` | `ExamAttempt` | `attemptType` practice/official (FR-007) |
-| `CandidateAnswer` | `candidateanswers` | `CandidateAnswer` | `selectedAnswerIds[]` |
-| `Result` | `results` | `result` | GLOSSARY: ExamResult |
-| `StudyDocument` | `studydocuments` | `Document` | Tên model tránh trùng DOM `Document`; MVP `filePath` local |
-| `Schedule` | `schedules` | `schedule` | Should Have |
-| `AuditLog` | `auditlogs` | *(thiếu diagram)* | Admin “quản lý log người tạo đề” |
-
----
-
-## Khác biệt / assumption cần bạn chốt
-
-| # | Nội dung | Đề xuất hiện tại | Cần xác nhận? |
-|---|---|---|---|
-| 1 | **Ngưỡng đạt** (FR-005) | `Exam.passThresholdPercent` default **70** — comment *Assumption nhóm nghiên cứu* | Có (BA) |
-| 2 | **UML `Question.type`** | Tách `questionKind` (lý thuyết/bài tập) + `answerType` (single/multiple) | OK? |
-| 3 | **`Exam.duration`** | Đổi tên `durationMinutes` (số, phút) | OK? |
-| 4 | **`ExamCode.departmentId`** | Mỗi mã đề gắn 1 bộ phận cho phần câu riêng (FR-002) | Có — logic sinh đề |
-| 5 | **GLOSSARY `ExamSession`** vs **`ExamAttempt`** | Code dùng **ExamAttempt** theo StarUML | Đồng bộ glossary sau? |
-| 6 | **GLOSSARY `ExamConfig`** | Gom cấu hình trên **Exam** (theo prompt + diagram) | Đã thống nhất prompt |
-| 7 | **Typo diagram** | `examAttemptld`, `submitttedAt` → `examAttemptId`, `submittedAt` | Sửa khi code |
-| 8 | **Validate số câu chung/riêng** (BRS #4) | Pre-validate `common + department = totalQuestions` | Assumption: có validate; có thể nới rule sau BA |
+| Tên Model | Bộ sưu tập (Collection) | Vai trò nghiệp vụ |
+| :--- | :--- | :--- |
+| `Role` | `roles` | Lưu trữ 4 quyền hạn nghiệp vụ cốt lõi: admin, examiner, leader, candidate. |
+| `User` | `users` | Thông tin tài khoản đăng nhập (username, password hash, trạng thái khóa, tokenVersion đa thiết bị). |
+| `Employee` | `employees` | Thông tin hồ sơ cá nhân nhân viên, liên kết 1-1 với `User` và thuộc 1 `Department`. |
+| `Department` | `departments` | Danh mục phòng ban trong nhà máy (được dùng để phân bổ câu hỏi riêng và lọc báo cáo). |
+| `Topic` | `topics` | Các chủ đề thi (ví dụ: An toàn lao động, Chuyên môn dệt, Chuyên môn may). |
+| `Question` | `questions` | Ngân hàng câu hỏi trắc nghiệm, chứa các trường scope (chung/bộ phận), questionKind (lý thuyết/thực hành), answerType (single/multiple). |
+| `Answer` | `answers` | Đáp án lựa chọn cho câu hỏi trắc nghiệm, chứa cờ `isCorrect`. Không embed để hỗ trợ import/export dễ dàng. |
+| `Exam` | `exams` | Đề xuất kỳ thi và vòng đời phê duyệt (chờ duyệt, duyệt, phát hành, lưu trữ). Cấu hình số lượng câu hỏi chung/riêng, passThresholdPercent. |
+| `ExamCode` | `examcodes` | Mã đề thi ngẫu nhiên (variant) được sinh tự động khi Leader nhấn phát hành kỳ thi. |
+| `ExamCodeQuestion` | `examcodequestions` | Bảng liên kết trung gian lưu thứ tự câu hỏi đảo ngẫu nhiên của mỗi mã đề. |
+| `ExamCandidate` | `examcandidates` | Danh sách thí sinh được chỉ định thi, liên kết với mã đề thi cụ thể, theo dõi số lượt thi tối đa và đã dùng. |
+| `ExamAttempt` | `examattempts` | Lượt làm bài thực tế của thí sinh. Quản lý trạng thái realtime (`in_progress`, `submitted`, `expired`) và `lastActiveAt` để tự động nộp bài khi mất kết nối > 1 phút. |
+| `CandidateAnswer` | `candidateanswers` | Bảng ghi nhận chi tiết các đáp án thí sinh đã lựa chọn cho mỗi câu hỏi khi nộp bài. |
+| `Result` | `results` | Kết quả điểm số cuối cùng của lượt thi, lưu điểm (thang 100), số câu đúng và trạng thái Đạt/Không đạt. |
+| `StudyDocument` | `studydocuments` | Tệp tin tài liệu ôn tập được Examiner upload (lưu trữ trên Cloudinary), gán theo phòng ban. |
+| `Schedule` | `schedules` | Thiết lập thời gian mở đề và đóng đề của kỳ thi. |
+| `Notification` | `notifications` | Hộp thư thông báo trong hệ thống hiển thị tin nhắn thông báo cho cán bộ và thí sinh. |
+| `AuditLog` | `auditlogs` | Nhật ký lưu lại toàn bộ hành động chỉnh sửa cấu hình dữ liệu quan trọng của Admin và Examiner. |
 
 ---
 
-## Enum (constants.js)
+## 3. Các quy tắc nghiệp vụ đặc thù trong cơ sở dữ liệu
 
-- `scope`: `Common` | `DepartmentSpecific` (BRS)
-- `difficulty`: `easy` | `medium` | `hard`
-- `exam.status`: `draft` → `pending_approval` → `approved` → `published` (FR-006, MVP sau)
-- `attemptType`: `practice` | `official` (FR-007)
-
----
-
-## Bước tiếp theo (sau khi bạn OK schema)
-
-1. Auth + seed role/admin (env `ADMIN_SEED_*`) — bạn review middleware (AGENT_RULES mục 5).  
-2. FR-001 Question bank + import Excel.  
-3. FR-002 → FR-005 theo thứ tự Must Have.  
-4. Client: giữ landing/modal hiện tại, chuyển dần sang `services/api.js` + token httpOnly.
-
----
-
-*Tài liệu UML gốc:* [usecase.mdj](../UML/usecase.mdj) · *Design system (FE):* [design-system.md](../design/design-system.md)
+*   **Pre-validate Số câu hỏi trong kỳ thi**: 
+    Trước khi lưu kỳ thi (`Exam`), schema kiểm tra điều kiện ràng buộc: `commonQuestionCount` (số câu chung) + `departmentQuestionCount` (số câu riêng theo bộ phận) phải bằng chính xác `totalQuestions` (tổng số câu hỏi của đề thi).
+*   **Ràng buộc Scope của câu hỏi**:
+    *   Nếu câu hỏi có `scope: 'DepartmentSpecific'` (phạm vi riêng theo bộ phận), DB bắt buộc phải có `departmentId`.
+    *   Nếu câu hỏi có `scope: 'Common'` (dùng chung), hệ thống tự động xóa trường `departmentId` (tránh lưu trữ dư thừa dữ liệu).
+*   **Cơ chế lưu trữ File tài liệu ôn tập**:
+    File tài liệu được lưu trữ dạng tệp tin nhị phân trên **Cloudinary** dưới dạng tài nguyên raw. Mongoose chỉ lưu trữ liên kết tĩnh an toàn kèm theo `imageCloudinaryId` (hoặc public_id trên Cloudinary) để phục vụ việc xóa hoặc thay thế tài nguyên sau này thông qua API.
+*   **Trạng thái Lượt thi (`ExamAttempt`)**:
+    *   `in_progress`: Th thí sinh đang làm bài, heartbeat được gửi đều đặn.
+    *   `submitted`: Bài thi đã được thí sinh chủ động nhấn nộp thành công.
+    *   `expired`: Bài thi bị hệ thống cưỡng chế nộp do quá giờ làm bài hoặc do thí sinh rời ca thi quá 1 phút (`autoSubmitReason: 'inactive_timeout'`).

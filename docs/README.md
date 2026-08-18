@@ -1,27 +1,37 @@
-# Z176 — Module thi chuyên môn (demo / khóa luận)
+# Z176 — Module thi chuyên môn (Hệ thống thực tế)
 
-- **client/** — React + Vite + Tailwind (trang chủ, modal thi demo trên dữ liệu mẫu). Chi tiết: [structure/client.md](../structure/client.md).
-- **server/** — Express + Mongoose (MVP đang dựng). Chi tiết: [structure/server.md](../structure/server.md).
-- **docs/** — Schema và tài liệu kỹ thuật: [MONGOOSE_SCHEMA.md](./MONGOOSE_SCHEMA.md).
-- **mock-data/** — Dữ liệu giả cho AI/dev (không dùng dữ liệu thật Z176).
+Thư mục này chứa tài liệu đặc tả kỹ thuật và mô hình dữ liệu chính thức của hệ thống thi trắc nghiệm chuyên môn nội bộ Z176.
 
-## Chạy nhanh (dev)
+## Cấu trúc thư mục dự án
 
+- **[client/](file:///c:/Users/duong/Desktop/HethongZ176/client)** — Ứng dụng client React 19 + Vite + Tailwind CSS v4. Chi tiết: [client.md](file:///c:/Users/duong/Desktop/HethongZ176/structure/client.md).
+- **[server/](file:///c:/Users/duong/Desktop/HethongZ176/server)** — Ứng dụng server-side Express API + MongoDB/Mongoose. Chi tiết: [server.md](file:///c:/Users/duong/Desktop/HethongZ176/structure/server.md).
+- **[docs/](file:///c:/Users/duong/Desktop/HethongZ176/docs)** — Tài liệu phân tích và thiết kế hệ thống.
+  - [MONGOOSE_SCHEMA.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/MONGOOSE_SCHEMA.md) — Mô hình cơ sở dữ liệu MongoDB/Mongoose.
+  - [AUTH_API.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/AUTH_API.md) — Mô tả cơ chế xác thực JWT và phân quyền.
+  - [sinh-de-tu-dong.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/sinh-de-tu-dong.md) — Thuật toán sinh đề và tạo mã đề thi.
+  - [luong-lam-bai-thi.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/luong-lam-bai-thi.md) — Thiết kế luồng làm bài thi realtime và cơ chế giám sát.
+- **[mock-data/](file:///c:/Users/duong/Desktop/HethongZ176/mock-data)** — Thư mục chứa dữ liệu mẫu chuẩn hóa để hỗ trợ phát triển (seed database) và cung cấp cấu trúc cho các AI Agent trợ lý.
+
+## Chạy nhanh (Môi trường Dev)
+
+### Terminal 1 — Backend (Server)
 ```bash
-# Terminal 1 — API (cần MongoDB + file .env, xem env.example)
 cd server
-cp .env.example .env   # điền MONGODB_URI tối thiểu
 npm install
-npm run dev
-
-# Terminal 2 — Giao diện
-cd client
-npm install
+# Tạo và cấu hình tệp .env (tham khảo .env.example)
+# Chạy dự án ở chế độ phát triển (watch mode)
 npm run dev
 ```
 
-Client mặc định port **3000** (`client/package.json`); CORS server nên gồm `http://localhost:3000` (đã liệt kê trong `env.example`).
+### Terminal 2 — Frontend (Client)
+```bash
+cd client
+npm install
+# Chạy ứng dụng Vite dev server (cổng 3000)
+npm run dev
+```
 
-## Quy ước
-
-Đọc [AGENTS.md](../AGENTS.md) trước khi code. Biến môi trường mẫu: [env.example](../env.example).
+## Quy ước phát triển
+- Luôn tôn trọng bảo mật dữ liệu của nhà máy Z176. Không sử dụng thông tin nhân sự/đề thi thật trong tệp mock dữ liệu.
+- Cấu hình CORS của server cần chấp nhận nguồn từ client (mặc định là `http://localhost:3000` hoặc theo cấu hình `.env`).
