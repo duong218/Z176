@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import XLSX from 'xlsx';
@@ -13,7 +14,8 @@ import {
   Department,
 } from '../models/index.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
-import { findDepartmentByName } from './department.service.js';
+import { findDepartmentByName, findOrCreateDepartmentByName, upsertDepartmentForImport } from './department.service.js';
+import { normalizeDeptName } from '../models/department.model.js';
 import { findOrCreateTopicByName } from './topic.service.js';
 import { writeAudit } from './audit.service.js';
 import { env } from '../config/env.js';
@@ -75,6 +77,18 @@ function normalizeKey(key) {
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/\s+/g, '');
+}
+
+// Dùng riêng cho việc SO KHỚP TRÙNG LẶP nội dung câu hỏi khi import (khác
+// normalizeKey ở trên — cái đó dùng để khớp TÊN CỘT Excel). Ở đây giữ lại
+// khoảng trắng đơn (chỉ gộp nhiều khoảng trắng liên tiếp) để "Câu hỏi A" và
+// "Câu hỏi A " hay "Câu   hỏi A" vẫn coi là trùng, nhưng không đi xa tới mức
+// bỏ hết dấu cách khiến 2 câu khác nghĩa bị nhận nhầm là 1.
+function normalizeContentForDedupe(content) {
+  return String(content ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 }
 
 // Dựng map "key đã chuẩn hoá -> value" để tra cứu qua resolveEnum() luôn khớp,
@@ -443,11 +457,20 @@ async function buildQuestionFromImportRow(row, rowIndex) {
     }
     const dept = await findDepartmentByName(String(deptName));
     if (!dept) {
-      throw new ApiError(
+      const err = new ApiError(
         400,
         `Dòng ${rowIndex}: không tìm thấy bộ phận "${deptName}"`,
         'IMPORT_DEPARTMENT_NOT_FOUND',
       );
+      // Đính kèm tên bộ phận gốc (chưa chuẩn hoá) để bước preview gom nhóm
+      // các dòng cùng thiếu 1 bộ phận và hiển thị cho người dùng tạo ngay.
+      err.departmentName = String(deptName).trim();
+      // Nếu file Excel có sẵn cột "Mã bộ phận" / "Mô tả bộ phận" thì lấy
+      // luôn để UI tiền điền (và khoá không cho sửa) trong modal preview —
+      // tránh người dùng phải gõ lại dữ liệu đã có sẵn trong file.
+      err.departmentCode = String(r.mabophan ?? r.maboph ?? r.deptcode ?? '').trim();
+      err.departmentDescription = String(r.motabophan ?? r.mota ?? r.deptdescription ?? '').trim();
+      throw err;
     }
     departmentId = dept._id;
   }
@@ -507,29 +530,204 @@ async function buildQuestionFromImportRow(row, rowIndex) {
   };
 }
 
-export async function importQuestionsFromExcelFile(filePath, createdBy, actorUserId, ipAddress) {
+function readImportRows(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new ApiError(400, 'Không đọc được file upload', 'IMPORT_FILE_MISSING');
   }
-
   const workbook = XLSX.readFile(filePath, { cellDates: false });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
     throw new ApiError(400, 'File Excel không có sheet', 'IMPORT_EMPTY');
   }
-
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
   if (!rows.length) {
     throw new ApiError(400, 'Sheet trống', 'IMPORT_EMPTY');
   }
+  return rows;
+}
 
-  const created = [];
+async function loadSeenKeys() {
+  // Tải trước toàn bộ câu hỏi ACTIVE hiện có để so khớp trùng lặp — so theo
+  // (topicId + scope + departmentId + content đã chuẩn hoá). Dùng Set thay vì
+  // query DB từng dòng để tránh N+1 query khi file có hàng trăm dòng.
+  const existingQuestions = await Question.find({ isActive: true }, 'content topicId scope departmentId').lean();
+  return new Set(
+    existingQuestions.map((q) =>
+      [
+        q.topicId?.toString() ?? '',
+        q.scope,
+        q.departmentId?.toString() ?? '',
+        normalizeContentForDedupe(q.content),
+      ].join('|'),
+    ),
+  );
+}
+
+function buildDedupeKey(payload) {
+  return [
+    payload.topicId?.toString() ?? '',
+    payload.scope,
+    payload.departmentId?.toString() ?? '',
+    normalizeContentForDedupe(payload.content),
+  ].join('|');
+}
+
+// Token dùng để tham chiếu lại đúng file Excel đã upload ở bước preview khi
+// gọi confirm (client không gửi lại file, chỉ gửi token). Token = tên file
+// vật lý multer đã lưu trong uploadDir — chỉ lấy basename để chặn path
+// traversal (vd token = "../../etc/passwd").
+function resolveImportTokenPath(token) {
+  const safe = path.basename(String(token ?? ''));
+  if (!safe || safe !== token) {
+    throw new ApiError(400, 'Token import không hợp lệ', 'IMPORT_TOKEN_INVALID');
+  }
+  return path.join(path.resolve(env.uploadDir), safe);
+}
+
+/**
+ * BƯỚC 1/2 — Đọc file Excel và PHÂN TÍCH TRƯỚC, KHÔNG ghi gì vào DB (trừ
+ * topic — vẫn tự tạo topic mới nếu chưa có, theo đúng hành vi cũ). Trả về:
+ *  - missingDepartments: tên bộ phận còn thiếu (gom theo tên, không lặp) để
+ *    UI cho người ra đề tạo ngay trong modal preview.
+ *  - duplicates: các dòng trùng với câu hỏi đã có sẵn (DB cũ hoặc trùng
+ *    ngay trong file) — để người dùng chọn giữ/bỏ từng dòng.
+ *  - ready: các dòng sạch, sẵn sàng import ngay.
+ *  - errors: lỗi khác (sai định dạng, thiếu đáp án đúng...) — luôn bị bỏ
+ *    qua, không thể "cứu" ở bước confirm.
+ * File Excel GIỮ NGUYÊN trên đĩa (chưa xoá) để bước confirm đọc lại.
+ */
+export async function previewImportQuestionsFromExcelFile(filePath) {
+  const rows = readImportRows(filePath);
+  const seenKeys = await loadSeenKeys();
+
+  const ready = [];
+  const duplicates = [];
   const errors = [];
+  // normalizeDeptName -> { name, code, description, rowCount } — rowCount
+  // để UI biết tick tạo bộ phận này sẽ "cứu" thêm được bao nhiêu câu hỏi,
+  // hiển thị đúng số câu sẽ import ngay trong modal preview.
+  const missingDepts = new Map();
 
   for (let i = 0; i < rows.length; i += 1) {
     const rowIndex = i + 2;
     try {
       const payload = await buildQuestionFromImportRow(rows[i], rowIndex);
+      const dedupeKey = buildDedupeKey(payload);
+      if (seenKeys.has(dedupeKey)) {
+        duplicates.push({ row: rowIndex, content: payload.content.slice(0, 120) });
+      } else {
+        seenKeys.add(dedupeKey);
+        ready.push({ row: rowIndex, content: payload.content.slice(0, 120) });
+      }
+    } catch (err) {
+      if (err.code === 'IMPORT_DEPARTMENT_NOT_FOUND') {
+        const key = normalizeDeptName(err.departmentName);
+        const entry = missingDepts.get(key) ?? {
+          name: err.departmentName,
+          code: '',
+          description: '',
+          rowCount: 0,
+        };
+        entry.rowCount += 1;
+        // Chỉ điền nếu chưa có — ưu tiên giá trị từ dòng gặp trước, tránh
+        // dòng sau có ô trống lại xoá mất giá trị dòng trước đã cung cấp.
+        if (!entry.code && err.departmentCode) entry.code = err.departmentCode;
+        if (!entry.description && err.departmentDescription) entry.description = err.departmentDescription;
+        missingDepts.set(key, entry);
+      }
+      errors.push({
+        row: rowIndex,
+        message: err.message ?? 'Lỗi không xác định',
+        code: err.code ?? 'IMPORT_ROW_ERROR',
+      });
+    }
+  }
+
+  return {
+    token: path.basename(filePath),
+    totalRows: rows.length,
+    readyCount: ready.length,
+    duplicateCount: duplicates.length,
+    errorCount: errors.length,
+    missingDepartments: [...missingDepts.values()],
+    duplicates,
+    ready,
+    errors,
+  };
+}
+
+/**
+ * BƯỚC 2/2 — Xác nhận import thật sau khi người dùng đã xem preview:
+ *  - createDepartments: [{ name }] — các bộ phận người dùng chọn tạo ngay
+ *    (vd lấy từ missingDepartments của bước preview).
+ *  - keepDuplicateRows: [rowIndex, ...] — các dòng TRÙNG mà người dùng vẫn
+ *    muốn thêm mới (mặc định: dòng trùng KHÔNG có trong danh sách này sẽ bị
+ *    bỏ qua, giữ câu cũ).
+ * Đọc lại đúng file đã upload ở bước preview qua `token`, xoá file sau khi
+ * xử lý xong (thành công hay có lỗi từng dòng cũng xoá, giống hành vi cũ).
+ */
+export async function confirmImportQuestions(token, options, createdBy, actorUserId, ipAddress) {
+  const { createDepartments = [], keepDuplicateRows = [] } = options ?? {};
+  const filePath = resolveImportTokenPath(token);
+  if (!fs.existsSync(filePath)) {
+    throw new ApiError(
+      400,
+      'Phiên import đã hết hạn hoặc đã được xử lý, vui lòng tải file lên lại',
+      'IMPORT_TOKEN_EXPIRED',
+    );
+  }
+
+  // Tạo các bộ phận còn thiếu TRƯỚC KHI ghi bất kỳ câu hỏi nào. Nếu bước
+  // này lỗi (thiếu mã, mã bị trùng...), dừng ngay tại đây — KHÔNG ghi câu
+  // hỏi nào cả — và trả lỗi rõ ràng để người dùng sửa lại mã/mô tả rồi bấm
+  // "Xác nhận nhập" lại luôn trong modal, không cần thoát ra ngoài tạo tay
+  // phòng ban ở tab riêng rồi import lại từ đầu.
+  for (const dept of createDepartments) {
+    const name = dept?.name?.trim();
+    if (!name) continue;
+
+    const code = dept?.code?.trim();
+    if (!code) {
+      throw new ApiError(
+        400,
+        `Vui lòng nhập mã bộ phận cho "${name}" trước khi import, hoặc bỏ tick "Tạo bộ phận mới" để bỏ qua các câu hỏi riêng của bộ phận này.`,
+        'IMPORT_DEPARTMENT_CODE_REQUIRED',
+      );
+    }
+
+    // upsertDepartmentForImport tự lo hết: đã có + active -> dùng luôn; đã có
+    // nhưng bị xoá mềm -> khôi phục lại với mã/mô tả mới; chưa có -> tạo mới.
+    // Không cần tự check tồn tại ở đây nữa để tránh bỏ sót trường hợp xoá mềm.
+    try {
+      await upsertDepartmentForImport({ name, code, description: dept?.description });
+    } catch (err) {
+      // upsertDepartmentForImport đã tự chuyển lỗi trùng khoá thành ApiError
+      // dễ hiểu — chỉ cần ném tiếp lên.
+      throw err;
+    }
+  }
+
+  const rows = readImportRows(filePath);
+  const seenKeys = await loadSeenKeys();
+  const keepSet = new Set(keepDuplicateRows);
+
+  const created = [];
+  const errors = [];
+  const skippedDuplicates = [];
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowIndex = i + 2;
+    try {
+      const payload = await buildQuestionFromImportRow(rows[i], rowIndex);
+      const dedupeKey = buildDedupeKey(payload);
+
+      if (seenKeys.has(dedupeKey) && !keepSet.has(rowIndex)) {
+        // Trùng và người dùng KHÔNG chọn giữ dòng này -> bỏ qua, không tạo
+        // trùng (mặc định an toàn).
+        skippedDuplicates.push({ row: rowIndex, content: payload.content.slice(0, 80) });
+        continue;
+      }
+
       const question = await Question.create({
         content: payload.content,
         questionKind: payload.questionKind,
@@ -542,6 +740,7 @@ export async function importQuestionsFromExcelFile(filePath, createdBy, actorUse
       });
       await replaceAnswers(question._id, payload.answers);
       created.push(question._id.toString());
+      seenKeys.add(dedupeKey); // đánh dấu luôn để dòng sau trong CÙNG file không tạo trùng nhau
     } catch (err) {
       errors.push({
         row: rowIndex,
@@ -562,7 +761,7 @@ export async function importQuestionsFromExcelFile(filePath, createdBy, actorUse
       actorUserId,
       action: 'question.import',
       resourceType: 'Question',
-      metadata: { count: created.length, failedRows: errors.length },
+      metadata: { count: created.length, failedRows: errors.length, skippedDuplicates: skippedDuplicates.length },
       ipAddress,
     });
   }
@@ -570,7 +769,9 @@ export async function importQuestionsFromExcelFile(filePath, createdBy, actorUse
   return {
     imported: created.length,
     failed: errors.length,
+    skipped: skippedDuplicates.length,
     errors,
+    skippedDuplicates,
     questionIds: created,
   };
 }

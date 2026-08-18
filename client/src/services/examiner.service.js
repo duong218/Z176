@@ -49,16 +49,25 @@ export async function deleteQuestion(id) {
   return res.data;
 }
 
-export async function importQuestions(file) {
+export async function previewImportQuestions(file) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await apiRequest('/questions/import', {
+  const res = await apiRequest('/questions/import/preview', {
     method: 'POST',
     headers: getAuthHeaders(),
     body: formData,
   });
-  return res.data;
+  return res.data; // { token, totalRows, readyCount, duplicateCount, errorCount, missingDepartments, duplicates, ready, errors }
+}
+
+export async function confirmImportQuestionsExcel({ token, createDepartments, keepDuplicateRows }) {
+  const res = await apiRequest('/questions/import/confirm', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ token, createDepartments, keepDuplicateRows }),
+  });
+  return res.data; // { imported, skipped, failed, errors, skippedDuplicates, questionIds }
 }
 
 export async function uploadQuestionImage(file) {

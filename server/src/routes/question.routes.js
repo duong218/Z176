@@ -11,7 +11,7 @@ const bankRoles = requireRoleCodes('admin', 'examiner');
 router.use(authenticate, bankRoles, requirePasswordChanged);
 
 router.get('/', questionController.list);
-router.post('/import', (req, res, next) => {
+router.post('/import/preview', (req, res, next) => {
   uploadExcel(req, res, (err) => {
     if (err instanceof ApiError) {
       next(err);
@@ -23,7 +23,9 @@ router.post('/import', (req, res, next) => {
     }
     next();
   });
-}, questionController.importExcel);
+}, questionController.previewImport);
+
+router.post('/import/confirm', questionController.confirmImport);
 
 router.post('/upload-image', (req, res, next) => {
   uploadQuestionImage(req, res, (err) => {

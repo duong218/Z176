@@ -193,12 +193,27 @@ export const getStatsByTopic = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'OK', code: 'QUESTION_STATS_OK', data });
 });
 
-export const importExcel = asyncHandler(async (req, res) => {
+export const previewImport = asyncHandler(async (req, res) => {
   if (!req.file?.path) {
     throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');
   }
-  const data = await questionService.importQuestionsFromExcelFile(
-    req.file.path,
+  const data = await questionService.previewImportQuestionsFromExcelFile(req.file.path);
+  res.json({
+    success: true,
+    message: 'Đã phân tích file, vui lòng xem lại trước khi xác nhận',
+    code: 'QUESTION_IMPORT_PREVIEW_OK',
+    data,
+  });
+});
+
+export const confirmImport = asyncHandler(async (req, res) => {
+  const { token, createDepartments, keepDuplicateRows } = req.body ?? {};
+  if (!token) {
+    throw new ApiError(400, 'Thiếu token phiên import (hãy preview lại)', 'IMPORT_TOKEN_MISSING');
+  }
+  const data = await questionService.confirmImportQuestions(
+    token,
+    { createDepartments, keepDuplicateRows },
     req.auth.userId,
     req.auth.userId,
     clientIp(req),
@@ -208,12 +223,12 @@ export const importExcel = asyncHandler(async (req, res) => {
     actorUserId: req.auth.userId,
     action: 'IMPORT_QUESTIONS',
     resourceType: 'Question',
-    metadata: { detail: `Import câu hỏi từ Excel (Thành công: ${data.imported}, Lỗi: ${data.failed})` },
+    metadata: { detail: `Import câu hỏi từ Excel (Thành công: ${data.imported}, Lỗi: ${data.failed}, Bỏ qua trùng: ${data.skipped})` },
     ipAddress: clientIp(req),
   });
   res.json({
     success: true,
-    message: `Import xong: ${data.imported} thành công, ${data.failed} lỗi`,
+    message: `Import xong: ${data.imported} thành công, ${data.skipped} bỏ qua (trùng), ${data.failed} lỗi`,
     code: 'QUESTION_IMPORT_DONE',
     data,
   });

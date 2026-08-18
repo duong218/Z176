@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, CheckSquare, Square, Image as ImageIcon } from 'lucide-react';
-import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, importQuestions, bulkDeleteQuestions, uploadQuestionImage } from '../../services/examiner.service';
+import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, CheckSquare, Square, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, previewImportQuestions, confirmImportQuestionsExcel, bulkDeleteQuestions, uploadQuestionImage } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 
@@ -32,9 +32,17 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
 
-  // Import State
-  const [importFile, setImportFile] = useState(null);
+  // Import Excel (bulk) state — 2 bước: preview (xem trước, chưa ghi DB) rồi
+  // confirm (ghi thật) — xem handleImportFile / handleConfirmImport bên dưới.
   const [showImportGuide, setShowImportGuide] = useState(false);
+  const [importLoading, setImportLoading] = useState(false); // đang upload + phân tích file (bước preview)
+  const [importPreview, setImportPreview] = useState(null); // { token, totalRows, readyCount, duplicateCount, errorCount, missingDepartments, duplicates, ready, errors }
+  const [importConfirming, setImportConfirming] = useState(false); // đang ghi thật (bước confirm)
+  // Bản nháp các phòng ban còn thiếu: mỗi phần tử = { name, code, description,
+  // include, codeLocked, descriptionLocked, rowCount }. codeLocked/descriptionLocked
+  // = true khi giá trị đã lấy sẵn được từ file Excel -> không cho sửa tay.
+  const [deptDrafts, setDeptDrafts] = useState([]);
+  const [keepDupRows, setKeepDupRows] = useState([]); // rowIndex của các dòng trùng mà người dùng chọn "vẫn thêm mới"
 
   // Form State
   const [content, setContent] = useState('');
@@ -360,22 +368,101 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     }
   };
 
-  const handleImportSubmit = async (e) => {
-    e.preventDefault();
-    if (!importFile) return;
-    setActionLoading(true);
+  // BƯỚC 1/2 — Chọn file là phân tích ngay (chưa ghi DB): server trả về
+  // phòng ban còn thiếu (để tạo ngay trong modal) và các câu trùng (để chọn
+  // giữ câu cũ hay vẫn thêm câu mới).
+  const handleImportFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImportLoading(true);
     setError('');
     try {
-      const res = await importQuestions(importFile);
-      showToast(`Import thành công! Đã nhập: ${res.imported} câu hỏi, Thất bại: ${res.failed} câu hỏi.`, res.failed > 0 ? 'warning' : 'success');
+      const data = await previewImportQuestions(file);
+      setImportPreview(data);
+      setDeptDrafts(
+        (data.missingDepartments || []).map((d) => ({
+          name: d.name,
+          code: d.code || '',
+          description: d.description || '',
+          include: true, // mặc định tick tạo hết
+          codeLocked: Boolean(d.code),
+          descriptionLocked: Boolean(d.description),
+          rowCount: d.rowCount || 0,
+        })),
+      );
+      setKeepDupRows([]); // mặc định: câu trùng bị bỏ qua, giữ câu cũ
       setIsImportOpen(false);
-      setImportFile(null);
       setShowImportGuide(false);
+    } catch (err) {
+      setError(err.message || 'Xem trước file Excel thất bại');
+    } finally {
+      setImportLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const closeImportPreview = () => {
+    setImportPreview(null);
+    setDeptDrafts([]);
+    setKeepDupRows([]);
+  };
+
+  const toggleDeptInclude = (name) => {
+    setDeptDrafts((prev) => prev.map((d) => (d.name === name ? { ...d, include: !d.include } : d)));
+  };
+
+  const updateDeptField = (name, field, value) => {
+    setDeptDrafts((prev) => prev.map((d) => (d.name === name ? { ...d, [field]: value } : d)));
+  };
+
+  // Số câu hỏi sẽ "cứu" được thêm nhờ các bộ phận đang được tick tạo VÀ đã
+  // điền đủ mã + mô tả — dùng để hiển thị đúng số câu trên nút xác nhận,
+  // và để chặn xác nhận khi còn thiếu thông tin.
+  const includedDeptRowCount = deptDrafts
+    .filter((d) => d.include && d.code.trim() && d.description.trim())
+    .reduce((sum, d) => sum + d.rowCount, 0);
+
+  const hasIncompleteIncludedDept = deptDrafts.some(
+    (d) => d.include && (!d.code.trim() || !d.description.trim()),
+  );
+
+  const toggleKeepDupRow = (row) => {
+    setKeepDupRows((prev) => (prev.includes(row) ? prev.filter((r) => r !== row) : [...prev, row]));
+  };
+
+  // BƯỚC 2/2 — Xác nhận: tạo các phòng ban đã tick + ghi thật câu hỏi vào DB
+  // (câu trùng chỉ được thêm nếu dòng đó nằm trong keepDupRows).
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    // Chặn ngay trên UI: bộ phận đang tick tạo mà chưa nhập đủ mã + mô tả sẽ
+    // khiến server lỗi khi tạo phòng ban -> nhắc điền đủ hoặc bỏ tick, thay vì
+    // để lỗi bay lên sau khi bấm xác nhận.
+    if (hasIncompleteIncludedDept) {
+      setError('Vui lòng nhập đủ mã và mô tả cho các bộ phận đang tạo, hoặc bỏ tick "Tạo bộ phận này" để bỏ qua.');
+      return;
+    }
+    setImportConfirming(true);
+    setError('');
+    try {
+      const res = await confirmImportQuestionsExcel({
+        token: importPreview.token,
+        createDepartments: deptDrafts
+          .filter((d) => d.include)
+          .map((d) => ({ name: d.name, code: d.code.trim(), description: d.description.trim() })),
+        keepDuplicateRows: keepDupRows,
+      });
+      showToast(
+        `Import xong: ${res.imported} thành công, ${res.skipped} bỏ qua (trùng), ${res.failed} lỗi.`,
+        res.failed > 0 ? 'warning' : 'success',
+      );
+      setImportPreview(null);
+      setDeptDrafts([]);
+      setKeepDupRows([]);
       await loadData(1);
     } catch (err) {
-      setError(err.message || 'Lỗi khi import file Excel');
+      setError(err.message || 'Import thất bại (phiên xem trước có thể đã hết hạn, hãy tải file lên lại)');
     } finally {
-      setActionLoading(false);
+      setImportConfirming(false);
     }
   };
 
@@ -853,7 +940,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleImportSubmit} className="p-4 sm:p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4">
               <a
                 href="/templates/Mau_Import_Cau_Hoi_Z176.xlsx"
                 download
@@ -904,7 +991,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                         <tr>
                           <td className="py-1.5 pr-2 font-semibold">Bộ phận</td>
                           <td className="py-1.5 pr-2 text-amber-600 font-semibold">Nếu Phạm vi = riêng</td>
-                          <td className="py-1.5">Đúng tên 1 bộ phận đang có trong hệ thống</td>
+                          <td className="py-1.5">Tên bộ phận — nếu chưa có, bạn sẽ được tạo ngay ở bước xem trước</td>
                         </tr>
                         <tr>
                           <td className="py-1.5 pr-2 font-semibold">Loại</td>
@@ -943,17 +1030,20 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 cursor-pointer relative">
                 <input
                   type="file"
-                  required
                   accept=".xlsx, .xls"
-                  onChange={(e) => setImportFile(e.target.files[0])}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleImportFile}
+                  disabled={importLoading}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-wait"
                 />
-                <Upload className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-700">Tải file Excel câu hỏi lên đây</p>
-                <p className="text-xs text-slate-400 mt-1">Định dạng hỗ trợ: .xlsx, .xls (Tối đa 5MB)</p>
-                {importFile && (
-                  <p className="mt-2 text-sm text-[#008BC5] font-semibold break-words">Tệp đã chọn: {importFile.name}</p>
+                {importLoading ? (
+                  <Loader2 className="w-10 h-10 text-[#008BC5] mx-auto mb-2 animate-spin" />
+                ) : (
+                  <Upload className="w-10 h-10 text-slate-400 mx-auto mb-2" />
                 )}
+                <p className="text-sm font-semibold text-slate-700">
+                  {importLoading ? 'Đang phân tích file...' : 'Tải file Excel câu hỏi lên đây'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">Định dạng hỗ trợ: .xlsx, .xls (Tối đa 5MB) — chọn file sẽ tự xem trước, chưa ghi vào hệ thống</p>
               </div>
 
               <p className="text-xs text-slate-500">
@@ -964,20 +1054,192 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                 <button
                   type="button"
                   onClick={() => setIsImportOpen(false)}
-                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                  disabled={importLoading}
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-50"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT EXCEL — XEM TRƯỚC & XÁC NHẬN (bước 2/2) */}
+      {importPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Xem trước import — chưa ghi vào hệ thống
+              </h3>
+              <button
+                onClick={closeImportPreview}
+                disabled={importConfirming}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="text-xl font-bold text-[#0F172A]">{importPreview.totalRows}</div>
+                  <div className="text-sm text-slate-500">Tổng số dòng</div>
+                </div>
+                <div className="bg-[#F0FDF4] rounded-lg p-3">
+                  <div className="text-xl font-bold text-[#22C55E]">{importPreview.readyCount}</div>
+                  <div className="text-sm text-slate-500">Sẵn sàng thêm</div>
+                </div>
+                <div className="bg-[#FFF7ED] rounded-lg p-3">
+                  <div className="text-xl font-bold text-[#F6AD37]">{importPreview.duplicateCount}</div>
+                  <div className="text-sm text-slate-500">Trùng câu cũ</div>
+                </div>
+                <div className="bg-[#FEECEC] rounded-lg p-3">
+                  <div className="text-xl font-bold text-[#E53E3E]">{importPreview.errorCount}</div>
+                  <div className="text-sm text-slate-500">Lỗi dữ liệu</div>
+                </div>
+              </div>
+
+              {/* PHÒNG BAN CÒN THIẾU — tạo ngay tại đây (mã + mô tả), không
+                  cần thoát ra ngoài tạo tay rồi import lại như trước. */}
+              {deptDrafts.length > 0 && (
+                <div className="border border-amber-300 bg-[#FFF7ED] rounded-lg p-3 space-y-3">
+                  <div className="flex items-start gap-2 text-xs text-[#92400E]">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      File có câu hỏi riêng cho các bộ phận sau nhưng hệ thống <b>chưa có</b>. Nhập đủ mã + mô tả rồi bấm "Xác nhận nhập" để tạo bộ phận và import luôn các câu riêng. Bỏ tick "Tạo bộ phận này" nếu bạn KHÔNG muốn tạo (các câu hỏi riêng của bộ phận đó sẽ bị bỏ qua, chỉ import câu chung).
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {deptDrafts.map((d) => (
+                      <div key={d.name} className="bg-white border border-amber-200 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={d.include}
+                              onChange={() => toggleDeptInclude(d.name)}
+                              disabled={importConfirming}
+                              className="w-4 h-4"
+                            />
+                            Tạo bộ phận này
+                            <span className="font-semibold text-[#0F172A]">{d.name}</span>
+                          </label>
+                          <span className="text-xs text-slate-500 shrink-0">{d.rowCount} câu riêng</span>
+                        </div>
+
+                        {d.include ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Mã phòng ban</label>
+                              <input
+                                type="text"
+                                value={d.code}
+                                onChange={(e) => updateDeptField(d.name, 'code', e.target.value)}
+                                disabled={importConfirming || d.codeLocked}
+                                placeholder="vd. CNTT"
+                                className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Tên phòng ban</label>
+                              <input
+                                type="text"
+                                value={d.name}
+                                disabled
+                                className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg bg-slate-100 text-slate-500"
+                              />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs text-slate-500 mb-1">Mô tả ngắn gọn</label>
+                              <input
+                                type="text"
+                                value={d.description}
+                                onChange={(e) => updateDeptField(d.name, 'description', e.target.value)}
+                                disabled={importConfirming || d.descriptionLocked}
+                                placeholder="Mô tả chức năng bộ phận"
+                                className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 pl-6">
+                            Sẽ bỏ qua {d.rowCount} câu riêng của bộ phận này, chỉ import câu chung.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CÂU TRÙNG — mặc định bỏ qua (giữ câu cũ), tick để vẫn thêm
+                  câu mới dù nội dung trùng (vd cố ý tạo 2 câu giống nhau). */}
+              {importPreview.duplicates?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">
+                    Các câu hỏi dưới đây <b>trùng nội dung</b> với câu đã có trong ngân hàng (cùng chủ đề/phạm vi/bộ phận). Mặc định sẽ <b>bỏ qua, giữ câu cũ</b> — tick vào dòng nào bạn muốn vẫn thêm câu mới song song.
+                  </p>
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                    {importPreview.duplicates.map((d) => (
+                      <label key={d.row} className="p-2.5 text-sm flex items-start gap-2 cursor-pointer hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={keepDupRows.includes(d.row)}
+                          onChange={() => toggleKeepDupRow(d.row)}
+                          disabled={importConfirming}
+                          className="w-4 h-4 mt-0.5 shrink-0"
+                        />
+                        <span className="text-slate-400 w-14 shrink-0">Dòng {d.row}</span>
+                        <span className="flex-1 min-w-0 text-slate-700">{d.content}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LỖI KHÁC — luôn bị bỏ qua, chỉ hiển thị để người dùng biết
+                  sửa lại file cho lần import sau. */}
+              {importPreview.errors?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">Các dòng dưới đây có lỗi khác, sẽ <b>luôn bị bỏ qua</b>:</p>
+                  <div className="border border-red-200 rounded-lg divide-y divide-red-100 max-h-40 overflow-y-auto">
+                    {importPreview.errors.map((e) => (
+                      <div key={e.row} className="p-2.5 text-sm flex items-start gap-2">
+                        <span className="text-slate-400 w-14 shrink-0">Dòng {e.row}</span>
+                        <span className="flex-1 min-w-0 text-[#E53E3E]">{e.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={closeImportPreview}
+                  disabled={importConfirming}
+                  className="flex-1 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
-                  type="submit"
-                  disabled={!importFile || actionLoading}
-                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={
+                    importConfirming ||
+                    hasIncompleteIncludedDept ||
+                    importPreview.readyCount + keepDupRows.length + includedDeptRowCount === 0
+                  }
+                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Tải lên & Import
+                  {importConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Xác nhận nhập ({importPreview.readyCount + keepDupRows.length + includedDeptRowCount} câu)
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
