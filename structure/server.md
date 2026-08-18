@@ -19,6 +19,7 @@ server/
     ├── controllers/
     │   ├── audit.controller.js                     # Xử lý request lấy danh sách audit log (phân trang, lọc)
     │   ├── auth.controller.js                      # Xử lý request đăng nhập, refresh token, đăng xuất, lấy thông tin user, đổi mật khẩu
+    │   ├── backup.controller.js                    # Xử lý request sao lưu: danh sách bản lưu trên Drive, tải về, khôi phục từ file .gz
     │   ├── department.controller.js                # Xử lý request CRUD phòng ban
     │   ├── exam.controller.js                      # Xử lý request kỳ thi: tạo, đệ trình, duyệt, từ chối, phát hành, lưu trữ, lấy active
     │   ├── exam-attempt.controller.js              # Xử lý request lượt thi: lấy đề, bắt đầu, nộp bài, autosave, heartbeat, cấp thêm lượt
@@ -59,6 +60,7 @@ server/
     ├── routes/
     │   ├── index.js                                # Router gốc: mount tất cả sub-router vào /api/*
     │   ├── auth.routes.js                          # Route xác thực: login, refresh, logout, me, change-password
+    │   ├── backup.routes.js                        # Route quản lý backup: danh sách, tải về, restore (chỉ admin)
     │   ├── audit.routes.js                         # Route audit log (chỉ admin)
     │   ├── department.routes.js                    # Route CRUD phòng ban (admin, examiner)
     │   ├── exam.routes.js                          # Route kỳ thi: active (public), CRUD + workflow (examiner/leader)
@@ -71,12 +73,15 @@ server/
     │   ├── topic.routes.js                         # Route CRUD chủ đề (admin, examiner)
     │   └── user.routes.js                          # Route quản lý user: CRUD, import/export Excel, phân role, khóa/mở, reset password (chỉ admin)
     ├── scripts/
-    │   ├── backup-cli.js                           # CLI sao lưu cơ sở dữ liệu
+    │   ├── backup-cli.js                           # CLI sao lưu cơ sở dữ liệu thủ công (dump -> upload Drive và xoay vòng)
     │   ├── cleanup-tmp-employees.js                # Script dọn dẹp nhân viên tạm (dữ liệu thừa từ import)
+    │   ├── get-google-refresh-token.js             # Script chạy một lần để cấp Refresh Token cho Google Drive OAuth2 cá nhân
     │   └── seed-cli.js                             # CLI tạo dữ liệu seed: role mặc định + tài khoản admin ban đầu
     ├── services/
     │   ├── audit.service.js                        # Nghiệp vụ audit: ghi log hành động, truy vấn/lọc/phân trang audit log
     │   ├── auth.service.js                         # Nghiệp vụ xác thực: verify password, tạo/verify JWT, refresh token (httpOnly cookie), tăng tokenVersion khi login mới
+    │   ├── backup.service.js                       # Nghiệp vụ sao lưu: dump database ra file .gz, upload lên Drive cá nhân thông qua Google OAuth2, dọn dẹp, tải về và khôi phục (restore)
+    │   ├── backup.scheduler.js                     # Cron scheduler: backup tự động hàng ngày lúc 3h sáng, giữ tối đa 5 bản lưu
     │   ├── department.service.js                   # Nghiệp vụ phòng ban: CRUD, kiểm tra trùng mã, đếm nhân viên
     │   ├── exam.service.js                         # Nghiệp vụ kỳ thi: tạo đề xuất, đệ trình, duyệt/từ chối/phát hành/lưu trữ, lấy kỳ thi active
     │   ├── exam-attempt.service.js                 # Nghiệp vụ lượt thi: lấy đề + trạng thái, bắt đầu/resume, nộp bài + chấm điểm, autosave, heartbeat + tự nộp khi rời 1 phút, cấp thêm lượt
@@ -101,9 +106,9 @@ server/
 | Nhóm | Chức năng |
 |---|---|
 | `app.js` | Khởi tạo Express app: Helmet (bảo mật headers), CORS (origin theo env), cookie parser, JSON body (2MB limit), mount routes, handler 404, error middleware (ẩn lỗi nội bộ ở production). |
-| `index.js` | Entry point: validate env, kết nối MongoDB, chạy seed nếu `SEED_ON_START=true` (tạo roles + admin), khởi động server, log rate limit status. |
+| `index.js` | Entry point: validate env, kết nối MongoDB, chạy seed nếu `SEED_ON_START=true` (tạo roles + admin), **khởi động cron backup tự động (3h sáng)**, khởi động server. |
 | `config/db.js` | Kết nối MongoDB qua Mongoose. |
-| `config/env.js` | Validate & export tất cả biến môi trường: port, JWT secrets/TTL, MongoDB URI, CORS origin, Cloudinary config, seed config. `assertRuntimeEnv()` kiểm tra đủ biến bắt buộc khi startup. |
+| `config/env.js` | Validate & export tất cả biến môi trường: port, JWT secrets/TTL, MongoDB URI, CORS origin, Cloudinary config, seed config, **thông tin Google OAuth2 credentials (Client ID, Client Secret, Refresh Token) cho Drive cá nhân**. `assertRuntimeEnv()` kiểm tra đủ biến bắt buộc khi startup. |
 
 ### Middleware
 
@@ -293,6 +298,15 @@ server/
 |---|---|---|---|
 | `GET` | `/` | Admin | Danh sách audit log (phân trang, lọc theo hành động/user/thời gian). |
 
+### `/api/backups` — Sao lưu & Phục hồi (chỉ Admin)
+
+| Method | Endpoint | Quyền | Mô tả |
+|---|---|---|---|
+| `GET` | `/` | Admin | Xem danh sách các bản backup đang lưu trữ trên Google Drive (tối đa 5 bản). |
+| `POST` | `/` | Admin | Tạo một bản sao lưu dữ liệu thủ công mới lên Google Drive và tự động xoay vòng. |
+| `GET` | `/:fileId/download` | Admin | Tải một bản sao lưu cụ thể từ Google Drive về máy. |
+| `POST` | `/restore` | Admin | Tải tệp sao lưu `.gz` từ máy tính lên và ghi đè, phục hồi lại toàn bộ cơ sở dữ liệu (yêu cầu confirm=RESTORE). |
+
 ### `/api/reports` — Báo cáo
 
 | Method | Endpoint | Quyền | Mô tả |
@@ -317,6 +331,6 @@ server/
 | **Candidate** (Thí sinh) | Xem kỳ thi, tài liệu ôn tập (theo phòng ban), vào thi (start/autosave/heartbeat/submit), xem lịch sử kết quả, thông báo. |
 | **Examiner** (Người ra đề) | CRUD câu hỏi/chủ đề/phòng ban, import Excel câu hỏi, upload ảnh câu hỏi, tạo + đệ trình đề xuất kỳ thi, quản lý tài liệu ôn tập, thông báo. |
 | **Leader** (Người duyệt đề) | Xem tất cả đề xuất, duyệt/từ chối/phát hành/lưu trữ kỳ thi, xem báo cáo tổng hợp, xuất Excel, cấp thêm lượt thi, thông báo. |
-| **Admin** (Quản trị viên) | Toàn quyền quản lý user (CRUD, import/export Excel, phân role, khóa/mở, reset password), audit log, quản lý câu hỏi/chủ đề/phòng ban, xem báo cáo, thông báo. |
+| **Admin** (Quản trị viên) | Toàn quyền quản lý user (CRUD, import/export Excel, phân role, khóa/mở, reset password), audit log, sao lưu & phục hồi dữ liệu (Backup/Restore), quản lý câu hỏi/chủ đề/phòng ban, xem báo cáo, thông báo. |
 
 Tất cả route nghiệp vụ (trừ Public) đều yêu cầu xác thực (`authenticate`) và đã đổi mật khẩu (`requirePasswordChanged`). Client sử dụng `VITE_API_URL` để kết nối API.

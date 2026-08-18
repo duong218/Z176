@@ -11,6 +11,7 @@ import examRoutes from './exam.routes.js';
 import examAttemptRoutes from './exam-attempt.routes.js';
 import notificationRoutes from './notification.routes.js';
 import studyDocumentRoutes from './study-document.routes.js';
+import backupRoutes from './backup.routes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/exams', examRoutes);
 router.use('/exam-attempts', examAttemptRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/study-documents', studyDocumentRoutes);
+router.use('/backups', backupRoutes);
 
 export default router;

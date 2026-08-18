@@ -49,9 +49,15 @@ export const env = {
     apiKey: optional('CLOUDINARY_API_KEY'),
     apiSecret: optional('CLOUDINARY_API_SECRET'),
   },
+  /**
+   * OAuth2 với Gmail cá nhân (KHÔNG dùng Service Account nữa vì Service Account
+   * không có storage quota trên Drive cá nhân — xem lịch sử debug).
+   * refreshToken lấy 1 lần qua scripts/get-google-refresh-token.js.
+   */
   googleBackup: {
-    serviceAccountEmail: optional('GOOGLE_SERVICE_ACCOUNT_EMAIL'),
-    privateKey: optional('GOOGLE_PRIVATE_KEY'),
+    clientId: optional('GOOGLE_OAUTH_CLIENT_ID'),
+    clientSecret: optional('GOOGLE_OAUTH_CLIENT_SECRET'),
+    refreshToken: optional('GOOGLE_REFRESH_TOKEN'),
     folderId: optional('GOOGLE_DRIVE_BACKUP_FOLDER_ID'),
   },
 };

@@ -60,3 +60,5 @@ uploads/
 tmp/
 server/uploads/
 server/tmp/
+server/backups/
+backups/
