@@ -78,6 +78,15 @@ export async function findOrCreateTopicByName(name) {
   });
   if (!topic) {
     topic = await Topic.create({ name: trimmed });
+  } else if (!topic.isActive) {
+    // Trùng tên với 1 chủ đề ĐÃ BỊ XOÁ MỀM — query ở trên KHÔNG lọc isActive
+    // nên vẫn khớp trúng chủ đề cũ và gắn topicId của nó vào câu hỏi vừa
+    // import, nhưng nếu không bật lại isActive thì chủ đề đó vẫn "vô hình"
+    // với mọi nơi hiển thị (dropdown chọn chủ đề, tạo đề xuất kỳ thi...) vì
+    // các chỗ đó đều gọi listTopics({ activeOnly: true }). Khôi phục lại
+    // luôn để câu hỏi vừa import có chủ đề dùng được ngay.
+    topic.isActive = true;
+    await topic.save();
   }
   return topic;
 }

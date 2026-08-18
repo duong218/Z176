@@ -128,6 +128,21 @@ export async function findOrCreateDepartmentByName(name) {
   const existing = await findDepartmentByName(trimmed);
   if (existing) return existing;
 
+  // Trùng tên với 1 bộ phận ĐÃ BỊ XOÁ MỀM (isActive:false) — findDepartmentByName()
+  // chỉ tìm bộ phận active nên không thấy được. Import nhân viên tự tạo phòng
+  // ban NGAY LÚC XEM TRƯỚC, không có bước cho người dùng sửa lỗi rồi thử lại
+  // như import câu hỏi, nên ở đây ưu tiên KHÔI PHỤC LẠI bộ phận cũ thay vì báo
+  // lỗi — người dùng xoá bộ phận trên giao diện thì hiểu là xoá hẳn, không
+  // biết đây là xoá mềm.
+  const slug = normalizeDeptName(trimmed);
+  const inactiveMatch = await Department.findOne({ slug, isActive: false });
+  if (inactiveMatch) {
+    inactiveMatch.isActive = true;
+    inactiveMatch.name = trimmed;
+    await inactiveMatch.save();
+    return inactiveMatch;
+  }
+
   try {
     const doc = await Department.create({ name: trimmed });
     return doc;
@@ -135,14 +150,6 @@ export async function findOrCreateDepartmentByName(name) {
     if (err.code === 11000) {
       const dept = await findDepartmentByName(trimmed);
       if (dept) return dept;
-      // Trùng tên với 1 bộ phận ĐANG BỊ VÔ HIỆU HOÁ (isActive:false) —
-      // findDepartmentByName() chỉ tìm bộ phận active nên không thấy được.
-      // Trả lỗi rõ ràng thay vì để lỗi Mongo (E11000) thô lọt ra client.
-      throw new ApiError(
-        409,
-        `Tên bộ phận "${trimmed}" đã tồn tại (có thể đang bị vô hiệu hoá) — vui lòng đổi tên khác hoặc kích hoạt lại bộ phận cũ`,
-        'DEPARTMENT_DUPLICATE',
-      );
     }
     throw err;
   }
@@ -190,6 +197,29 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
         });
       }
       return byName;
+    }
+  }
+
+  // Trước khi tạo mới, kiểm tra xem có bộ phận nào ĐÃ BỊ XOÁ MỀM đang giữ
+  // đúng mã hoặc đúng tên này không -> khôi phục lại (giống hành vi
+  // findOrCreateDepartmentByName ở trên), thay vì tạo mới sẽ đụng unique
+  // index rồi vỡ ra lỗi Mongo thô — import nhân viên tự tạo phòng ban ngay
+  // lúc xem trước, không có bước sửa lỗi rồi thử lại như import câu hỏi.
+  const inactiveMatch =
+    (await Department.findOne({ code: normalizedCode, isActive: false })) ||
+    (trimmedName
+      ? await Department.findOne({ slug: normalizeDeptName(trimmedName), isActive: false })
+      : null);
+  if (inactiveMatch) {
+    inactiveMatch.isActive = true;
+    inactiveMatch.code = normalizedCode;
+    if (trimmedName) inactiveMatch.name = trimmedName;
+    try {
+      await inactiveMatch.save();
+      return inactiveMatch;
+    } catch {
+      /* mã bị trùng bộ phận khác do race condition -> rơi xuống nhánh tạo
+       * mới bên dưới, để logic 11000 ở đó xử lý tiếp */
     }
   }
 
