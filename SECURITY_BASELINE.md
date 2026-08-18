@@ -1,6 +1,6 @@
 # SECURITY_BASELINE.md — Chuẩn bảo mật tối thiểu
 ## Module Thi Chuyên Môn Nội Bộ — Z176
-**Người thực hiện:** Phạm Ngọc Dương — VNUA | **Trạng thái:** Bản nháp chuẩn bị, chưa nhận đề tài chính thức
+**Người thực hiện:** Phạm Ngọc Dương — VNUA 
 **Mục đích:** Cụ thể hóa mục 4 "Do-Not-Touch" trong SKILLS.md thành checklist áp dụng được — dùng để tự review code (của mình lẫn AI sinh ra) trước khi merge, và để chạy trước mỗi lần demo/deploy.
 
 > File này đứng dưới AGENT_RULES.md và SKILLS.md về thứ tự ưu tiên, nhưng là bản chi tiết nhất về mặt kỹ thuật cho riêng chủ đề bảo mật. Khi SKILLS.md mục 4 và file này có vẻ mâu thuẫn — SKILLS.md thắng, báo lại để đồng bộ.

@@ -1,5 +1,5 @@
 # LIBRARY.md — Thư viện Skill/Repo cho AI Agent
-**Chủ sở hữu:** Phạm Ngọc Dương — VNUA | **Dùng cho:** LucyClass + Khóa luận Module Thi Chuyên Môn (Z176)
+**Người thực hiện:** Phạm Ngọc Dương — VNUA | **Dùng cho:** Module Thi Chuyên Môn (Z176)
 **Cách dùng:** Đặt file này ở root project. Paste vào AGENTS.md hoặc để nguyên tên `LIBRARY.md` — Antigravity/Codex/Claude/Cursor tự đọc khi cần chọn skill. Cần việc gì → tìm đúng nhóm bên dưới → lấy URL áp dụng luôn, không tự bịa pattern.
 
 > ⚠️ Đề tài Z176 là dữ liệu quân đội nội bộ — chỉ dùng các skill này để tham khảo pattern/code mẫu, **không paste dữ liệu thật của đơn vị vào bất kỳ tool bên thứ 3 nào bên dưới**. Xem thêm AGENT_RULES.md / SKILLS.md.
