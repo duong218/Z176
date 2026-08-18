@@ -6,24 +6,28 @@
 
 1. **Toàn bộ dữ liệu trong thư mục này là bịa (fictional)** — tên người, đơn vị, câu hỏi, đáp án đều không có thật. Không có bất kỳ liên hệ nào với nhân sự/dữ liệu thật của Z176.
 2. AI (Claude, Cursor, Antigravity, Codex...) chỉ được đọc dữ liệu mẫu **từ đây** khi cần ví dụ để code/test — không bao giờ được cấp dữ liệu thật, kể cả khi Dương lỡ paste vào chat (xem AGENT_RULES.md mục 1.4).
-3. Khi seed database cho môi trường dev/demo, dùng đúng các file này (`npm run seed` sẽ đọc từ `mock-data/`) — không tự chế thêm trường/giá trị trùng tên thật.
-4. Nếu cần thêm loại dữ liệu mẫu mới (vd thêm nhóm câu hỏi, thêm role) — thêm file mới vào đây theo đúng convention đặt tên `<tên-collection>.mock.json`, không sửa trực tiếp vào code seed.
-5. Thư mục này **không bao giờ** được đồng bộ với dữ liệu production. Khi deploy thật, dùng script seed riêng (không có trong repo) hoặc nhập tay bởi người có thẩm quyền (AGENT_RULES.md mục 1.3).
+3. Khi seed database cho môi trường dev/demo, dùng đúng các file này — không tự chế thêm trường/giá trị trùng tên thật.
+4. Thư mục này **không bao giờ** được đồng bộ với dữ liệu production. Khi deploy thật, dùng script seed riêng (không có trong repo) hoặc nhập tay bởi người có thẩm quyền (AGENT_RULES.md mục 1.3).
 
 ## Danh sách file
 
-| File | Mô tả | Tương ứng model (dự kiến) |
+| File | Mô tả | Tương ứng model |
 |---|---|---|
-| `users.mock.json` | 6 tài khoản mẫu, đủ 3 role: Admin / Người ra đề / Thí sinh | `User` |
-| `examConfig.mock.json` | Cấu hình đề thi mẫu (số câu, thời gian, điểm liệt) — theo nguyên tắc "không magic number" trong SKILLS.md | `ExamConfig` |
-| `questions.mock.json` | Ngân hàng câu hỏi mẫu, nhiều dạng (trắc nghiệm 1 đáp án, nhiều đáp án, đúng/sai) | `Question` |
-| `exams.mock.json` | Đề thi mẫu, tham chiếu tới `questions.mock.json` | `Exam` |
-| `examSessions.mock.json` | Phiên làm bài mẫu (đang làm / đã nộp / bị ngắt kết nối giữa chừng) | `ExamSession` |
-| `results.mock.json` | Kết quả thi mẫu, gắn với `examSessions.mock.json` | `Result` |
-| `auditLog.mock.json` | Log audit mẫu cho hành động nhạy cảm (theo SECURITY_BASELINE.md mục 3) | `AuditLog` |
+| `users.mock.json` | Tài khoản mẫu (admin, examiner, leader, candidate) kèm thông tin mustChangePassword | `User` |
+| `roles.mock.json` | 4 vai trò của hệ thống (admin, examiner, leader, candidate) | `Role` |
+| `employees.mock.json` | Hồ sơ nhân viên tương ứng liên kết với User và phòng ban | `Employee` |
+| `departments.mock.json` | Danh sách phòng ban chuyên môn mẫu | `Department` |
+| `topics.mock.json` | Danh sách chủ đề thi trắc nghiệm mẫu | `Topic` |
+| `questions.mock.json` | Ngân hàng câu hỏi mẫu, phân loại theo độ khó, phạm vi và chủ đề | `Question` |
+| `answers.mock.json` | Đáp án của các câu hỏi mẫu tương ứng | `Answer` |
+| `exams.mock.json` | Đề xuất kỳ thi mẫu (draft, published, cấu hình câu hỏi chung/riêng) | `Exam` |
+| `examCandidates.mock.json` | Danh sách thí sinh được phân mã đề tham gia kỳ thi | `ExamCandidate` |
+| `examAttempts.mock.json` | Các lượt thi mẫu của thí sinh (in_progress, submitted, expired) | `ExamAttempt` |
+| `results.mock.json` | Kết quả thi mẫu, chấm điểm tự động gắn với lượt thi | `Result` |
+| `auditLog.mock.json` | Nhật ký hệ thống mẫu ghi lại các hành động nhạy cảm của người dùng | `AuditLog` |
 
 ## Lưu ý kỹ thuật
 
-- ID dùng dạng chuỗi giả `"u_001"`, `"q_001"`... không dùng ObjectId thật để tránh nhầm với dữ liệu seed thật khi debug.
-- Mật khẩu mẫu trong `users.mock.json` là hash bcrypt **giả** (chuỗi placeholder), không phải hash thật của mật khẩu nào — không dùng để test bcrypt.compare thật, chỉ để test shape dữ liệu.
-- Câu hỏi mẫu cố tình có nội dung vô thưởng vô phạt (kiến thức phổ thông) — không liên quan chuyên môn quân sự/nội bộ thật.
+- Mọi ID liên kết giữa các file đã được chuẩn hóa sang định dạng **ObjectId** dạng chuỗi 24 ký tự hợp lệ của MongoDB (ví dụ: `"65b9a8f1e4b0a1c2d3e4f501"`) để AI dễ dàng viết các hàm populate, aggregate, hoặc test truy vấn liên kết bảng.
+- Mật khẩu mẫu trong `users.mock.json` là hash bcrypt **giả** (chuỗi placeholder), không dùng để test bcrypt.compare thật.
+- Câu hỏi mẫu cố tình có nội dung vô thưởng vô phạt (kiến thức phổ thông, nội quy an toàn lao động cơ bản) — không liên quan chuyên môn quân sự/nội bộ thật.
