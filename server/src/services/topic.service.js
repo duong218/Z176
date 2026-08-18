@@ -6,14 +6,43 @@ export async function listTopics({ activeOnly = true } = {}) {
   return Topic.find(filter).sort({ name: 1 }).lean();
 }
 
+// Escape ký tự đặc biệt trong regex (dùng chung cho tìm kiếm không phân
+// biệt hoa/thường bên dưới).
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Tạo chủ đề mới. Nếu tên trùng với 1 chủ đề ĐÃ BỊ XOÁ MỀM (isActive:false)
+ * thì KHÔI PHỤC LẠI chủ đề đó (kèm mô tả mới) thay vì báo lỗi trùng —
+ * người dùng bấm Xóa trên giao diện thì hiểu là xóa hẳn, không biết đây là
+ * xóa mềm, nên báo lỗi "đã tồn tại" ở đây rất khó hiểu.
+ * Trả về thêm `restored: true` khi rơi vào nhánh khôi phục, để nơi gọi (vd
+ * toast ở TopicTab) hiển thị đúng thông báo "đã khôi phục chủ đề cũ (bao
+ * gồm các câu hỏi cũ thuộc chủ đề này)" thay vì "tạo chủ đề mới" — tránh gây
+ * bất ngờ khi chủ đề "mới tạo" lại có sẵn câu hỏi.
+ */
 export async function createTopic({ name, description }) {
   const trimmed = name?.trim();
   if (!trimmed) {
     throw new ApiError(400, 'Tên chủ đề là bắt buộc', 'TOPIC_VALIDATION');
   }
+
+  const inactiveMatch = await Topic.findOne({
+    name: { $regex: `^${escapeRegExp(trimmed)}$`, $options: 'i' },
+    isActive: false,
+  });
+  if (inactiveMatch) {
+    inactiveMatch.isActive = true;
+    inactiveMatch.name = trimmed;
+    if (description !== undefined) inactiveMatch.description = description?.trim() || '';
+    await inactiveMatch.save();
+    return { ...inactiveMatch.toObject(), restored: true };
+  }
+
   try {
     const doc = await Topic.create({ name: trimmed, description: description?.trim() });
-    return doc.toObject();
+    return { ...doc.toObject(), restored: false };
   } catch (err) {
     if (err.code === 11000) {
       throw new ApiError(409, 'Chủ đề đã tồn tại', 'TOPIC_DUPLICATE');
@@ -55,12 +84,6 @@ export async function deactivateTopic(id) {
   topic.isActive = false;
   await topic.save();
   return { id: topic._id.toString(), isActive: false };
-}
-
-// Escape ký tự đặc biệt trong regex để tránh lỗi hoặc khớp sai khi tên chủ
-// đề chứa các ký tự như . ( ) + * ? [ ] ^ $ | \
-function escapeRegExp(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function findOrCreateTopicByName(name) {

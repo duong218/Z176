@@ -104,7 +104,11 @@ export async function createTopic(payload) {
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  return res.data;
+  // Giữ nguyên toàn bộ field của topic (bao gồm `restored` từ service) và
+  // đính kèm thêm `message` server trả về, để UI phân biệt được trường hợp
+  // "khôi phục chủ đề đã xoá mềm" với "tạo chủ đề mới" thay vì hiện chung 1
+  // thông báo dễ gây hiểu nhầm.
+  return { ...res.data, message: res.message };
 }
 
 export async function updateTopic(id, payload) {

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { fetchTopics, createTopic, updateTopic, deleteTopic } from '../../services/examiner.service';
 import { useConfirm } from '../ConfirmDialog';
+import { useToast } from '../ToastContext';
 
 export const TopicTab = ({ onViewQuestions } = {}) => {
   const confirmAction = useConfirm();
+  const { showToast } = useToast();
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -55,8 +57,16 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
     try {
       if (editingTopic) {
         await updateTopic(editingTopic._id, { name, description });
+        showToast('Cập nhật chủ đề thành công', 'success');
       } else {
-        await createTopic({ name, description });
+        const result = await createTopic({ name, description });
+        // result.restored = true khi tên trùng với 1 chủ đề đã bị xoá mềm
+        // trước đó -> hệ thống khôi phục lại thay vì tạo mới, cần báo rõ để
+        // người dùng không bất ngờ khi "chủ đề mới" lại có sẵn câu hỏi cũ.
+        showToast(
+          result?.message || (result?.restored ? 'Đã khôi phục chủ đề trước đó' : 'Tạo chủ đề thành công'),
+          result?.restored ? 'warning' : 'success',
+        );
       }
       setIsOpen(false);
       setEditingTopic(null);

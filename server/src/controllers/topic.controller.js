@@ -15,16 +15,22 @@ export const create = asyncHandler(async (req, res) => {
 
   await writeAudit({
     actorUserId: req.auth.userId,
-    action: 'CREATE_TOPIC',
+    action: data.restored ? 'RESTORE_TOPIC' : 'CREATE_TOPIC',
     resourceType: 'Topic',
     resourceId: data._id,
-    metadata: { detail: `Tạo chủ đề mới: ${name}` },
+    metadata: {
+      detail: data.restored
+        ? `Khôi phục chủ đề đã bị vô hiệu hoá trước đó: ${name}`
+        : `Tạo chủ đề mới: ${name}`,
+    },
     ipAddress: req.ip,
   });
   res.status(201).json({
     success: true,
-    message: 'Tạo chủ đề thành công',
-    code: 'TOPIC_CREATED',
+    message: data.restored
+      ? 'Đã khôi phục chủ đề trước đó bị vô hiệu hoá — các câu hỏi cũ thuộc chủ đề này cũng dùng lại được'
+      : 'Tạo chủ đề thành công',
+    code: data.restored ? 'TOPIC_RESTORED' : 'TOPIC_CREATED',
     data,
   });
 });
