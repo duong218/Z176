@@ -15,6 +15,7 @@ import {
   Square,
   List,
   ChevronLeft,
+  ShieldAlert,
 } from 'lucide-react';
 import { Z176_COMPANY_INFO } from '../data';
 import { fetchMyResults } from '../services/report.service';
@@ -81,6 +82,12 @@ function savedAnswersToMap(savedAnswers) {
 // chính xác tuyệt đối.
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
+// Số giây đếm ngược cảnh báo "rời màn hình thi" trước khi tự nộp bài với đáp
+// án hiện tại. Đây là lớp cảnh báo SỚM, RÕ RÀNG cho thí sinh thấy ngay — khác
+// với cơ chế heartbeat/auto-submit sau 1 phút "im lặng" đã có sẵn ở backend
+// (vẫn giữ nguyên, không đụng vào, đây chỉ là lớp UI cảnh báo thuần client).
+const LEAVE_WARNING_SECONDS = 10;
+
 export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   // step: 'loading' | 'confirm' | 'testing' | 'submitting' | 'result' | 'auto-submitted' | 'error'
   const [step, setStep] = useState('loading');
@@ -117,12 +124,30 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   // thí sinh bấm nhầm "NỘP BÀI THI" khi đề dài (30-50 câu) mà chưa làm hết.
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
+  // ── Cảnh báo "rời màn hình thi" (chuyển tab/app, alt-tab, khoá máy...) ────
+  // Hiện overlay ngay lập tức + đếm ngược LEAVE_WARNING_SECONDS giây. Quay lại
+  // trước khi hết giờ thì huỷ, không ảnh hưởng gì. Hết giờ thì tự nộp bài với
+  // đáp án hiện có (giống hệt luồng auto-submit đã có, chỉ rút ngắn thời gian
+  // và có cảnh báo rõ ràng thay vì âm thầm).
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [leaveSecondsLeft, setLeaveSecondsLeft] = useState(LEAVE_WARNING_SECONDS);
+  const leaveDeadlineRef = useRef(null);
+  const leaveIntervalRef = useRef(null);
+  const leaveActiveRef = useRef(false);
+
   const [resultData, setResultData] = useState(null);
 
   const finishingRef = useRef(false);
   // Giữ attemptId mới nhất trong ref để heartbeat/interval luôn đọc đúng giá
   // trị hiện tại mà không phải dựng lại interval mỗi lần state đổi.
   const attemptIdRef = useRef(null);
+  // Giữ step mới nhất trong ref — cần cho listener rời-màn-hình vì listener
+  // được đăng ký ở cấp document/window, phải luôn biết step "testing" có còn
+  // đúng không tại thời điểm sự kiện xảy ra, không phải lúc effect chạy.
+  const stepRef = useRef(step);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   // ── Tải dữ liệu khi mở modal ─────────────────────────────
   useEffect(() => {
@@ -266,6 +291,9 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   // — đúng yêu cầu ban đầu, tránh heartbeat "ma" khi thí sinh đang ở tab khác.
   // Nếu backend phát hiện đã rời quá 1 phút (autoSubmitReason khác null), coi
   // như bài đã bị hệ thống tự nộp — dừng làm bài ngay và hiện đúng thông báo.
+  // Lớp này KHÔNG đổi — cảnh báo 10s bên dưới là lớp UI bổ sung, không thay
+  // thế cơ chế 1-phút-im-lặng này (phòng trường hợp thí sinh rời tab nhưng
+  // JS bị treo/throttle nặng và overlay không kịp bắn).
   useEffect(() => {
     if (step !== 'testing' || !attemptId) return;
 
@@ -305,6 +333,91 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [step, attemptId]);
+
+  // ── Cảnh báo rời màn hình thi + đếm ngược 10s ────────────────────────────
+  // Bắt CẢ 2 nguồn sự kiện để không lọt trường hợp nào:
+  // - visibilitychange -> 'hidden': đổi tab, đóng/mở app khác trên mobile,
+  //   khoá màn hình, tắt màn hình.
+  // - window 'blur': bắt cả trường hợp alt-tab sang cửa sổ khác nhưng tab
+  //   trình duyệt vẫn kỹ thuật "visible" (visibilitychange không bắn).
+  // Dùng chung 1 hàm start/cancel, có cờ leaveActiveRef để tránh 2 sự kiện
+  // cùng lúc dựng 2 interval chồng nhau.
+  const clearLeaveTimer = useCallback(() => {
+    if (leaveIntervalRef.current) {
+      clearInterval(leaveIntervalRef.current);
+      leaveIntervalRef.current = null;
+    }
+  }, []);
+
+  const cancelLeaveWarning = useCallback(() => {
+    leaveActiveRef.current = false;
+    leaveDeadlineRef.current = null;
+    clearLeaveTimer();
+    setShowLeaveWarning(false);
+    setLeaveSecondsLeft(LEAVE_WARNING_SECONDS);
+  }, [clearLeaveTimer]);
+
+  const startLeaveWarning = useCallback(() => {
+    if (stepRef.current !== 'testing') return;
+    if (leaveActiveRef.current) return; // đã đang đếm rồi, không dựng lại
+    leaveActiveRef.current = true;
+
+    const deadline = Date.now() + LEAVE_WARNING_SECONDS * 1000;
+    leaveDeadlineRef.current = deadline;
+    setLeaveSecondsLeft(LEAVE_WARNING_SECONDS);
+    setShowLeaveWarning(true);
+
+    // Tính theo deadline thời gian thực (Date.now()) chứ không đếm theo số
+    // lần tick — nên vẫn ra đúng kết quả ngay cả khi trình duyệt throttle
+    // setInterval lúc tab ẩn (delay tick không làm sai tổng thời gian).
+    clearLeaveTimer();
+    leaveIntervalRef.current = setInterval(() => {
+      const remainingMs = leaveDeadlineRef.current - Date.now();
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      setLeaveSecondsLeft(remainingSec);
+      if (remainingMs <= 0) {
+        clearLeaveTimer();
+        leaveActiveRef.current = false;
+        setShowLeaveWarning(false);
+        handleFinishExam();
+      }
+    }, 500);
+  }, [clearLeaveTimer, handleFinishExam]);
+
+  useEffect(() => {
+    if (step !== 'testing') {
+      // Rời khỏi bước testing (đã nộp bài, đóng modal...) — dọn sạch cảnh báo
+      // đang treo nếu có, tránh countdown chạy ngầm vô nghĩa.
+      cancelLeaveWarning();
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        startLeaveWarning();
+      } else if (document.visibilityState === 'visible') {
+        cancelLeaveWarning();
+      }
+    };
+    const handleBlur = () => startLeaveWarning();
+    const handleFocus = () => cancelLeaveWarning();
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      clearLeaveTimer();
+    };
+  }, [step, startLeaveWarning, cancelLeaveWarning, clearLeaveTimer]);
+
+  // ── Chặn copy nội dung câu hỏi/đáp án (mức răn đe, không chặn screenshot) ─
+  const handleBlockCopy = useCallback((e) => {
+    e.preventDefault();
+  }, []);
 
   // ── Autosave 1 câu trả lời lên server, không chặn UI (fire-and-forget) ───
   const answerRequestSeqRef = useRef(0);
@@ -388,7 +501,26 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-[10px] shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[92vh]">
+      <div className="bg-white w-full max-w-2xl rounded-[10px] shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[92vh] relative">
+        {/* Overlay cảnh báo rời màn hình thi — chỉ hiện khi đang testing và
+            phát hiện tab/app bị chuyển. Che toàn bộ modal, không cho tương
+            tác gì khác cho tới khi quay lại hoặc hết giờ. */}
+        {showLeaveWarning && step === 'testing' && (
+          <div className="absolute inset-0 z-[60] bg-[#0F172A]/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#F6AD37] flex items-center justify-center shadow-z176">
+              <ShieldAlert className="w-9 h-9 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Bạn đã rời khỏi màn hình thi!</h3>
+            <p className="text-sm text-slate-200 max-w-sm">
+              Vui lòng quay lại ngay. Nếu không, bài thi sẽ tự động được nộp với các đáp án đang chọn.
+            </p>
+            <div className="w-20 h-20 rounded-full border-4 border-[#F6AD37] flex items-center justify-center">
+              <span className="text-3xl font-extrabold text-white font-mono">{leaveSecondsLeft}</span>
+            </div>
+            <p className="text-xs text-slate-400">giây trước khi tự động nộp bài</p>
+          </div>
+        )}
+
         {/* Modal Header */}
         <div className="bg-[#0F172A] text-white p-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -478,10 +610,10 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                     {examData.exam.durationMinutes} phút.
                   </li>
                   <li>Mỗi câu hỏi chọn 1 hoặc nhiều đáp án đúng tuỳ theo yêu cầu của từng câu.</li>
-                  <li>Không thoát trình duyệt trong khi đang làm bài.</li>
+                  <li>Không thoát trình duyệt, không chuyển sang tab/ứng dụng khác trong khi đang làm bài.</li>
                   <li>
-                    Nếu không có thao tác nào trên trang thi quá 1 phút (chuyển tab, khoá máy, mất mạng...), hệ thống
-                    sẽ tự động nộp bài với các đáp án đã chọn gần nhất.
+                    Nếu rời khỏi màn hình thi (chuyển tab, mở app khác, alt-tab...), hệ thống sẽ hiện cảnh báo và tự
+                    động nộp bài sau {LEAVE_WARNING_SECONDS} giây nếu không quay lại kịp.
                   </li>
                   <li>Mỗi thí sinh có {examData.maxAttempts} lượt thi chính thức. Muốn thi lại cần được Người duyệt đề cấp phép riêng.</li>
                   {examData.attempt && (
@@ -626,8 +758,13 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
               </div>
             ) : (
               <>
-                {/* Question Content */}
-                <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                {/* Question Content — chặn copy + không cho bôi đen chọn văn
+                    bản (mức răn đe, không chặn được screenshot/chụp lại). */}
+                <div
+                  className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 select-none"
+                  onCopy={handleBlockCopy}
+                  style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
+                >
                   {submitError && (
                     <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] text-sm flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -652,6 +789,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                         alt={`Hình minh hoạ câu ${currentQuestionIndex + 1}`}
                         loading="lazy"
                         onError={() => setImageLoadFailed(true)}
+                        onDragStart={(e) => e.preventDefault()}
                         className="max-h-72 w-auto object-contain"
                       />
                     </div>
