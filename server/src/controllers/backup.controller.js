@@ -8,12 +8,14 @@ export const createBackup = asyncHandler(async (req, res) => {
   const driveFile = await backupService.createBackupToDrive({ prefix: 'z176-manual' });
   const { kept, deleted } = await backupService.rotateDriveBackups();
 
+  // Lưu ý: driveFile.id là ID file trên Google Drive (chuỗi tự do), KHÔNG phải
+  // Mongoose ObjectId, nên không gán vào resourceId (schema AuditLog validate
+  // resourceId là ObjectId) — chỉ đặt trong metadata để tránh lỗi validation.
   await auditService.writeAudit({
     actorUserId: req.user?.id,
     action: 'BACKUP_MANUAL_CREATE',
     resourceType: 'Backup',
-    resourceId: driveFile.id,
-    metadata: { fileName: driveFile.name, kept, deleted },
+    metadata: { driveFileId: driveFile.id, fileName: driveFile.name, kept, deleted },
     ipAddress: req.ip,
   });
 
@@ -44,11 +46,12 @@ export const downloadBackup = asyncHandler(async (req, res) => {
 
   await backupService.streamDriveFileToResponse(fileId, res);
 
+  // fileId là Drive file id (string), không phải ObjectId -> để trong metadata
   await auditService.writeAudit({
     actorUserId: req.user?.id,
     action: 'BACKUP_DOWNLOAD',
     resourceType: 'Backup',
-    resourceId: fileId,
+    metadata: { driveFileId: fileId, fileName },
     ipAddress: req.ip,
   });
 });

@@ -2,8 +2,6 @@ import { apiRequest, API_BASE_URL } from './api';
 import { getAuthHeaders } from './auth.service';
 import { fetchActiveExam } from './exam-review.service';
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 export async function fetchOverviewStats() {
   const [users, activeExam] = await Promise.all([
     fetchUsers(),
@@ -118,12 +116,15 @@ export async function fetchAuditLogs(params = {}) {
 }
 
 export async function triggerBackup() {
-  await delay(2500);
-  // Mock backup response
+  const res = await apiRequest('/backups', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  // res.data: { id, name, size, createdTime } — trả kèm link Drive để admin bấm xem trực tiếp
   return {
     success: true,
-    message: 'Backup dữ liệu thành công',
-    downloadUrl: 'https://drive.google.com/file/d/demo-backup-link/view'
+    message: res.message || 'Backup dữ liệu thành công',
+    downloadUrl: res.data?.id ? `https://drive.google.com/file/d/${res.data.id}/view` : undefined,
   };
 }
 
