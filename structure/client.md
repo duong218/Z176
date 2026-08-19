@@ -57,6 +57,7 @@ client/
 │   │   ├── admin/
 │   │   │   ├── AccountTab.jsx              # Tab quản lý tài khoản: CRUD user, import/export Excel, phân role, khóa/mở, reset mật khẩu
 │   │   │   ├── AuditLogTab.jsx             # Tab nhật ký hệ thống: lọc, phân trang, xem chi tiết audit log
+│   │   │   ├── BackupTab.jsx               # Tab quản lý sao lưu: danh sách file backup trên Drive, tải về, khôi phục an toàn
 │   │   │   └── OverviewTab.jsx             # Tab tổng quan admin: thống kê user, kỳ thi, câu hỏi
 │   │   │
 │   │   ├── examiner/
@@ -141,6 +142,7 @@ client/
 |---|---|
 | `admin/AccountTab.jsx` | Tab quản lý tài khoản: tạo tài khoản đơn lẻ, import danh sách nhân viên từ Excel (preview → confirm 2 bước), xuất danh sách tài khoản + mật khẩu tạm ra Excel, phân role, khóa/mở khóa, reset mật khẩu. |
 | `admin/AuditLogTab.jsx` | Tab nhật ký hệ thống: lọc theo hành động/người dùng/thời gian, phân trang, xem chi tiết. |
+| `admin/BackupTab.jsx` | Tab quản lý sao lưu & khôi phục: tải file từ Google Drive, ghi đè/khôi phục lại CSDL với tính năng % tiến trình (progress) và chặn thao tác an toàn. |
 | `admin/OverviewTab.jsx` | Tab tổng quan: thống kê nhanh số user, kỳ thi, câu hỏi trong hệ thống. |
 
 ### Components — Examiner (Người ra đề)
@@ -168,7 +170,7 @@ client/
 
 | Page | Chức năng |
 |---|---|
-| `pages/admin/AdminDashboard.jsx` | Dashboard quản trị viên: điều phối 3 tab (Overview, Account, AuditLog). |
+| `pages/admin/AdminDashboard.jsx` | Dashboard quản trị viên: điều phối 4 tab (Overview, Account, AuditLog, Backup). |
 | `pages/candidate/CandidateDashboard.jsx` | Dashboard thí sinh: xem kỳ thi đang diễn ra, tài liệu ôn tập, vào phòng thi, xem lịch sử kết quả. |
 | `pages/examiner/ExaminerDashboard.jsx` | Dashboard người ra đề: điều phối các tab (Overview, QuestionBank, Topic, Department, ExamProposal, StudyDocument). |
 | `pages/leader/LeaderDashboard.jsx` | Dashboard người duyệt đề: điều phối các tab (Overview, ExamReview, DepartmentReport, ExamReport, DetailedResults). |
@@ -180,7 +182,7 @@ client/
 | `services/api.js` | HTTP client chung: `apiRequest()` tự động gắn Authorization header, xử lý 401 bằng silent refresh (gom nhiều request cùng lúc thành 1 lần refresh duy nhất), phát `SESSION_EXPIRED_EVENT` khi refresh thất bại. |
 | `services/token-store.js` | Quản lý access token trong `localStorage`: `getAccessToken()`, `saveAccessToken()`, `clearAccessToken()`, `getAuthHeaders()`. |
 | `services/auth.service.js` | API xác thực: `loginUser()`, `refreshAccessToken()`, `logoutUser()`, `fetchMe()`, `changePassword()`. |
-| `services/admin.service.js` | API quản trị: CRUD user, import Excel nhân viên 2 bước (preview → confirm), xuất Excel tài khoản + mật khẩu tạm, phân role, khóa/mở khóa, reset mật khẩu. |
+| `services/admin.service.js` | API quản trị: CRUD user, import Excel nhân viên, phân role, khóa/mở, reset mật khẩu, chức năng sao lưu/khôi phục (`fetchBackups`, `restoreBackupFile` dùng `XMLHttpRequest` bắt sự kiện onprogress). |
 | `services/exam-attempt.service.js` | API lượt thi thí sinh: `fetchMyExam()` (lấy đề thi + trạng thái), `startExamAttempt()` (bắt đầu/resume), `submitExamAttempt()` (nộp bài), `answerExamQuestion()` (autosave đáp án), `sendExamHeartbeat()` (heartbeat giữ phiên). |
 | `services/exam-review.service.js` | API quản lý kỳ thi: lấy danh sách, duyệt, từ chối, phát hành chính thức, lưu trữ, lấy kỳ thi active cho trang chủ. |
 | `services/examiner.service.js` | API người ra đề: CRUD câu hỏi, chủ đề, phòng ban, import Excel câu hỏi. |

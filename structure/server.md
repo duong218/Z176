@@ -82,12 +82,13 @@ server/
     │   ├── auth.service.js                         # Nghiệp vụ xác thực: verify password, tạo/verify JWT, refresh token (httpOnly cookie), tăng tokenVersion khi login mới
     │   ├── backup.service.js                       # Nghiệp vụ sao lưu: dump database ra file .gz, upload lên Drive cá nhân thông qua Google OAuth2, dọn dẹp, tải về và khôi phục (restore)
     │   ├── backup.scheduler.js                     # Cron scheduler: backup tự động hàng ngày lúc 3h sáng, giữ tối đa 5 bản lưu
+    │   ├── upload-cleanup.scheduler.js             # Cron scheduler: dọn dẹp file tạm (uploadDir) quá 6 tiếng mỗi giờ một lần
     │   ├── department.service.js                   # Nghiệp vụ phòng ban: CRUD, kiểm tra trùng mã, đếm nhân viên
     │   ├── exam.service.js                         # Nghiệp vụ kỳ thi: tạo đề xuất, đệ trình, duyệt/từ chối/phát hành/lưu trữ, lấy kỳ thi active
     │   ├── exam-attempt.service.js                 # Nghiệp vụ lượt thi: lấy đề + trạng thái, bắt đầu/resume, nộp bài + chấm điểm, autosave, heartbeat + tự nộp khi rời 1 phút, cấp thêm lượt
     │   ├── exam-code-generation.service.js         # Nghiệp vụ sinh mã đề: tạo nhiều mã đề với thứ tự câu hỏi/đáp án ngẫu nhiên khi phát hành kỳ thi
     │   ├── notification.service.js                 # Nghiệp vụ thông báo: tạo thông báo theo sự kiện hệ thống, truy vấn, đánh dấu đã đọc
-    │   ├── question.service.js                     # Nghiệp vụ câu hỏi: CRUD, import từ Excel (validate từng dòng), upload ảnh lên Cloudinary, thống kê theo chủ đề, xóa hàng loạt
+    │   ├── question.service.js                     # Nghiệp vụ câu hỏi: CRUD, import từ Excel (validate từng dòng, xử lý ảnh đính kèm), upload ảnh lên Cloudinary, thống kê theo chủ đề, xóa hàng loạt
     │   ├── report.service.js                       # Nghiệp vụ báo cáo: tổng quan hệ thống, theo phòng ban, theo kỳ thi, kết quả chi tiết, xuất Excel (exceljs), tra cứu công khai, lịch sử thí sinh
     │   ├── role.service.js                         # Nghiệp vụ role: truy vấn danh sách role
     │   ├── seed.service.js                         # Nghiệp vụ seed: tạo 4 role mặc định (admin/examiner/leader/candidate) + tài khoản admin ban đầu
@@ -106,7 +107,7 @@ server/
 | Nhóm | Chức năng |
 |---|---|
 | `app.js` | Khởi tạo Express app: Helmet (bảo mật headers), CORS (origin theo env), cookie parser, JSON body (2MB limit), mount routes, handler 404, error middleware (ẩn lỗi nội bộ ở production). |
-| `index.js` | Entry point: validate env, kết nối MongoDB, chạy seed nếu `SEED_ON_START=true` (tạo roles + admin), **khởi động cron backup tự động (3h sáng)**, khởi động server. |
+| `index.js` | Entry point: validate env, kết nối MongoDB, chạy seed nếu `SEED_ON_START=true` (tạo roles + admin), **khởi động cron backup tự động (3h sáng)** và **cron dọn file tạm**, khởi động server. |
 | `config/db.js` | Kết nối MongoDB qua Mongoose. |
 | `config/env.js` | Validate & export tất cả biến môi trường: port, JWT secrets/TTL, MongoDB URI, CORS origin, Cloudinary config, seed config, **thông tin Google OAuth2 credentials (Client ID, Client Secret, Refresh Token) cho Drive cá nhân**. `assertRuntimeEnv()` kiểm tra đủ biến bắt buộc khi startup. |
 
@@ -155,7 +156,7 @@ server/
 | `exam-attempt.service.js` | Lấy đề thi + trạng thái lượt thi (ẩn đáp án đúng), bắt đầu/resume lượt thi, nộp bài + chấm điểm tự động, autosave đáp án, heartbeat giữ phiên (tự nộp bài khi rời ca thi >1 phút), cấp thêm lượt thi chính thức (leader). |
 | `exam-code-generation.service.js` | Sinh mã đề khi phát hành kỳ thi: tạo nhiều mã đề với thứ tự câu hỏi/đáp án ngẫu nhiên, phân mã đề cho thí sinh. |
 | `notification.service.js` | Tạo thông báo theo sự kiện (kỳ thi được duyệt/phát hành, kết quả thi...), truy vấn, đánh dấu đã đọc, đánh dấu tất cả đã đọc. |
-| `question.service.js` | CRUD câu hỏi (kèm đáp án), import hàng loạt từ Excel (validate từng dòng, báo lỗi cụ thể), upload ảnh minh hoạ lên Cloudinary, thống kê câu hỏi theo chủ đề, xóa hàng loạt. |
+| `question.service.js` | CRUD câu hỏi (kèm đáp án), import hàng loạt từ Excel (bắt lỗi định dạng file, validate từng dòng báo lỗi cụ thể), upload ảnh minh hoạ lên Cloudinary, thống kê câu hỏi theo chủ đề, xóa hàng loạt. |
 | `report.service.js` | Tổng quan hệ thống (số user/kỳ thi/câu hỏi), báo cáo theo phòng ban (tỉ lệ đạt), báo cáo theo kỳ thi, kết quả chi tiết (danh sách thí sinh + điểm), xuất Excel (exceljs với format chuyên nghiệp), tra cứu kết quả công khai, lịch sử kết quả thí sinh. |
 | `role.service.js` | Truy vấn danh sách role từ DB. |
 | `seed.service.js` | Tạo 4 role mặc định (admin/examiner/leader/candidate) + tài khoản admin ban đầu (từ env) khi khởi động. |
