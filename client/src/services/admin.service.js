@@ -174,25 +174,86 @@ export async function downloadBackupFile(fileId, fileName) {
 }
 
 /**
- * Khôi phục dữ liệu từ 1 file backup (.gz) chọn từ máy admin. Backend sẽ
- * mongorestore --drop (XOÁ TOÀN BỘ dữ liệu hiện tại rồi ghi đè bằng dữ liệu
- * trong file) — bắt buộc gửi kèm confirm=RESTORE, khớp với xác nhận đã yêu
- * cầu admin thao tác ở UI (BackupTab) trước khi gọi hàm này.
+ * Khôi phục dữ liệu từ 1 file backup (.gz) chọn từ máy admin — dùng
+ * XMLHttpRequest (không phải apiRequest/fetch) vì cần theo dõi % tải lên
+ * THẬT qua xhr.upload.onprogress (fetch không hỗ trợ progress upload).
+ *
+ * Có 2 giai đoạn tách biệt, callback onPhaseChange báo hiệu chuyển pha:
+ * - 'uploading': đang gửi file lên server — có % thật.
+ * - 'processing': file đã gửi xong, server đang chạy mongorestore --drop —
+ *   KHÔNG có tín hiệu tiến trình nào từ backend (chạy đồng bộ, không dùng
+ *   WebSocket/SSE), nên không thể hiện % thật ở bước này.
+ *
+ * Trả về { promise, cancel } thay vì chỉ Promise, để nơi gọi có thể chủ
+ * động huỷ khi phát hiện mất mạng (vd sự kiện 'offline' của trình duyệt).
+ * LƯU Ý: cancel() chỉ thực sự "huỷ" được nếu đang ở giai đoạn 'uploading'
+ * (server chưa nhận đủ file, chưa bắt đầu restore). Nếu đã sang giai đoạn
+ * 'processing', gọi cancel() chỉ dừng việc CLIENT chờ phản hồi — tiến trình
+ * mongorestore ở server vẫn tiếp tục chạy độc lập, không có cách nào dừng
+ * nó từ phía trình duyệt.
  */
-export async function restoreBackupFile(file) {
-  const formData = new FormData();
-  formData.append('backupFile', file);
-  formData.append('confirm', 'RESTORE');
+export function restoreBackupFile(file, { onUploadProgress, onPhaseChange } = {}) {
+  const xhr = new XMLHttpRequest();
 
-  const headers = getAuthHeaders();
-  delete headers['Content-Type']; // để browser tự set boundary cho multipart/form-data
+  const promise = new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('backupFile', file);
+    formData.append('confirm', 'RESTORE');
 
-  const res = await apiRequest('/backups/restore', {
-    method: 'POST',
-    headers,
-    body: formData,
+    const headers = getAuthHeaders();
+    delete headers['Content-Type']; // để browser tự set boundary cho multipart/form-data
+
+    xhr.open('POST', `${API_BASE_URL}/backups/restore`, true);
+    xhr.withCredentials = true;
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value) xhr.setRequestHeader(key, value);
+    });
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onUploadProgress) {
+        onUploadProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    // Toàn bộ file đã rời trình duyệt -> server bắt đầu xử lý (mongorestore).
+    // Từ đây KHÔNG còn ý nghĩa "huỷ an toàn" nữa.
+    xhr.upload.onload = () => {
+      onPhaseChange?.('processing');
+    };
+
+    xhr.onload = () => {
+      let body = {};
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        // response không phải JSON hợp lệ
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body.success) {
+        resolve(body);
+      } else {
+        const err = new Error(body.message || `Khôi phục thất bại (mã lỗi HTTP ${xhr.status}).`);
+        err.code = body.code || 'RESTORE_FAILED';
+        reject(err);
+      }
+    };
+
+    xhr.onerror = () => {
+      const err = new Error(
+        'Mất kết nối tới máy chủ trong khi khôi phục (lỗi mạng hoặc server không phản hồi).',
+      );
+      err.code = 'NETWORK_ERROR';
+      reject(err);
+    };
+
+    xhr.onabort = () => {
+      const err = new Error('Đã huỷ quá trình khôi phục.');
+      err.code = 'ABORTED';
+      reject(err);
+    };
+
+    xhr.send(formData);
   });
-  return res; // { success, message }
+
+  return { promise, cancel: () => xhr.abort() };
 }
 
 /**
