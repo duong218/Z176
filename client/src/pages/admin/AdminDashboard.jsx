@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { OverviewTab } from '../../components/admin/OverviewTab';
 import { AccountTab } from '../../components/admin/AccountTab';
 import { AuditLogTab } from '../../components/admin/AuditLogTab';
-import { LayoutDashboard, Users, Activity } from 'lucide-react';
+import { BackupTab } from '../../components/admin/BackupTab';
+import { LayoutDashboard, Users, Activity, Database } from 'lucide-react';
 
 export const AdminDashboard = ({ currentUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -11,6 +12,7 @@ export const AdminDashboard = ({ currentUser }) => {
     { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'accounts', label: 'Tài khoản', icon: <Users className="w-5 h-5" /> },
     { id: 'audit', label: 'Nhật ký (Log)', icon: <Activity className="w-5 h-5" /> },
+    { id: 'backup', label: 'Sao lưu & Phục hồi', icon: <Database className="w-5 h-5" /> },
   ];
 
   return (
@@ -44,6 +46,7 @@ export const AdminDashboard = ({ currentUser }) => {
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'accounts' && <AccountTab currentUser={currentUser} />}
           {activeTab === 'audit' && <AuditLogTab />}
+          {activeTab === 'backup' && <BackupTab />}
         </div>
       </div>
     </div>

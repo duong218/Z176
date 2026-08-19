@@ -128,6 +128,73 @@ export async function triggerBackup() {
   };
 }
 
+/** Danh sách các bản backup hiện có trên Google Drive (tối đa `maxKept` bản, mới nhất trước). */
+export async function fetchBackups() {
+  const res = await apiRequest('/backups', {
+    headers: getAuthHeaders(),
+  });
+  return { items: res.data ?? [], maxKept: res.maxKept };
+}
+
+/**
+ * Tải 1 bản backup cụ thể (.gz) về máy admin — dùng làm bước trung gian
+ * trước khi khôi phục (tải về máy rồi mới upload lại qua form khôi phục),
+ * vì API /restore chỉ nhận file upload trực tiếp, không nhận fileId trên Drive.
+ * Không dùng apiRequest() (parse JSON) vì response là file nhị phân.
+ */
+export async function downloadBackupFile(fileId, fileName) {
+  const headers = getAuthHeaders();
+  delete headers['Content-Type'];
+
+  const res = await fetch(
+    `${API_BASE_URL}/backups/${fileId}/download?fileName=${encodeURIComponent(fileName || 'backup.gz')}`,
+    { method: 'GET', credentials: 'include', headers },
+  );
+
+  if (!res.ok) {
+    let message = 'Tải bản sao lưu thất bại';
+    try {
+      const errBody = await res.json();
+      message = errBody?.message || message;
+    } catch {
+      // response không phải JSON
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'backup.gz';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Khôi phục dữ liệu từ 1 file backup (.gz) chọn từ máy admin. Backend sẽ
+ * mongorestore --drop (XOÁ TOÀN BỘ dữ liệu hiện tại rồi ghi đè bằng dữ liệu
+ * trong file) — bắt buộc gửi kèm confirm=RESTORE, khớp với xác nhận đã yêu
+ * cầu admin thao tác ở UI (BackupTab) trước khi gọi hàm này.
+ */
+export async function restoreBackupFile(file) {
+  const formData = new FormData();
+  formData.append('backupFile', file);
+  formData.append('confirm', 'RESTORE');
+
+  const headers = getAuthHeaders();
+  delete headers['Content-Type']; // để browser tự set boundary cho multipart/form-data
+
+  const res = await apiRequest('/backups/restore', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+  return res; // { success, message }
+}
+
 /**
  * BƯỚC 1/2 — Xem trước import Excel: gửi file lên, nhận về danh sách từng
  * dòng đã phân loại (create/reuse/update/conflict/error), CHƯA ghi gì vào DB.
