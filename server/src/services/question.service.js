@@ -534,7 +534,23 @@ function readImportRows(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new ApiError(400, 'Không đọc được file upload', 'IMPORT_FILE_MISSING');
   }
-  const workbook = XLSX.readFile(filePath, { cellDates: false });
+
+  let workbook;
+  try {
+    workbook = XLSX.readFile(filePath, { cellDates: false });
+  } catch (err) {
+    // Thư viện xlsx ném lỗi kỹ thuật khó hiểu (vd "Corrupted zip",
+    // "Unsupported file") khi file không phải Excel thật — thường gặp nhất
+    // là file đổi đuôi tay (.txt -> .xlsx) hoặc file Excel bị hỏng giữa
+    // chừng lúc upload. Bọc lại thành ApiError tiếng Việt rõ ràng để người
+    // ra đề biết cần tải lại đúng file Excel, thay vì thấy lỗi 500 thô.
+    throw new ApiError(
+      400,
+      'File không đúng định dạng Excel hoặc đã bị hỏng. Vui lòng kiểm tra lại file (.xlsx) và tải lên lại.',
+      'IMPORT_INVALID_FORMAT',
+    );
+  }
+
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
     throw new ApiError(400, 'File Excel không có sheet', 'IMPORT_EMPTY');

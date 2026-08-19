@@ -3,6 +3,7 @@ import { assertRuntimeEnv, env } from './config/env.js';
 import { connectDatabase } from './config/db.js';
 import { runStartupSeed } from './services/seed.service.js';
 import { initBackupScheduler } from './services/backup.scheduler.js';
+import { initUploadCleanupScheduler } from './services/upload-cleanup.scheduler.js';
 
 async function main() {
   assertRuntimeEnv();
@@ -23,6 +24,11 @@ async function main() {
 
   // Đăng ký cron backup tự động (3h sáng, Asia/Ho_Chi_Minh) — chỉ chạy sau khi DB đã kết nối thành công
   initBackupScheduler();
+
+  // Đăng ký cron dọn file tạm còn sót trong uploadDir (import Excel bị bỏ
+  // dở, tài liệu ôn tập chưa xử lý xong...) — chạy mỗi giờ, xoá file quá 6
+  // tiếng tuổi. Ghi audit khi có xoá.
+  initUploadCleanupScheduler();
 
   const app = createApp();
   app.listen(env.port, () => {
