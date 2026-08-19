@@ -334,3 +334,44 @@ server/
 | **Admin** (Quản trị viên) | Toàn quyền quản lý user (CRUD, import/export Excel, phân role, khóa/mở, reset password), audit log, sao lưu & phục hồi dữ liệu (Backup/Restore), quản lý câu hỏi/chủ đề/phòng ban, xem báo cáo, thông báo. |
 
 Tất cả route nghiệp vụ (trừ Public) đều yêu cầu xác thực (`authenticate`) và đã đổi mật khẩu (`requirePasswordChanged`). Client sử dụng `VITE_API_URL` để kết nối API.
+
+---
+
+## Luồng xử lý dữ liệu (Data Flow)
+
+Kiến trúc tuân thủ mô hình **Controller-Service-Repository** (Mongoose đảm nhiệm vai trò Repository).
+
+1. **Request Lifecycle**: Client Gửi Request → Express Router → `auth.middleware` (nếu có) → `rate-limit` (nếu có) → `upload.middleware` (nếu có) → **Controller**.
+2. **Controller**: Xử lý input (req.params, req.body), gọi Service xử lý nghiệp vụ, trả về HTTP status và JSON response (chuẩn format `res.json({ message, data })`). Dùng `asyncHandler` để tự động đẩy lỗi.
+3. **Service**: Đảm nhận mọi logic nghiệp vụ (validate, kết nối model, tính toán, gọi external API như Cloudinary, Drive). Trả về dữ liệu sạch hoặc ném ra `ApiError`.
+4. **Model/Mongoose**: Tương tác với MongoDB (thêm/sửa/xóa), validate schema cấp cơ sở dữ liệu, kích hoạt pre/post hooks.
+5. **Error Handler**: Lỗi từ bất kỳ đâu bị ném sẽ rơi vào global error middleware (định nghĩa cuối cùng trong `app.js`). Middleware này log lỗi và chuẩn hóa JSON báo lỗi trước khi gửi về client.
+
+## Kiến trúc cơ sở dữ liệu & Liên kết (Relations)
+
+Dữ liệu được tổ chức theo tính toàn vẹn thông qua tham chiếu (Ref):
+
+- **Tổ chức nhân sự**: `Department` (1) ↔ (N) `Employee` (1) ↔ (1) `User` ↔ (1) `Role`.
+  - Một user gắn với một role cụ thể. User liên kết tới thông tin nhân sự (Employee) qua mã nhân viên.
+- **Kỳ thi và Đề thi**: `Exam` (1) ↔ (N) `ExamCode` (1) ↔ (N) `ExamCodeQuestion` ↔ (1) `Question`.
+  - `Exam` (Kỳ thi) là container. Khi duyệt, `ExamCode` (Mã đề thi) được sinh ra từ việc trộn ngẫu nhiên `Question`.
+- **Lượt thi và Kết quả**: `User (Candidate)` ↔ `ExamCandidate` ↔ `ExamAttempt` ↔ `AttemptQuestion` ↔ `Answer`.
+  - Một `ExamAttempt` lưu trạng thái (in progress/submitted), thời gian kết thúc, log heartbeat. `AttemptQuestion` lưu lại đáp án đang chọn dở. Kết thúc tạo ra `Result`.
+
+## Quản lý Lỗi (Error Handling Strategy)
+
+- Sử dụng `ApiError` class kế thừa `Error` có thêm `statusCode` và `code` (mã định danh).
+- Ví dụ: `throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy người dùng');`
+- Bọc toàn bộ controller bằng `asyncHandler` để không cần khối `try/catch` dài dòng.
+- Global Error Handler (`app.js`) sẽ tự map statusCode (hoặc 500 nếu lỗi server) và loại bỏ chi tiết stacktrace nếu đang ở môi trường production.
+
+## Tiêu chuẩn Bảo mật (Security Standards)
+
+- **Helmet**: Tự động set HTTP headers chống XSS, Clickjacking.
+- **CORS**: Chỉ cho phép `VITE_API_URL` được quyền gọi API, bảo vệ resource cross-origin.
+- **Rate Limit**: Áp dụng chặt chẽ cho endpoint nhạy cảm:
+  - `/login`: 5 req / 15 phút (ngừa brute force).
+  - `/start`, `/submit`, `/heartbeat`: Chống DDOS/spam.
+- **JWT**: Sử dụng chiến lược *Access Token (ngắn hạn, trong Header)* và *Refresh Token (dài hạn, HTTP-Only Cookie)* để chống XSS đánh cắp token.
+- **Mật khẩu**: Băm bằng `bcryptjs` (hash + salt), bắt buộc đổi mật khẩu khi cấp tài khoản mới.
+- **Ngăn chặn phiên (Session Revocation)**: Sử dụng trường `tokenVersion` trên model `User`. Đăng nhập mới sẽ tăng phiên bản, làm access token cũ trở nên bất hợp lệ.

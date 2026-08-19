@@ -211,3 +211,40 @@ client/
 8. Các service gọi backend qua `api.js`; khi token hết hạn, auto refresh (1 lần duy nhất cho nhiều request đồng thời); khi refresh cũng thất bại, phát `SESSION_EXPIRED_EVENT` → hiện `SessionRevokedModal`.
 9. Kiểm tra phiên bị thu hồi mỗi 5s (tài khoản đăng nhập nơi khác → `tokenVersion` thay đổi).
 10. Kỳ thi active trên trang chủ tự cập nhật mỗi 60s.
+
+---
+
+## Quản lý Trạng thái (State Management)
+
+Dự án sử dụng chiến lược quản lý trạng thái phân tán, chủ yếu dựa trên React Context và Local State:
+
+- **Auth State**: Quản lý tập trung tại `App.jsx` (lưu trữ `user`, `role`, `mustChangePassword`) truyền xuống các component con dưới dạng props hoặc qua các component bọc (Wrapper).
+- **Global UI State**: Sử dụng Context API.
+  - `ToastContext`: Cung cấp hàm `addToast()` để hiển thị thông báo ở mọi nơi mà không cần truyền props.
+  - `ConfirmContext`: Quản lý hiển thị dialog xác nhận.
+- **Local State**: Các form, danh sách, modal quản lý trạng thái độc lập bằng `useState`, `useReducer`.
+
+## Tích hợp API và Gọi dữ liệu (API Integration & Data Fetching)
+
+- **Axios Instance (`api.js`)**: Cấu hình URL cơ sở, timeout và credentials.
+- **Interceptor Flow**:
+  - Request Interceptor: Tự động gắn header `Authorization: Bearer <token>` bằng token lấy từ `token-store.js`.
+  - Response Interceptor: Bắt lỗi 401 (Unauthorized). Gọi luồng *Silent Refresh Token* ngầm để cấp lại access token.
+  - **Queueing Mechanism**: Khi refresh đang chạy, mọi request gọi API khác sẽ bị tạm giữ (push vào queue) và chỉ được thực thi tiếp khi refresh thành công (tránh gọi refresh nhiều lần liên tiếp).
+- **Custom Event `SESSION_EXPIRED_EVENT`**: Khi refresh thất bại hoặc tokenVersion bị thu hồi, hệ thống phát event để đẩy user ra ngoài (hiển thị modal thông báo và xóa token).
+
+## Routing và Phân quyền Giao diện (Routing & Role-based UI)
+
+- Không sử dụng thư viện Routing phức tạp bên thứ 3 (như react-router) ở quy mô hiện tại mà dùng luồng điều hướng (conditional rendering) thủ công gọn nhẹ qua trạng thái Auth.
+- **Tầng bảo vệ (Guards)**: `App.jsx` quyết định load trang chủ hay dashboard dựa vào role của `user` trả về từ `/api/auth/me`.
+- Dashboard của từng vai trò được tải theo lazy-load (tuỳ chọn) hoặc nạp động dựa vào role code (`admin`, `examiner`, `leader`, `candidate`).
+- Nếu user truy cập trái phép tab của người khác, UI mặc định sẽ không render component tab đó (kiểm duyệt hiển thị 1 chiều từ Frontend).
+
+## Tiêu chuẩn UI/CSS (Tailwind v4)
+
+- **Cấu hình**: Sử dụng Tailwind CSS v4 không cần cấu hình phức tạp trong `tailwind.config.js`, sử dụng cú pháp import CSS nội tuyến `@theme`.
+- **Thiết kế Responsive**: Mobile-first cho toàn bộ layout. Tab/Dashboard sử dụng Flexbox/CSS Grid.
+- **Animations**:
+  - Sử dụng thư viện `Motion` (Framer Motion) hoặc Tailwind classes (`animate-spin`, `transition-all`) cho vi tương tác (micro-interactions).
+  - Tối ưu cuộn trang: Sử dụng thư viện `Lenis` tạo hiệu ứng cuộn mượt (Smooth Scrolling) trên trang chủ.
+- **Icons**: Sử dụng bộ `Lucide-React`, đồng nhất SVG format cho toàn bộ hệ thống (dễ dàng thay đổi kích thước `size` và màu sắc `strokeWidth`).
