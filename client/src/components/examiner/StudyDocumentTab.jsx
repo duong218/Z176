@@ -18,6 +18,7 @@ import {
   previewStudyDocument,
   downloadStudyDocument,
 } from '../../services/study-document.service';
+import { useConfirm } from '../ConfirmDialog';
 
 const SCOPE_COMMON = 'Common';
 const SCOPE_DEPARTMENT = 'DepartmentSpecific';
@@ -46,6 +47,7 @@ const isPdf = (doc) =>
   doc.mimeType === 'application/pdf' || doc.originalFileName?.toLowerCase().endsWith('.pdf');
 
 export const StudyDocumentTab = () => {
+  const confirmAction = useConfirm();
   const [documents, setDocuments] = useState([]);
   const [topics, setTopics] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -163,9 +165,11 @@ export const StudyDocumentTab = () => {
   };
 
   const handleDelete = async (doc) => {
-    if (!window.confirm(`Gỡ tài liệu "${doc.title}"? Thí sinh sẽ không còn xem được tài liệu này.`)) {
-      return;
-    }
+    const ok = await confirmAction(
+      `Gỡ tài liệu "${doc.title}"? Thí sinh sẽ không còn xem được tài liệu này.`,
+      { title: 'Gỡ tài liệu', confirmLabel: 'Gỡ tài liệu' }
+    );
+    if (!ok) return;
     setBusyId(doc._id);
     setError(null);
     try {

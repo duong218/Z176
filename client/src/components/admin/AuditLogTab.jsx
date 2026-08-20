@@ -48,6 +48,9 @@ const ACTION_LABELS = {
   RESTORE_TOPIC: 'Khôi phục chủ đề',
   UPDATE_TOPIC: 'Cập nhật chủ đề',
   DEACTIVATE_TOPIC: 'Ngừng sử dụng chủ đề',
+  // Tài liệu ôn tập
+  UPLOAD_STUDY_DOCUMENT: 'Đăng tài liệu ôn tập',
+  DEACTIVATE_STUDY_DOCUMENT: 'Gỡ tài liệu ôn tập',
 };
 
 // Các action mang tính cảnh báo/nhạy cảm — hiển thị nhấn mạnh bằng màu vàng-cam
@@ -64,6 +67,7 @@ const EMPHASIZED_ACTIONS = new Set([
   'BULK_DELETE_QUESTIONS',
   'question.bulk_deactivate',
   'DEACTIVATE_TOPIC',
+  'DEACTIVATE_STUDY_DOCUMENT',
 ]);
 
 const RESOURCE_TYPE_OPTIONS = [
