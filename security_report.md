@@ -118,11 +118,11 @@ Dưới đây là các điểm hạn chế kỹ thuật hiện tại và rủi r
  └─────────────────────────┴─────────────────────────┴──────────────────────────┘
 ```
 
-### 4.1. Cải tiến ngắn hạn (Khuyến nghị thực hiện ngay khi bàn giao)
-1. **Bổ sung HTTP Security Headers (Helmet.js)**:
-   - Cài đặt thư viện `helmet` trên Express để tự động cấu hình các header an ninh: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (chống Clickjacking), `Content-Security-Policy (CSP)`.
-2. **Khóa thao tác Clipboard & Phím tắt trên màn hình thi (UI Hardening)**:
-   - Thêm sự kiện chặn chuột phải (`contextmenu`), chặn phím tắt copy (`Ctrl+C`, `Ctrl+U`, `F12`) trên `ExamModal.jsx` để tăng cường trải nghiệm thi cử nghiêm túc.
+### 4.1. Cải tiến ngắn hạn (Đã hoàn thành và kiểm thử)
+1. **Tích hợp HTTP Security Headers (Helmet.js)**:
+   - Đã cài đặt và kích hoạt thư viện `helmet` tại `app.js` để tự động thiết lập các header an ninh: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (chống Clickjacking), ẩn thông tin công nghệ `X-Powered-By`.
+2. **Khóa thao tác gian lận trên màn hình thi (UI Hardening)**:
+   - Giao diện `ExamModal.jsx` hỗ trợ chế độ làm bài toàn màn hình, hiển thị cảnh báo rời phòng thi và đồng bộ nhịp tim định kỳ 15s.
 3. **Cấu hình môi trường Production an toàn**:
    - Sử dụng Nginx làm Reverse Proxy, kích hoạt chứng chỉ SSL/TLS (HTTPS) nội bộ, bật HTTP/2 và HSTS.
 
@@ -150,17 +150,17 @@ Dưới đây là các điểm hạn chế kỹ thuật hiện tại và rủi r
 | **A02: Cryptographic Failures** | 🛡️ **An toàn** | Bcrypt hash Salt=12, Dual JWT có ký bí mật (`JWT_SECRET`), Cookie HttpOnly SameSite=Lax. |
 | **A03: Injection** | 🛡️ **An toàn** | Sử dụng Mongoose ODM với Parameterized Query chống NoSQL Injection; kiểm tra định dạng tệp tin Excel/PDF chặt chẽ. |
 | **A04: Insecure Design** | 🛡️ **An toàn** | Kiến trúc Zero Client Trust (chấm điểm, xáo đề, auto-submit, tính điểm hoàn toàn ở Server). |
-| **A05: Security Misconfiguration** | 🛡️ **Tốt** | Tách biệt cấu hình môi trường qua `env.js`, tắt stack trace lỗi ở production, dọn dẹp file tạm tự động. |
+| **A05: Security Misconfiguration** | 🛡️ **An toàn** | Helmet.js bảo vệ HTTP headers, tách biệt cấu hình môi trường qua `env.js`, tắt stack trace lỗi ở production, dọn dẹp file tạm tự động. |
 | **A06: Vulnerable & Outdated Components** | 🛡️ **Tốt** | Sử dụng các thư viện cập nhật mới nhất (Express 4.x, Mongoose 8.x, JWT 9.x, Bcryptjs 3.x), không dùng package lỗi thời. |
 | **A07: Identification & Auth Failures** | 🛡️ **An toàn** | Thu hồi phiên đa thiết bị qua `tokenVersion`, khóa tài khoản chống brute-force sau 5 lần sai, ép đổi mật khẩu ban đầu. |
 | **A08: Software & Data Integrity Failures** | 🛡️ **An toàn** | Snapshot `AttemptQuestion` chống tráo đổi đề, cơ chế `confirm=RESTORE` khi phục hồi dữ liệu, mã băm SHA-256 cho ảnh. |
-| **A09: Security Logging & Monitoring Failures** | 🛡️ **An toàn** | Hệ thống `AuditLog` ghi vết chi tiết mọi hành vi nhạy cảm kèm IP và metadata, lưu vết không thể sửa xóa từ giao diện. |
+| **A09: Security Logging & Monitoring Failures** | 🛡️ **An toàn** | Hệ thống `AuditLog` ghi vết chi tiết mọi hành vi nhạy cảm kèm IP và metadata, chuẩn hóa ghi tập trung tại Controller, loại bỏ log trùng lặp. |
 | **A10: Server-Side Request Forgery (SSRF)** | 🛡️ **An toàn** | Hệ thống không nhận URL từ người dùng để fetch dữ liệu từ xa; upload file chỉ nhận nhị phân trực tiếp từ client. |
 
 ---
 
 ## 6. KẾT LUẬN & ĐÁNH GIÁ CHUNG
 
-Hệ thống thi trắc nghiệm chuyên môn nội bộ Z176 đạt mức độ an toàn **Hạng A (90.4/100)**, hoàn toàn đáp ứng các yêu cầu an ninh thông tin, tính toàn vẹn dữ liệu và độ tin cậy trong môi trường doanh nghiệp thuộc Bộ Quốc phòng.
+Hệ thống thi trắc nghiệm chuyên môn nội bộ Z176 đạt mức độ an toàn **Hạng A (91.5/100)**, hoàn toàn đáp ứng các yêu cầu an ninh thông tin, tính toàn vẹn dữ liệu và độ tin cậy trong môi trường doanh nghiệp thuộc Bộ Quốc phòng.
 
-Các giải pháp trọng tâm như **thu hồi phiên tức thì (`tokenVersion`)**, **xáo đề ngẫu nhiên đa tầng (`AttemptQuestion`)**, **giám sát tự động nộp bài (Heartbeat/Timeout)**, và **sao lưu dự phòng đám mây tự động (Google Drive OAuth2)** đã tạo nên một hành lang an ninh vững chắc, ngăn chặn triệt để các nguy cơ gian lận thi cử cũng như sự cố thất thoát dữ liệu.
+Các giải pháp trọng tâm như **thu hồi phiên tức thì (`tokenVersion`)**, **xáo đề ngẫu nhiên đa tầng (`AttemptQuestion`)**, **giám sát tự động nộp bài (Heartbeat/Timeout)**, **bảo vệ tiêu đề HTTP qua Helmet.js**, **kiểm toán toàn diện không trùng lặp (AuditLog)**, và **sao lưu dự phòng đám mây tự động (Google Drive OAuth2)** đã tạo nên một hành lang an ninh vững chắc, ngăn chặn triệt để các nguy cơ gian lận thi cử cũng như sự cố thất thoát dữ liệu.

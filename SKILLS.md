@@ -1,85 +1,88 @@
-# SKILLS.md — Quy ước kỹ thuật
-## Module Thi Chuyên Môn Nội Bộ — Z176
-**Người thực hiện:** Phạm Ngọc Dương — VNUA | **Trạng thái:** Bản nháp chuẩn bị, chưa nhận đề tài chính thức
-**Mục đích:** Là "luật chơi" kỹ thuật cho bản thân và cho AI tool (Cursor/Claude/Copilot...) khi bắt đầu code, tránh việc AI generate lệch convention hoặc đụng vào phần nhạy cảm.
+# SKILLS.md — Quy ước kỹ thuật và Nguyên tắc phát triển
+## Hệ Thống Thi Trắc Nghiệm Chuyên Môn Nội Bộ — Nhà Máy Z176
+**Người thực hiện:** Phạm Ngọc Dương — VNUA | **Dự án:** Hệ thống thi trắc nghiệm chuyên môn nội bộ Z176
 
-> ⚠️ File này sẽ được cập nhật lại sau buổi khảo sát chính thức (đặc biệt câu 26-30 về hạ tầng), hiện tại các mục đánh dấu 🔸 là **giả định tạm**, cần chốt lại sau khi có câu trả lời khảo sát.
+**Mục đích:** Là bộ quy tắc và chuẩn mực kỹ thuật bắt buộc dành cho lập trình viên và AI Coding Assistant khi phát triển, bảo trì mã nguồn trong dự án. Đảm bảo toàn bộ hệ thống nhất quán về kiến trúc, tuân thủ an toàn thông tin và quy chuẩn nghiệp vụ.
 
 ---
 
-## 1. Tech Stack (dự kiến)
+## 1. Công nghệ sử dụng chính thức (Tech Stack)
 
-| Layer | Lựa chọn mặc định | Ghi chú |
+| Thành phần | Lựa chọn chính thức | Chi tiết kỹ thuật & Thư viện |
 |---|---|---|
-| Frontend | React 18 + Vite | Đổi nếu Z176 yêu cầu framework khác (câu hỏi #28) |
-| Styling | Tailwind CSS | |
-| Backend | Node.js + Express | |
-| Database | MongoDB | 🔸 Cân nhắc PostgreSQL nếu đơn vị yêu cầu dữ liệu quan hệ chặt chẽ hơn cho audit log |
-| Auth | JWT + bcrypt, role-based | Không dùng OAuth bên thứ 3 công khai (Google/Facebook login) — môi trường nội bộ |
-| Deploy | 🔸 Chờ khảo sát #26: on-premise hay cloud | Chuẩn bị sẵn 2 phương án: Docker cho on-prem, Render/Vercel cho demo local |
-
-**Nguyên tắc chọn stack:** Ưu tiên những gì đơn vị CNTT Z176 có thể tự maintain sau khi khóa luận kết thúc (câu hỏi #30), không chọn công nghệ quá kén người bảo trì.
+| **Frontend** | React 19 + Vite | SPA hiệu năng cao, React Context cho state toàn cục (`ToastContext`, `ConfirmContext`). |
+| **Styling & UI** | Tailwind CSS v4 | Thiết kế tối giản, responsive mobile-first, Lucide React icons, Lenis smooth scroll, Motion micro-animations, Recharts biểu đồ. |
+| **Backend** | Node.js (>=22 <25) + Express.js | Kiến trúc Controller - Service - Model phân lớp rõ ràng. |
+| **Database** | MongoDB Atlas & Mongoose ODM | Lưu trữ cấu trúc dữ liệu linh hoạt (ngân hàng câu hỏi, đề thi, lượt thi, audit logs). |
+| **Xác thực (Auth)** | JWT kép + Cookie HttpOnly | `accessToken` (15 phút, gửi Header) + `refreshToken` (7 ngày, httpOnly cookie) + `tokenVersion` (thu hồi phiên tức thì). |
+| **Tệp tin & Đa phương tiện**| Cloudinary + Multer + exceljs/xlsx | Lưu ảnh minh họa câu hỏi, tài liệu ôn tập (.pdf, .docx, .xlsx), đọc/xuất file Excel kết quả & tài khoản nhân viên. |
+| **Sao lưu đám mây** | Google Drive API (OAuth2) | Backup tự động CSDL định kỳ lúc 3h sáng (xoay vòng 5 bản lưu) và khôi phục an toàn qua giao diện Admin. |
 
 ---
 
-## 2. Cấu trúc thư mục chuẩn
+## 2. Cấu trúc thư mục chuẩn của dự án
 
-```
-exam-system/
-├── client/                  # React app
+```text
+HethongZ176/
+├── client/                              # Ứng dụng Frontend React 19 + Vite
+│   ├── public/templates/                # File Excel mẫu chuẩn (Mau_Import_Cau_Hoi, Mau_Import_Nhan_Vien)
+│   └── src/
+│       ├── components/
+│       │   ├── admin/                   # AccountTab, AuditLogTab, BackupTab, OverviewTab
+│       │   ├── examiner/                # DepartmentTab, ExamProposalTab, OverviewTab, QuestionBankTab, StudyDocumentTab, TopicTab
+│       │   ├── leader/                  # DepartmentReportTab, DetailedResultsTab, ExamReportTab, ExamReviewTab, OverviewTab
+│       │   ├── ConfirmDialog.jsx        # Dialog xác nhận chuẩn thay thế window.confirm()
+│       │   ├── ExamModal.jsx            # Giao diện làm bài thi toàn màn hình (autosave, heartbeat, đếm giờ)
+│       │   └── ToastContext.jsx         # Quản lý thông báo toast toàn hệ thống
+│       ├── pages/                       # AdminDashboard, CandidateDashboard, ExaminerDashboard, LeaderDashboard
+│       └── services/                    # Tầng giao tiếp API (api.js, auth, admin, examiner, exam-attempt, study-document...)
+│
+├── server/                              # Ứng dụng Backend Express.js REST API
 │   ├── src/
-│   │   ├── components/      # UI components, chia theo domain (exam/, question/, report/)
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   ├── services/        # gọi API, KHÔNG chứa business logic
-│   │   ├── contexts/        # AuthContext, ExamSessionContext
-│   │   └── utils/
-├── server/
-│   ├── src/
-│   │   ├── models/           # Mongoose schema
-│   │   ├── controllers/
-│   │   ├── routes/
-│   │   ├── middlewares/      # auth, role-check, audit-log
-│   │   ├── services/         # business logic tách khỏi controller
-│   │   └── config/
-├── docs/                     # UML, ERD, đặc tả nghiệp vụ
-└── mock-data/                 # DỮ LIỆU GIẢ dùng khi làm việc với AI — xem AGENT_RULES.md
+│   │   ├── config/                      # db.js, env.js (validate runtime env)
+│   │   ├── controllers/                 # Tầng điều phối request/response, ghi Audit Log chuẩn hóa
+│   │   ├── middlewares/                 # auth.middleware, rate-limit.middleware, upload.middleware
+│   │   ├── models/                      # Mongoose Schema: User, Role, Employee, Department, Topic, Question, Exam...
+│   │   ├── routes/                      # Định tuyến RESTful API (/api/*)
+│   │   ├── services/                    # Nghiệp vụ cốt lõi: exam, attempt, question, user, backup, study-document...
+│   │   └── utils/                       # ApiError, asyncHandler
+│
+├── structure/                           # Tài liệu chi tiết kiến trúc (client.md, server.md)
+└── GLOSSARY.md                          # Bảng thuật ngữ nghiệp vụ & tên Model chuẩn hóa
 ```
 
-**Quy tắc:** Controller mỏng, Service dày (business logic nằm ở service, không nằm ở controller/route).
+---
+
+## 3. Quy chuẩn lập trình (Coding Conventions)
+
+1. **Phân chia trách nhiệm (Controller mỏng — Service dày):**
+   * **Controller**: Nhận input (`req.params`, `req.body`), gọi Service thực thi nghiệp vụ, ghi Audit Log (nếu là hành động nhạy cảm) và trả về response JSON qua `res.json({ message, data })`.
+   * **Service**: Chứa toàn bộ business logic, validate dữ liệu, truy vấn database qua Model, ném lỗi qua `throw new ApiError(statusCode, code, message)`.
+2. **Quy chuẩn ghi Audit Log:**
+   * Ghi **tập trung tại Controller** sau khi service hoàn thành thao tác thành công (tránh ghi trùng lặp ở service).
+   * Sử dụng mã hành động chuẩn tiếng Anh (`CREATE_USER`, `LOCK_USER`, `UPDATE_QUESTION`, `BACKUP_RESTORE`...) và luôn truyền đầy đủ `actorUserId: req.auth.userId`, `resourceType`, `metadata.detail`.
+3. **Naming Conventions:**
+   * `camelCase` cho biến, hàm, tham số (ví dụ: `loadData`, `newDepartmentId`, `examCandidateId`).
+   * `PascalCase` cho React Components, Context và Mongoose Models (ví dụ: `AccountTab`, `ExamAttempt`).
+   * `UPPER_SNAKE_CASE` cho hằng số và Enum (ví dụ: `QUESTION_SCOPE`, `ACTION_LABELS`).
+   * `kebab-case` cho tên file routes và services (ví dụ: `exam-attempt.service.js`, `study-document.routes.js`).
+4. **React Performance & Hooks:**
+   * Bọc các hàm fetch dữ liệu trong `useCallback` khi truyền vào `useEffect` dependency.
+   * Sử dụng `useRef` lưu các giá trị filter/search không cần kích hoạt re-render để tránh gọi lại API liên tục khi gõ phím.
+   * Ưu tiên dùng `useConfirm()` từ `ConfirmDialog.jsx` thay vì `window.confirm()`.
 
 ---
 
-## 3. Coding Convention
+## 4. Danh sách Nguyên tắc cứng (Bảo mật & Toàn vẹn) 🔒
 
-- **Naming:** camelCase cho biến/hàm, PascalCase cho component/model, kebab-case cho tên file route.
-- **Commit message:** `feat/fix/refactor/docs: mô tả ngắn` — để sau này viết báo cáo khóa luận dễ trace lại quá trình.
-- **Không magic number:** mọi cấu hình đề thi (số câu, thời gian, điểm liệt) đưa vào bảng cấu hình (`ExamConfig`), không hardcode.
-- **Validation:** validate ở cả client (UX) và server (bắt buộc, không tin client).
-- **Error handling:** trả lỗi theo format chuẩn `{ success, message, code }`, không leak stack trace ra response ở production.
+Các nguyên tắc sau đây **tuyệt đối không được vi phạm**:
 
----
-
-## 4. Danh sách "Do-Not-Touch" / Nguyên tắc cứng ngay từ đầu
-
-Đây là các nguyên tắc **không được vi phạm dù AI đề xuất khác**, vì gắn với đặc thù dữ liệu quân đội nội bộ:
-
-1. 🔒 **Không bao giờ lưu đáp án/câu hỏi ở dạng chưa mã hóa hoàn toàn rõ ràng trong log hoặc console.log khi debug** — kể cả môi trường dev.
-2. 🔒 **Không tự ý tích hợp API/SDK bên thứ ba gửi dữ liệu ra ngoài** (analytics, error tracking như Sentry bản cloud...) trừ khi đã xác nhận với Ban CNTT.
-3. 🔒 **Không dùng tài khoản demo/test có thông tin thật của nhân viên Z176.**
-4. 🔒 **Mọi endpoint liên quan đề thi/đáp án đều phải qua middleware kiểm tra role**, không có "endpoint tạm bỏ qua auth để test nhanh" còn sót lại khi deploy.
-5. 🔒 **Không dùng thư viện sinh số ngẫu nhiên không an toàn (`Math.random()`) cho việc trộn đề/đáp án** — dùng `crypto.randomInt()` hoặc tương đương.
+1. 🔒 **Bảo mật đề thi & Đáp án:** Không bao giờ trả về trường đáp án đúng (`isCorrect`) về client của Thí sinh trước hoặc trong khi đang làm bài thi.
+2. 🔒 **Sinh số ngẫu nhiên an toàn:** Tuyệt đối không dùng `Math.random()` cho thuật toán trộn câu hỏi, xáo trộn đáp án hoặc sinh mã ngẫu nhiên liên quan đến bảo mật — phải sử dụng `crypto.randomInt()` hoặc các hàm ngẫu nhiên bảo mật tương đương.
+3. 🔒 **Xác thực & Phân quyền đa lớp:** Mọi API thao tác dữ liệu đều phải đi qua `authenticate` (kiểm tra JWT + `tokenVersion`) và `requireRoleCodes(...)` để kiểm soát đúng quyền hạn của từng vai trò (`admin`, `examiner`, `leader`, `candidate`).
+4. 🔒 **Thu hồi phiên làm việc tức thì:** Khi tài khoản đăng nhập ở thiết bị mới, đổi mật khẩu hoặc bị admin khóa/reset mật khẩu, trường `tokenVersion` trên model `User` phải được tăng lên (`+1`) để vô hiệu hóa toàn bộ phiên cũ.
+5. 🔒 **Không rò rỉ dữ liệu nhạy cảm:** Không in log mật khẩu, đáp án đề thi hoặc stacktrace lỗi nội bộ ra response client ở môi trường production.
+6. 🔒 **Không dùng tài khoản thật khi kiểm thử:** Dữ liệu thử nghiệm hoặc mock data cho AI chỉ dùng thông tin giả lập, không sử dụng dữ liệu định danh thật của cán bộ, công nhân viên Nhà máy Z176.
 
 ---
-
-## 5. Việc còn để mở — chờ khảo sát chính thức
-
-| Mục | Câu hỏi khảo sát liên quan | Ảnh hưởng tới skill này |
-|---|---|---|
-| Ngôn ngữ/framework bắt buộc | #28 | Có thể phải viết lại toàn bộ mục 1 |
-| On-premise vs cloud | #26, #29 | Ảnh hưởng chiến lược deploy, offline-first hay không |
-| Kết nối HR có sẵn | #23 | Quyết định có cần module quản lý user riêng hay chỉ đồng bộ |
-| Yêu cầu bảo mật đề thi đặc thù | #13, #35 | Bổ sung thêm rule mã hóa/log vào mục 4 |
-
----
-*File này là bản chuẩn bị trước khi nhận đề tài chính thức — cập nhật sau buổi khảo sát với Z176.*
+*Bản quyền sản phẩm thuộc về tác giả Phạm Ngọc Dương - Sinh viên K67 - Khoa Công nghệ thông tin - Học viện Nông nghiệp Việt Nam.*

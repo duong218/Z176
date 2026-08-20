@@ -148,6 +148,22 @@ Người dùng làm việc/thi chủ yếu trên điện thoại. Toàn bộ h�
 
 **Đã bỏ:** badge "Mới/AI/Beta" màu cyan — không cần huy hiệu quảng bá tính năng trong hệ thống nội bộ.
 
+### Thông báo (Toast Notification)
+- **Nền & Viền:** Nền trắng `#FFFFFF`, viền trái `4px solid` theo màu semantic (Xanh lá `#22C55E` thành công, Đỏ `#E53E3E` lỗi, Vàng `#F6AD37` cảnh báo, Xanh `#008BC5` thông tin).
+- **Vị trí:** Cố định góc trên/dưới màn hình, luôn có icon và nút đóng `X` (vùng chạm `44×44px`).
+- **Thời lượng:** Tự đóng sau 3.5s hoặc cho phép đóng thủ công. Quản lý qua `ToastContext.jsx`.
+
+### Hộp thoại xác nhận (ConfirmDialog)
+- **Cấu trúc:** Thay thế hoàn toàn `window.confirm()`.
+- **Giao diện:** Modal căn giữa màn hình, backdrop đen mờ (`bg-black/60`), tiêu đề in đậm, nội dung giải thích rõ ràng hậu quả hành động, 2 nút lựa chọn (Hủy: Secondary, Xác nhận: Primary/Danger).
+- **Z-Index:** Thiết lập `z-[110]` để luôn nổi lên trên các modal thông thường khác.
+
+### Hộp thoại Modal & Modal lồng nhau (Stacked Modals)
+- **Modal chính:** `z-50`, bo góc `12px` (hoặc `rounded-[10px]`), padding `20px–24px`, thanh tiêu đề phân cách rõ ràng và nút đóng góc trên bên phải.
+- **Modal con (Inline Action):** Mở đè lên modal cha (ví dụ: tạo nhanh phòng ban từ dropdown trong form tài khoản), thiết lập `z-[60]` để phân tách lớp hiển thị rõ ràng, backdrop riêng.
+
+---
+
 ## 5. Bố cục (Layout)
 
 ### Hệ khoảng cách (Spacing)
@@ -164,8 +180,9 @@ Người dùng làm việc/thi chủ yếu trên điện thoại. Toàn bộ h�
 - **Column:** lưới đối xứng đơn giản (không dùng bố cục bất đối xứng 7/5, 8/4 — bố cục càng quen thuộc, càng dễ theo dõi với người dùng không rành công nghệ)
 
 ### Border Radius
-- **Nhỏ:** `8px` — badge, input
-- **Chuẩn:** `10px` — nút, card
+- **Nhỏ:** `8px` — badge, input, ô lưới câu hỏi
+- **Chuẩn:** `10px` — nút, card, modal
+- **Lớn:** `12px` — question card, modal lớn
 - **Không dùng bo góc pill (999px)** cho các thành phần chức năng — chỉ chấp nhận cho progress bar (đã quy định ở mục 9)
 
 ## 6. Độ sâu & Hiệu ứng (Elevation)
@@ -176,10 +193,11 @@ Người dùng làm việc/thi chủ yếu trên điện thoại. Toàn bộ h�
 
 ### Nên
 - Chỉ dùng đúng 5 màu chức năng đã quy định ở mục 2 — nhất quán ở mọi màn hình
-- Bo góc nhất quán theo thang 8/10px
+- Bo góc nhất quán theo thang 8/10/12px
 - Icon luôn kèm nhãn chữ, không dùng icon đơn độc
-- Cỡ chữ tối thiểu 16px cho nội dung cần đọc để thao tác
+- Cỡ chữ tối thiểu 16px cho nội dung cần đọc để thao tác (input text, câu hỏi, đáp án, nút)
 - Giữ layout lặp lại đúng khuôn mẫu giữa các màn hình tương tự
+- Sử dụng `useConfirm()` từ `ConfirmDialog.jsx` và `useToast()` cho mọi thao tác phản hồi người dùng
 
 ### Không nên
 - Không dùng gradient cho bất kỳ thành phần chức năng nào (nút, card, trạng thái)
@@ -187,6 +205,7 @@ Người dùng làm việc/thi chủ yếu trên điện thoại. Toàn bộ h�
 - Không dùng shadow nhiều lớp/đậm — chỉ 1 mức duy nhất theo mục 6
 - Không để chữ dưới 16px cho nội dung chính (caption tối thiểu 14px)
 - Không dùng bố cục bất đối xứng hoặc icon-only để tạo cảm giác "hiện đại" — ưu tiên quen thuộc, dễ đoán hơn ấn tượng thị giác
+- Không dùng `window.confirm()` hay `alert()` gốc của trình duyệt
 
 ## 8. Responsive (Mobile-first)
 
@@ -267,14 +286,15 @@ Trên mobile, **không đặt lưới điều hướng cố định trên màn h
 0. **Đối tượng người dùng:** doanh nghiệp thuộc Bộ Quốc phòng, người dùng 30–60 tuổi, dùng chủ yếu trên mobile. Mọi quyết định thiết kế ưu tiên đơn giản/rõ ràng hơn "hiện đại/bắt mắt".
 1. **Chỉ 5 màu chức năng trong toàn hệ thống:** xanh `#008BC5` (hành động chính), xanh lá `#22C55E` (thành công/đạt), đỏ `#E53E3E` (lỗi/không đạt), vàng-cam `#F6AD37` (cảnh báo), xám (trung tính). Không thêm màu nào khác dù với lý do gì.
 2. **Không dùng gradient** ở bất kỳ thành phần chức năng nào (nút, card, trạng thái) trong toàn hệ thống, không riêng gì luồng thi.
-3. Bo góc: 8px (nhỏ — badge, input) / 10px (chuẩn — nút, card). Không dùng bo góc pill (999px) trừ progress bar.
+3. Bo góc: 8px (nhỏ — badge, input) / 10px (chuẩn — nút, card) / 12px (card lớn, modal). Không dùng bo góc pill (999px) trừ progress bar.
 4. Shadow chỉ 1 mức duy nhất `0px 1px 3px rgba(15,23,42,0.08)` cho toàn hệ thống — không phân cấp nhiều lớp.
 5. Font Inter. **Cỡ chữ tối thiểu 16px cho mọi nội dung cần đọc để thao tác** — không dùng cỡ 13–15px như hệ thống hiện đại thông thường.
 6. Trạng thái thi trắc nghiệm dùng đúng 4 màu cố định (xem mục 1).
 7. Khoảng cách gọn (16–24px) toàn hệ thống, không có khoảng trắng lớn kiểu landing page (64–96px đã bỏ).
-8. Input/nút cao tối thiểu 48px, bo góc 10px, focus ring xanh mềm.
+8. Input/nút cao tối thiểu 48px (vùng chạm tối thiểu 44×44px), bo góc 10px, focus ring xanh mềm.
 9. **Icon luôn kèm nhãn chữ** — không dùng icon đơn độc không giải thích ở bất kỳ đâu trong hệ thống.
 10. **Vùng chạm tối thiểu 44×44px** (ưu tiên 48×48px) cho mọi phần tử tương tác trên mobile.
 11. **Lưới điều hướng câu hỏi không đặt cố định trên màn hình mobile** — dùng bottom sheet mở từ 1 nút trong header/bottom bar.
 12. **Bottom action bar mobile tối đa 2 nút/hàng** ("Câu trước"/"Câu tiếp"); nút "Nộp bài" và nút mở danh sách câu hỏi đặt tách riêng.
 13. Trạng thái đúng/sai/đạt/không đạt luôn có **cả màu và chữ** đi kèm — không dựa hoàn toàn vào màu sắc để truyền đạt thông tin.
+14. **Sử dụng `ConfirmDialog` (`useConfirm`) và `ToastContext` (`useToast`)** thay cho các hộp thoại pop-up gốc của trình duyệt (`alert`, `confirm`).
