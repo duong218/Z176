@@ -17,7 +17,7 @@ const ACTION_LABELS = {
   CHANGE_PASSWORD: 'Đổi mật khẩu',
   // Đề thi
   CREATE_EXAM: 'Tạo đề thi',
-  SUBMIT_EXAM: 'Đệ trình đề thi',
+  SUBMIT_EXAM: 'Đề nghị duyệt đề thi',
   APPROVE_EXAM: 'Duyệt đề thi',
   REJECT_EXAM: 'Từ chối đề thi',
   PUBLISH_EXAM: 'Phát hành đề thi',
@@ -38,11 +38,14 @@ const ACTION_LABELS = {
   DELETE_QUESTION: 'Ngừng sử dụng câu hỏi',
   BULK_DELETE_QUESTIONS: 'Xóa hàng loạt câu hỏi',
   IMPORT_QUESTIONS: 'Import câu hỏi từ Excel',
-  // Ghi chú: 2 action dạng "chấm" dưới đây không thấy trong question.controller.js
-  // đã xem — nhiều khả năng được ghi thêm ở question.service.js. Tạm đặt nhãn
-  // theo đúng ngữ cảnh hiển thị trong ảnh chụp; nên đối chiếu lại nếu có file đó.
+  // Ghi chú: các action dạng "chấm" dưới đây được ghi ở tầng service
+  // (question.service.js) — SONG SONG với action IN HOA tương ứng ghi ở tầng
+  // controller (question.controller.js) cho CÙNG 1 thao tác. Đã xác nhận
+  // trực tiếp từ mã nguồn question.service.js (không còn là suy đoán).
   'question.import': 'Import câu hỏi từ Excel',
+  'question.deactivate': 'Ngừng sử dụng câu hỏi',
   'question.bulk_deactivate': 'Ngừng sử dụng hàng loạt câu hỏi',
+  'question.update': 'Cập nhật câu hỏi',
   // Chủ đề (topic.controller.js)
   CREATE_TOPIC: 'Tạo chủ đề',
   RESTORE_TOPIC: 'Khôi phục chủ đề',
@@ -65,6 +68,7 @@ const EMPHASIZED_ACTIONS = new Set([
   'BACKUP_RESTORE',
   'DELETE_QUESTION',
   'BULK_DELETE_QUESTIONS',
+  'question.deactivate',
   'question.bulk_deactivate',
   'DEACTIVATE_TOPIC',
   'DEACTIVATE_STUDY_DOCUMENT',
