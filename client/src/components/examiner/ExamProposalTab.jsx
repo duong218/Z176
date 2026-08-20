@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
-import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
+
+// MỚI — Danh sách đề xuất kỳ thi hiện tải hết 1 lần (không phân trang phía
+// server, xem fetchMyExamProposals). Về sau số lượng đề xuất tăng dần theo
+// thời gian sẽ khiến trang kéo dài mãi, nên phân trang phía client, mỗi lượt
+// hiển thị 10 kỳ thi.
+const PAGE_SIZE = 10;
 
 export const ExamProposalTab = () => {
   const { showToast } = useToast();
@@ -11,6 +17,9 @@ export const ExamProposalTab = () => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // MỚI — Trang hiện tại của danh sách đề xuất (phân trang client-side, 10
+  // kỳ thi/trang). Reset về trang 1 mỗi khi tải lại danh sách (xem loadData).
+  const [page, setPage] = useState(1);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -51,6 +60,7 @@ export const ExamProposalTab = () => {
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setTopics(Array.isArray(topicsData) ? topicsData : []);
+      setPage(1);
     } catch (error) {
       console.error(error);
     } finally {
@@ -125,6 +135,18 @@ export const ExamProposalTab = () => {
     }
   };
 
+  // MỚI — Cắt danh sách theo trang hiện tại (10 kỳ thi/trang). exams giữ
+  // nguyên toàn bộ dữ liệu gốc (không đổi) — chỉ pagedExams (phần hiển thị)
+  // thay đổi theo `page`.
+  const totalPages = Math.max(1, Math.ceil(exams.length / PAGE_SIZE));
+  const pagedExams = exams.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage);
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'draft': return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium border border-slate-200 flex items-center gap-1"><FilePlus className="w-3 h-3" /> Nháp</span>;
@@ -170,7 +192,7 @@ export const ExamProposalTab = () => {
         <>
           {/* Mobile card list */}
           <div className="animate-fade-in-up md:hidden space-y-3" style={{ '--stagger-delay': '80ms' }}>
-            {exams.map(exam => (
+            {pagedExams.map(exam => (
               <div key={exam._id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -229,7 +251,7 @@ export const ExamProposalTab = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
-                  {exams.map(exam => (
+                  {pagedExams.map(exam => (
                     <tr key={exam._id} className="hover:bg-slate-50">
                       <td className="p-4 font-medium text-slate-800">{exam.title}</td>
                       <td className="p-4 text-slate-600">{exam.topicId?.name}</td>
@@ -263,6 +285,33 @@ export const ExamProposalTab = () => {
               </table>
             </div>
           </div>
+
+          {/* MỚI — Điều hướng trang, chỉ hiện khi có nhiều hơn 1 trang. */}
+          {exams.length > PAGE_SIZE && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between gap-2">
+              <p className="text-sm text-slate-500">
+                Trang {page}/{totalPages} (Tổng {exams.length} đề xuất)
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 1}
+                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
