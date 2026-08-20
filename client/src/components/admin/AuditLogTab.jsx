@@ -28,6 +28,26 @@ const ACTION_LABELS = {
   AUTO_SUBMIT_EXAM_ATTEMPT: 'Tự động nộp bài (hết giờ)',
   RESUME_EXAM_ATTEMPT: 'Tiếp tục làm bài',
   GRANT_EXTRA_EXAM_ATTEMPT: 'Cấp thêm lượt thi',
+  // Sao lưu & phục hồi (backup.controller.js)
+  BACKUP_MANUAL_CREATE: 'Tạo bản sao lưu thủ công',
+  BACKUP_DOWNLOAD: 'Tải bản sao lưu',
+  BACKUP_RESTORE: 'Khôi phục dữ liệu từ bản sao lưu',
+  // Câu hỏi (question.controller.js)
+  CREATE_QUESTION: 'Tạo câu hỏi',
+  UPDATE_QUESTION: 'Cập nhật câu hỏi',
+  DELETE_QUESTION: 'Ngừng sử dụng câu hỏi',
+  BULK_DELETE_QUESTIONS: 'Xóa hàng loạt câu hỏi',
+  IMPORT_QUESTIONS: 'Import câu hỏi từ Excel',
+  // Ghi chú: 2 action dạng "chấm" dưới đây không thấy trong question.controller.js
+  // đã xem — nhiều khả năng được ghi thêm ở question.service.js. Tạm đặt nhãn
+  // theo đúng ngữ cảnh hiển thị trong ảnh chụp; nên đối chiếu lại nếu có file đó.
+  'question.import': 'Import câu hỏi từ Excel',
+  'question.bulk_deactivate': 'Ngừng sử dụng hàng loạt câu hỏi',
+  // Chủ đề (topic.controller.js)
+  CREATE_TOPIC: 'Tạo chủ đề',
+  RESTORE_TOPIC: 'Khôi phục chủ đề',
+  UPDATE_TOPIC: 'Cập nhật chủ đề',
+  DEACTIVATE_TOPIC: 'Ngừng sử dụng chủ đề',
 };
 
 // Các action mang tính cảnh báo/nhạy cảm — hiển thị nhấn mạnh bằng màu vàng-cam
@@ -39,6 +59,11 @@ const EMPHASIZED_ACTIONS = new Set([
   'REJECT_EXAM',
   'ARCHIVE_EXAM',
   'AUTO_SUBMIT_EXAM_ATTEMPT',
+  'BACKUP_RESTORE',
+  'DELETE_QUESTION',
+  'BULK_DELETE_QUESTIONS',
+  'question.bulk_deactivate',
+  'DEACTIVATE_TOPIC',
 ]);
 
 const RESOURCE_TYPE_OPTIONS = [
@@ -47,6 +72,7 @@ const RESOURCE_TYPE_OPTIONS = [
   { value: 'Question', label: 'Câu hỏi' },
   { value: 'Topic', label: 'Chủ đề' },
   { value: 'Department', label: 'Phòng ban' },
+  { value: 'Backup', label: 'Sao lưu & phục hồi' },
 ];
 
 function getActionLabel(action) {
@@ -229,8 +255,8 @@ export const AuditLogTab = () => {
 
   return (
     <div className="space-y-4">
-      {/* Thanh tìm kiếm + nút mở bộ lọc */}
-      <div className="space-y-3">
+      {/* Thanh tìm kiếm + nút mở bộ lọc — MỚI: animate-fade-in-up khi tab vừa tải xong */}
+      <div className="animate-fade-in-up space-y-3" style={{ '--stagger-delay': '0ms' }}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#64748B]" />
@@ -335,8 +361,11 @@ export const AuditLogTab = () => {
         </div>
       ) : (
         <>
-          {/* Desktop Table (Hidden on Mobile) */}
-          <div className="hidden sm:block overflow-x-auto bg-white rounded-xl border border-[#E2E8F0]">
+          {/* Desktop Table (Hidden on Mobile) — MỚI: animate cả khối 1 lần
+              (không so le từng dòng) vì danh sách có thể dài + còn nút "Xem
+              thêm" load thêm log, so le từng dòng sẽ không nhất quán giữa
+              lần tải đầu và lần bấm tải thêm. */}
+          <div className="animate-fade-in-up hidden sm:block overflow-x-auto bg-white rounded-xl border border-[#E2E8F0]" style={{ '--stagger-delay': '80ms' }}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#F6F8FA] border-b border-[#E2E8F0] text-base text-[#334155]">
@@ -365,7 +394,7 @@ export const AuditLogTab = () => {
           </div>
 
           {/* Mobile List (Hidden on Desktop) */}
-          <div className="sm:hidden space-y-3">
+          <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '80ms' }}>
             {logs.map(log => (
               <div key={log._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-2">
                 <div className="flex justify-between items-start gap-2">

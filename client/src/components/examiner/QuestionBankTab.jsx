@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, CheckSquare, Square, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, previewImportQuestions, confirmImportQuestionsExcel, bulkDeleteQuestions, uploadQuestionImage } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
@@ -63,7 +63,21 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     { content: '', isCorrect: false }
   ]);
 
-  const loadData = async (page = 1) => {
+  // Giữ giá trị `search` mới nhất trong 1 ref — để loadData bên dưới luôn đọc
+  // được search hiện tại mà KHÔNG cần liệt kê `search` vào dependency của
+  // useCallback (đọc qua ref không kích hoạt exhaustive-deps). Nhờ vậy tránh
+  // được việc gõ tìm kiếm làm loadData đổi tham chiếu -> effect tự chạy lại
+  // theo từng phím gõ; ô tìm kiếm vẫn chỉ tải lại khi bấm tìm/enter
+  // (xem handleSearchSubmit bên dưới).
+  const searchRef = useRef(search);
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
+  // useCallback: giữ nguyên tham chiếu hàm loadData giữa các lần render (chỉ
+  // đổi khi 1 trong các filter dưới đây đổi) — để useEffect kế tiếp có thể
+  // khai báo loadData vào dependency array mà không gây loop vô hạn.
+  const loadData = useCallback(async (page = 1) => {
     setLoading(true);
     setError('');
     try {
@@ -71,7 +85,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
         fetchQuestions({
           page,
           limit: 10,
-          search,
+          search: searchRef.current,
           topicId: selectedTopic,
           scope: selectedScope,
           departmentId: selectedDept,
@@ -90,12 +104,12 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType]);
 
   useEffect(() => {
     setSelectedIds([]);
     loadData(1);
-  }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType]);
+  }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType, loadData]);
 
   // Khi nhận filter từ bên ngoài (vd bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở
   // tab Chủ đề), áp topicId đó vào bộ lọc. Dùng initialFilter?.ts (mốc thời

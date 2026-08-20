@@ -243,10 +243,11 @@ export const BackupTab = () => {
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-3 p-4 hover:bg-slate-50 transition-colors"
+                className="animate-fade-in-up flex items-center justify-between gap-3 p-4 hover:bg-slate-50 transition-colors"
+                style={{ '--stagger-delay': `${Math.min(index, 6) * 50}ms` }}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-[#008BC5]/10 text-[#008BC5] flex items-center justify-center shrink-0">
@@ -280,8 +281,10 @@ export const BackupTab = () => {
         )}
       </div>
 
-      {/* KHÔI PHỤC — vùng nguy hiểm, tách biệt hẳn về mặt hình ảnh */}
-      <div className="border-2 border-[#E53E3E]/30 bg-[#FEECEC]/40 rounded-xl p-4 sm:p-5 space-y-4">
+      {/* KHÔI PHỤC — vùng nguy hiểm, tách biệt hẳn về mặt hình ảnh.
+          MỚI — trễ hơn danh sách backup 1 nhịp để mắt tự nhiên đọc từ trên
+          xuống, không phải khối cảnh báo nguy hiểm này giật vào trước. */}
+      <div className="animate-fade-in-up border-2 border-[#E53E3E]/30 bg-[#FEECEC]/40 rounded-xl p-4 sm:p-5 space-y-4" style={{ '--stagger-delay': '150ms' }}>
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-6 h-6 text-[#E53E3E] shrink-0 mt-0.5" />
           <div>

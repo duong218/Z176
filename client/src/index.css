@@ -42,3 +42,38 @@ html.lenis, html.lenis body {
 .lenis.lenis-stopped {
   overflow: hidden;
 }
+
+/* ============================================
+   Hiệu ứng "fade + slide up" khi dashboard tải xong.
+   Dùng thuần CSS (opacity + transform) — 2 thuộc tính
+   duy nhất được GPU compositor xử lý riêng, không kích
+   hoạt layout/paint lại như animate width/height/margin.
+   Vì vậy an toàn dùng cho danh sách dài (10-20+ item)
+   mà không lo giật/lag, kể cả trên máy yếu.
+   ============================================ */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* dùng biến --stagger-delay để so le từng phần tử, set qua inline style */
+  animation-delay: var(--stagger-delay, 0ms);
+}
+
+/* Tôn trọng người dùng bật "giảm chuyển động" trong hệ điều hành/trình duyệt
+   (accessibility) — tắt hẳn animation, hiện ngay lập tức. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

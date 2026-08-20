@@ -62,7 +62,7 @@ export const OverviewTab = () => {
     try {
       const res = await triggerBackup();
       setBackupResult(res);
-    } catch (err) {
+    } catch {
       setBackupResult({ success: false, message: 'Backup thất bại' });
     } finally {
       setBackupLoading(false);
@@ -156,8 +156,16 @@ export const OverviewTab = () => {
       )}
 
       {/* Tổng số tài khoản + kỳ thi đang diễn ra */}
+      {/* MỚI — Hiệu ứng fade-in-up so le (stagger) khi dashboard vừa tải xong
+          dữ liệu. --stagger-delay tính theo index * 60ms để các card xuất
+          hiện lần lượt thay vì cùng lúc — cảm giác mượt và "có chủ đích" hơn.
+          Thuần CSS (xem animate-fade-in-up trong index.css), không dùng
+          Motion cho phần này để giữ nhẹ khi danh sách dài. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors">
+        <div
+          className="animate-fade-in-up bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors"
+          style={{ '--stagger-delay': '0ms' }}
+        >
           <div className="w-12 h-12 bg-[#008BC5]/10 text-[#008BC5] rounded-xl flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
           </div>
@@ -167,7 +175,10 @@ export const OverviewTab = () => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors">
+        <div
+          className="animate-fade-in-up bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-slate-300 transition-colors"
+          style={{ '--stagger-delay': '60ms' }}
+        >
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${activeExam ? 'bg-[#22C55E]/10 text-[#22C55E]' : 'bg-slate-100 text-slate-400'}`}>
             <FileCheck className="w-6 h-6" />
           </div>
@@ -188,8 +199,12 @@ export const OverviewTab = () => {
       <div>
         <p className="text-sm font-medium text-slate-500 mb-3">Tài khoản theo vai trò</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {roleEntries.map(({ code, label, icon: Icon, color, count }) => (
-            <div key={code} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+          {roleEntries.map(({ code, label, icon: Icon, color, count }, index) => (
+            <div
+              key={code}
+              className="animate-fade-in-up bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors"
+              style={{ '--stagger-delay': `${120 + index * 60}ms` }}
+            >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${COLOR_CLASSES[color]}`}>
                 <Icon className="w-5 h-5" />
               </div>
@@ -204,27 +219,18 @@ export const OverviewTab = () => {
           con số ở bảng card phía trên. Chỉ 1 màu cột (xanh chính) theo đúng
           nguyên tắc "càng ít màu càng dễ nhớ" của design-system.md — không tô
           mỗi cột 1 màu khác nhau. */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="animate-fade-in-up bg-white p-5 rounded-xl border border-slate-200 shadow-sm" style={{ '--stagger-delay': '360ms' }}>
         <p className="text-sm font-medium text-slate-500 mb-3">Biểu đồ phân bổ tài khoản theo vai trò</p>
         {!hasUsers ? (
           <div className="py-10 text-center text-slate-400 text-sm">Chưa có tài khoản nào trong hệ thống.</div>
         ) : (
-          <div className="h-72">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  // interval={0} — MỚI: bắt buộc Recharts vẽ ĐỦ 4 nhãn vai
-                  // trò. Mặc định Recharts tự ước lượng chỗ trống rồi ẩn bớt
-                  // nhãn nếu thấy "không đủ chỗ" — trên khung hẹp mobile, nó
-                  // chỉ giữ lại nhãn đầu/cuối (đây là lý do 4 vai trò mà chỉ
-                  // hiện 2 nhãn trong ảnh chụp, không phải do CSS đè nhau).
-                  interval={0}
-                  angle={-20}
-                  textAnchor="end"
-                  height={46}
-                  tick={{ fill: '#334155', fontSize: 11 }}
+                  tick={{ fill: '#334155', fontSize: 13 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
                 />
@@ -233,7 +239,6 @@ export const OverviewTab = () => {
                   tick={{ fill: '#334155', fontSize: 13 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
-                  width={28}
                 />
                 <Tooltip
                   contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}

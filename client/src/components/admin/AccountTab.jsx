@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown, Info, Download } from 'lucide-react';
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, previewImportEmployeesExcel, confirmImportEmployeesExcel, downloadImportResultsCsv, downloadSingleAccountCredential, exportCandidateCredentialsExcel } from '../../services/admin.service';
 import { apiRequest } from '../../services/api';
@@ -139,7 +139,11 @@ export const AccountTab = ({ currentUser }) => {
   const [importResult, setImportResult] = useState(null); // { total, created, updated, reused, failed, results }
   const fileInputRef = useRef(null);
 
-  const loadData = async () => {
+  // useCallback: giữ nguyên tham chiếu hàm giữa các lần render (chỉ đổi khi
+  // showToast đổi) — để useEffect bên dưới có thể khai báo loadData vào
+  // dependency array đúng theo eslint mà KHÔNG gây loop vô hạn (nếu không bọc
+  // useCallback, loadData sẽ là hàm mới mỗi render → effect chạy lại liên tục).
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [usersData, rolesData, departmentsData] = await Promise.all([
@@ -155,11 +159,11 @@ export const AccountTab = ({ currentUser }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   // Xác định role đang chọn trong form tạo tài khoản có phải 'candidate' (thí sinh) không —
   // dùng để hiện/ẩn nhóm field Họ tên/Mã NV/Phòng ban.
@@ -362,8 +366,9 @@ export const AccountTab = ({ currentUser }) => {
   return (
     <div className="space-y-4">
       {/* Toolbar — mobile: xếp dọc, mỗi nút full-width cao 48px, luôn có nhãn chữ.
-          Desktop (sm:): quay lại bố cục 1 hàng như cũ. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
+          Desktop (sm:): quay lại bố cục 1 hàng như cũ.
+          MỚI — animate-fade-in-up: hiệu ứng xuất hiện khi tab vừa tải xong. */}
+      <div className="animate-fade-in-up flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6" style={{ '--stagger-delay': '0ms' }}>
         <div className="relative w-full sm:w-80">
           <input
             type="text"
@@ -494,8 +499,11 @@ export const AccountTab = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden sm:block overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+      {/* Desktop Table (Hidden on Mobile) — MỚI: animate cả khối bảng 1 lần,
+          KHÔNG so le từng dòng — nếu bảng có nhiều người dùng, so le từng
+          dòng sẽ khiến dòng cuối hiện rất trễ (vd 50 dòng x 60ms = 3s chờ),
+          trong khi đây là bảng cần thấy toàn bộ ngay để tìm kiếm/dò dữ liệu. */}
+      <div className="animate-fade-in-up hidden sm:block overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm" style={{ '--stagger-delay': '80ms' }}>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
@@ -585,7 +593,7 @@ export const AccountTab = ({ currentUser }) => {
       </div>
 
       {/* Mobile List (Hidden on Desktop) */}
-      <div className="sm:hidden space-y-4">
+      <div className="animate-fade-in-up sm:hidden space-y-4" style={{ '--stagger-delay': '80ms' }}>
         {filteredUsers.map(user => (
           <div key={user._id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex justify-between items-start">
