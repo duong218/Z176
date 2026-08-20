@@ -340,7 +340,10 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
             {/* ── Mục: Dashboard (thông tin cá nhân + tổng quan nhanh) ── */}
             {activeSection === 'dashboard' && (
               <>
-                <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-6">
+                {/* MỚI — animate-fade-in-up: hiệu ứng xuất hiện so le khi mục
+                    "Dashboard" vừa được chọn, đồng bộ pattern với AdminDashboard
+                    (xem OverviewTab.jsx / AccountTab.jsx bên Admin). */}
+                <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 p-6" style={{ '--stagger-delay': '0ms' }}>
                   <h2 className="text-lg font-bold text-[#0F172A] mb-4 flex items-center gap-2">
                     <UserCircle2 className="w-5 h-5 text-[#008BC5]" />
                     Thông tin cá nhân
@@ -374,7 +377,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="animate-fade-in-up grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ '--stagger-delay': '60ms' }}>
                   <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-5 flex items-center gap-4">
                     <div className="w-11 h-11 rounded-lg bg-[#008BC5]/10 flex items-center justify-center shrink-0">
                       <History className="w-6 h-6 text-[#008BC5]" />
@@ -424,7 +427,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   const chartMinWidth = Math.max(chartData.length * MIN_BAR_WIDTH, 320);
 
                   return (
-                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-6">
+                    <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 p-6" style={{ '--stagger-delay': '120ms' }}>
                       <h2 className="text-lg font-bold text-[#0F172A] mb-1 flex items-center gap-2">
                         <History className="w-5 h-5 text-[#008BC5]" />
                         Điểm số qua các lần thi
@@ -481,7 +484,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                 })()}
 
                 {/* Lối tắt vào thi ngay từ Dashboard */}
-                <div className="bg-white rounded-xl shadow-z176 border border-[#E2E8F0] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-[#E2E8F0] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" style={{ '--stagger-delay': '180ms' }}>
                   <div className="flex items-start gap-3">
                     <div className="w-11 h-11 rounded-lg bg-[#EAF6FF] flex items-center justify-center shrink-0">
                       <ShieldCheck className="w-6 h-6 text-[#008BC5]" />
@@ -507,7 +510,9 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
 
             {/* ── Mục: Thi trực tuyến ── */}
             {activeSection === 'exam' && (
-              <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+              // MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi chuyển
+              // sang mục "Thi trực tuyến", cùng pattern với AdminDashboard.
+              <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '0ms' }}>
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                   <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                     <CheckSquare className="w-5 h-5 text-[#008BC5]" />
@@ -569,7 +574,9 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
 
             {/* ── Mục: Lịch sử kết quả ── */}
             {activeSection === 'history' && (
-              <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+              // MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi chuyển
+              // sang mục "Lịch sử kết quả", cùng pattern với AdminDashboard.
+              <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '0ms' }}>
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                   <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                     <History className="w-5 h-5 text-[#008BC5]" />
@@ -583,8 +590,8 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   </div>
                 ) : (
                   <>
-                    {/* Desktop Table */}
-                    <div className="hidden sm:block overflow-x-auto">
+                    {/* Desktop Table — MỚI: animate-fade-in-up, so le sau header */}
+                    <div className="animate-fade-in-up hidden sm:block overflow-x-auto" style={{ '--stagger-delay': '80ms' }}>
                       <table className="w-full text-base">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 text-sm uppercase">
@@ -621,8 +628,8 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                       </table>
                     </div>
 
-                    {/* Mobile Card List */}
-                    <div className="sm:hidden p-4 space-y-3">
+                    {/* Mobile Card List — MỚI: animate-fade-in-up, so le sau header */}
+                    <div className="animate-fade-in-up sm:hidden p-4 space-y-3" style={{ '--stagger-delay': '80ms' }}>
                       {results.map((r) => (
                         <div key={r._id} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
                           <div className="flex items-start justify-between gap-2">
@@ -675,8 +682,8 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                   </div>
                 ) : (
                   <>
-                    {/* Tài liệu của kỳ thi hiện tại */}
-                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+                    {/* Tài liệu của kỳ thi hiện tại — MỚI: animate-fade-in-up */}
+                    <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '0ms' }}>
                       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                         <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                           <BookOpen className="w-5 h-5 text-[#008BC5]" />
@@ -710,8 +717,8 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                       )}
                     </div>
 
-                    {/* Tất cả tài liệu đã đăng (bao gồm tài liệu cũ) */}
-                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+                    {/* Tất cả tài liệu đã đăng (bao gồm tài liệu cũ) — MỚI: animate-fade-in-up */}
+                    <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '100ms' }}>
                       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                         <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                           <FileText className="w-5 h-5 text-[#008BC5]" />
