@@ -15,9 +15,10 @@ const ACTION_LABELS = {
   UNLOCK_USER: 'Mở khóa tài khoản',
   RESET_PASSWORD: 'Đặt lại mật khẩu',
   CHANGE_PASSWORD: 'Đổi mật khẩu',
+  EXPORT_CANDIDATE_CREDENTIALS: 'Xuất danh sách tài khoản nhân viên',
   // Đề thi
   CREATE_EXAM: 'Tạo đề thi',
-  SUBMIT_EXAM: 'Đề nghị duyệt đề thi',
+  SUBMIT_EXAM: 'Đệ trình đề thi',
   APPROVE_EXAM: 'Duyệt đề thi',
   REJECT_EXAM: 'Từ chối đề thi',
   PUBLISH_EXAM: 'Phát hành đề thi',
