@@ -131,7 +131,9 @@ export const DepartmentTab = () => {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AccountTab.jsx / AuditLogTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3" style={{ '--stagger-delay': '0ms' }}>
         <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Danh sách bộ phận / phòng ban</h3>
         <button
           onClick={handleOpenAdd}
@@ -145,7 +147,7 @@ export const DepartmentTab = () => {
       {/* MỚI — Tìm kiếm theo tên/mã, chỉ hiện khi danh sách đủ dài để cần lọc
           (từ 6 bộ phận trở lên); với danh sách ngắn ô này chỉ chiếm chỗ vô ích. */}
       {departments.length >= 6 && (
-        <div className="relative">
+        <div className="animate-fade-in-up relative" style={{ '--stagger-delay': '80ms' }}>
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -161,7 +163,7 @@ export const DepartmentTab = () => {
           tả, không padding lớn) để 10-20 bộ phận không kéo dài quá mức khi
           cuộn. Desktop/tablet (sm+): vẫn giữ dạng lưới card đầy đủ như cũ vì
           không gian ngang rộng, không bị áp lực chiều cao. */}
-      <div className="sm:hidden bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+      <div className="animate-fade-in-up sm:hidden bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden" style={{ '--stagger-delay': '140ms' }}>
         {filteredDepartments.map((dept) => (
           <div key={dept._id} className="flex items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
@@ -205,7 +207,7 @@ export const DepartmentTab = () => {
         )}
       </div>
 
-      <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="animate-fade-in-up hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4" style={{ '--stagger-delay': '140ms' }}>
         {filteredDepartments.map(dept => (
           <div key={dept._id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
             <div>

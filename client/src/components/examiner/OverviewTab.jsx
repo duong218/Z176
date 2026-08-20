@@ -127,7 +127,9 @@ export const OverviewTab = () => {
     <div className="space-y-6">
       <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với OverviewTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" style={{ '--stagger-delay': '0ms' }}>
         {summaryCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
             <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center mb-2.5 sm:mb-3 ${color}`}>
@@ -142,7 +144,7 @@ export const OverviewTab = () => {
       {/* MỚI — Biểu đồ đề xuất kỳ thi theo trạng thái, giúp Người ra đề thấy
           ngay có bao nhiêu đề xuất đang chờ duyệt / đã duyệt / bị từ chối mà
           không cần mở tab "Đề xuất kỳ thi" để đếm thủ công. */}
-      <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="animate-fade-in-up bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 shadow-sm" style={{ '--stagger-delay': '180ms' }}>
         <p className="text-sm font-medium text-slate-500 mb-3 px-1">Đề xuất kỳ thi theo trạng thái</p>
         {!hasProposals ? (
           <div className="py-10 text-center text-slate-400 text-sm">Bạn chưa tạo đề xuất kỳ thi nào.</div>

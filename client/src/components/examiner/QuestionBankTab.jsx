@@ -490,7 +490,9 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       )}
 
       {/* Toolbar & Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AccountTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4" style={{ '--stagger-delay': '0ms' }}>
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <input
@@ -584,7 +586,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* Bulk actions bar */}
       {questions.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 text-sm">
+        <div className="animate-fade-in-up bg-white rounded-xl border border-slate-200 p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 text-sm" style={{ '--stagger-delay': '80ms' }}>
           <button
             type="button"
             onClick={toggleSelectAllOnPage}
@@ -629,7 +631,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="animate-fade-in-up space-y-4" style={{ '--stagger-delay': '140ms' }}>
           {questions.map((q) => (
             <div key={q.id} className={`bg-white p-3.5 sm:p-5 rounded-xl border shadow-sm space-y-3.5 sm:space-y-4 hover:shadow-md transition-shadow ${selectedIds.includes(q.id) ? 'border-[#008BC5] ring-1 ring-[#008BC5]/30' : 'border-slate-200'}`}>
               <div className="flex justify-between items-start gap-2 sm:gap-4">

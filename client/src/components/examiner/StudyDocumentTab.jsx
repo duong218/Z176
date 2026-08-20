@@ -186,7 +186,9 @@ export const StudyDocumentTab = () => {
   return (
     <div className="space-y-5">
       {/* Form đăng tài liệu */}
-      <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với BackupTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '0ms' }}>
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
           <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
             <UploadCloud className="w-5 h-5 text-[#008BC5]" />
@@ -303,7 +305,7 @@ export const StudyDocumentTab = () => {
       </div>
 
       {/* Danh sách tài liệu đã đăng */}
-      <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
+      <div className="animate-fade-in-up bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden" style={{ '--stagger-delay': '80ms' }}>
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
           <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-[#008BC5]" />

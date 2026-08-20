@@ -124,7 +124,9 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AccountTab.jsx / AuditLogTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3" style={{ '--stagger-delay': '0ms' }}>
         <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Danh sách chủ đề</h3>
         <button
           onClick={handleOpenAdd}
@@ -135,7 +137,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="animate-fade-in-up grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4" style={{ '--stagger-delay': '80ms' }}>
         {topics.map(topic => (
           <div key={topic._id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
             <div>

@@ -139,7 +139,9 @@ export const ExamProposalTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AccountTab.jsx / AuditLogTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm" style={{ '--stagger-delay': '0ms' }}>
         <div>
           <h2 className="text-base sm:text-lg font-bold text-[#0F172A]">Danh sách đề xuất kỳ thi</h2>
           <p className="text-sm text-slate-500">Tạo cấu trúc đề thi và trình Người duyệt đề phê duyệt</p>
@@ -167,7 +169,7 @@ export const ExamProposalTab = () => {
       ) : (
         <>
           {/* Mobile card list */}
-          <div className="md:hidden space-y-3">
+          <div className="animate-fade-in-up md:hidden space-y-3" style={{ '--stagger-delay': '80ms' }}>
             {exams.map(exam => (
               <div key={exam._id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -213,7 +215,7 @@ export const ExamProposalTab = () => {
           </div>
 
           {/* Desktop / tablet table */}
-          <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="animate-fade-in-up hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style={{ '--stagger-delay': '80ms' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
