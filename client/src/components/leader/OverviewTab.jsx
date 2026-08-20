@@ -117,7 +117,9 @@ export const OverviewTab = () => {
     <div className="space-y-6">
       <h3 className="text-lg font-bold text-[#0F172A]">Thống kê nhanh</h3>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với OverviewTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up grid grid-cols-2 lg:grid-cols-4 gap-4" style={{ '--stagger-delay': '0ms' }}>
         {summaryCards.map(({ label, value, icon: Icon, iconBg, iconColor }) => (
           <div key={label} className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-z176">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: iconBg }}>
@@ -129,7 +131,7 @@ export const OverviewTab = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="animate-fade-in-up grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ '--stagger-delay': '180ms' }}>
         {/* Biểu đồ tròn Đạt/Không đạt */}
         <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-z176">
           <p className="text-base font-semibold text-[#334155] mb-3">Tỷ lệ Đạt / Không đạt</p>

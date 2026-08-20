@@ -95,7 +95,9 @@ export const DetailedResultsTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AuditLogTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" style={{ '--stagger-delay': '0ms' }}>
         <div>
           <h2 className="text-lg font-bold text-[#0F172A]">Kết quả chi tiết</h2>
           <p className="text-base text-[#334155]">Danh sách các bài thi đã nộp</p>
@@ -110,7 +112,7 @@ export const DetailedResultsTab = () => {
       </div>
 
       {/* Bộ lọc — xếp cột đơn trên mobile, đủ chiều cao 48px cho mỗi ô theo design system */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+      <div className="animate-fade-in-up bg-white rounded-xl border border-[#E2E8F0] p-4" style={{ '--stagger-delay': '80ms' }}>
         <form onSubmit={applyFilters} className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="w-5 h-5 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -181,7 +183,7 @@ export const DetailedResultsTab = () => {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
+          <div className="animate-fade-in-up hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ '--stagger-delay': '140ms' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
@@ -231,7 +233,7 @@ export const DetailedResultsTab = () => {
           </div>
 
           {/* Mobile Card List */}
-          <div className="sm:hidden space-y-3">
+          <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '140ms' }}>
             {data.map((item) => (
               <div key={item._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
                 <div className="flex items-start justify-between gap-2">

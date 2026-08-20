@@ -174,7 +174,7 @@ export const ExamReviewTab = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+            <div className="animate-fade-in-up hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden" style={{ '--stagger-delay': '0ms' }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
@@ -212,7 +212,7 @@ export const ExamReviewTab = () => {
             </div>
 
             {/* Mobile Card List */}
-            <div className="sm:hidden space-y-3">
+            <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '0ms' }}>
               {pendingExams.map(exam => (
                 <div key={exam._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
                   <div>
@@ -254,7 +254,7 @@ export const ExamReviewTab = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+            <div className="animate-fade-in-up hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden" style={{ '--stagger-delay': '100ms' }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
@@ -301,7 +301,7 @@ export const ExamReviewTab = () => {
             </div>
 
             {/* Mobile Card List */}
-            <div className="sm:hidden space-y-3">
+            <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '100ms' }}>
               {approvedExams.map(exam => (
                 <div key={exam._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
                   <div>
@@ -352,7 +352,7 @@ export const ExamReviewTab = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+            <div className="animate-fade-in-up hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden" style={{ '--stagger-delay': '200ms' }}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
@@ -397,7 +397,7 @@ export const ExamReviewTab = () => {
             </div>
 
             {/* Mobile Card List */}
-            <div className="sm:hidden space-y-3">
+            <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '200ms' }}>
               {historyExams.map(exam => {
                 const processedAt = exam.publishedAt || exam.approvedAt || exam.updatedAt || exam.createdAt;
                 return (

@@ -60,7 +60,9 @@ export const DepartmentReportTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* MỚI — animate-fade-in-up: đồng bộ hiệu ứng xuất hiện khi tab vừa tải
+          xong, cùng pattern với AuditLogTab.jsx bên Admin. */}
+      <div className="animate-fade-in-up flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" style={{ '--stagger-delay': '0ms' }}>
         <div>
           <h2 className="text-lg font-bold text-[#0F172A]">Thống kê theo Phòng ban</h2>
           <p className="text-base text-[#334155]">Chi tiết số lượng thí sinh, lượt thi và tỷ lệ đạt</p>
@@ -85,7 +87,7 @@ export const DepartmentReportTab = () => {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
+          <div className="animate-fade-in-up hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ '--stagger-delay': '80ms' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
@@ -122,7 +124,7 @@ export const DepartmentReportTab = () => {
           </div>
 
           {/* Mobile Card List */}
-          <div className="sm:hidden space-y-3">
+          <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '80ms' }}>
             {data.map((item) => (
               <div key={item._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
                 <div className="flex items-center gap-2">
