@@ -209,13 +209,22 @@ export const OverviewTab = () => {
         {!hasUsers ? (
           <div className="py-10 text-center text-slate-400 text-sm">Chưa có tài khoản nào trong hệ thống.</div>
         ) : (
-          <div className="h-64">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: '#334155', fontSize: 13 }}
+                  // interval={0} — MỚI: bắt buộc Recharts vẽ ĐỦ 4 nhãn vai
+                  // trò. Mặc định Recharts tự ước lượng chỗ trống rồi ẩn bớt
+                  // nhãn nếu thấy "không đủ chỗ" — trên khung hẹp mobile, nó
+                  // chỉ giữ lại nhãn đầu/cuối (đây là lý do 4 vai trò mà chỉ
+                  // hiện 2 nhãn trong ảnh chụp, không phải do CSS đè nhau).
+                  interval={0}
+                  angle={-20}
+                  textAnchor="end"
+                  height={46}
+                  tick={{ fill: '#334155', fontSize: 11 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
                 />
@@ -224,6 +233,7 @@ export const OverviewTab = () => {
                   tick={{ fill: '#334155', fontSize: 13 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
+                  width={28}
                 />
                 <Tooltip
                   contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}

@@ -46,6 +46,33 @@ const formatDateTime = (value) => {
   });
 };
 
+// MỚI — Custom tick cho trục X của biểu đồ "Điểm số qua các lần thi". Tên kỳ
+// thi trong thực tế có thể rất dài (ví dụ "Chuyển đề tổng hợp cơ quan Z176"),
+// nếu hiển thị nguyên văn sẽ luôn có nguy cơ đè lên nhãn cột bên cạnh dù đã
+// xoay góc. Ở đây cắt còn tối đa 14 ký tự + "…", tên đầy đủ vẫn xem được qua
+// Tooltip khi hover/chạm vào cột, hoặc qua thẻ <title> (tooltip trình duyệt).
+const MAX_TICK_CHARS = 14;
+const TruncatedTick = ({ x, y, payload }) => {
+  const full = String(payload.value ?? '');
+  const short = full.length > MAX_TICK_CHARS ? `${full.slice(0, MAX_TICK_CHARS)}…` : full;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <title>{full}</title>
+      <text
+        x={0}
+        y={0}
+        dy={10}
+        textAnchor="end"
+        transform="rotate(-40)"
+        fill="#334155"
+        fontSize={12}
+      >
+        {short}
+      </text>
+    </g>
+  );
+};
+
 const isPdf = (doc) =>
   doc.mimeType === 'application/pdf' || doc.originalFileName?.toLowerCase().endsWith('.pdf');
 
@@ -379,62 +406,79 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     sử kết quả" và tự đọc bảng. Sắp xếp theo thời gian nộp bài
                     tăng dần (cũ → mới, trái → phải) để đọc như 1 dòng thời
                     gian. Cột tô màu theo đúng 2 màu semantic Đạt/Không đạt. */}
-                {results.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-[#0F172A] mb-1 flex items-center gap-2">
-                      <History className="w-5 h-5 text-[#008BC5]" />
-                      Điểm số qua các lần thi
-                    </h2>
-                    <p className="text-sm text-slate-500 mb-4">Sắp xếp theo thời gian, từ lần thi cũ nhất đến gần nhất</p>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[...results]
-                            .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
-                            .map((r) => ({
-                              label: r.examTitle,
-                              score: r.score,
-                              passed: r.passed,
-                              submittedAt: formatDateTime(r.submittedAt),
-                            }))}
-                          margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                          <XAxis
-                            dataKey="label"
-                            tick={{ fill: '#334155', fontSize: 12 }}
-                            axisLine={{ stroke: '#E2E8F0' }}
-                            tickLine={false}
-                            interval={0}
-                            angle={-15}
-                            textAnchor="end"
-                            height={50}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            tick={{ fill: '#334155', fontSize: 13 }}
-                            axisLine={{ stroke: '#E2E8F0' }}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}
-                            formatter={(value, _name, props) => [
-                              `${value} điểm — ${props?.payload?.passed ? 'Đạt' : 'Không đạt'}`,
-                              props?.payload?.submittedAt,
-                            ]}
-                          />
-                          <Bar dataKey="score" name="Điểm" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                            {[...results]
-                              .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
-                              .map((r, index) => (
-                                <Cell key={index} fill={r.passed ? '#22C55E' : '#E53E3E'} />
-                              ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                {results.length > 0 && (() => {
+                  const chartData = [...results]
+                    .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
+                    .map((r) => ({
+                      label: r.examTitle,
+                      score: r.score,
+                      passed: r.passed,
+                      submittedAt: formatDateTime(r.submittedAt),
+                    }));
+                  // Mỗi cột cần tối thiểu ~90px để nhãn xoay đủ góc không đè
+                  // nhau. Khi số kỳ thi vượt quá độ rộng khung nhìn, biểu đồ
+                  // sẽ rộng hơn 100% và người dùng scroll ngang để xem — thay
+                  // vì nén cứng vào width="100%" khiến nhãn càng lúc càng
+                  // chồng lên nhau khi có thêm kỳ thi mới theo thời gian.
+                  const MIN_BAR_WIDTH = 90;
+                  const chartMinWidth = Math.max(chartData.length * MIN_BAR_WIDTH, 320);
+
+                  return (
+                    <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-6">
+                      <h2 className="text-lg font-bold text-[#0F172A] mb-1 flex items-center gap-2">
+                        <History className="w-5 h-5 text-[#008BC5]" />
+                        Điểm số qua các lần thi
+                      </h2>
+                      <p className="text-sm text-slate-500 mb-4">Sắp xếp theo thời gian, từ lần thi cũ nhất đến gần nhất</p>
+                      {/* Scroll ngang khi nhiều kỳ thi, thay vì để Recharts tự
+                          nén cột + nhãn vào đúng 100% chiều rộng khung nhìn. */}
+                      <div className="h-72 overflow-x-auto overflow-y-hidden -mx-2 px-2">
+                        <div style={{ minWidth: chartMinWidth, height: '100%' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                              <XAxis
+                                dataKey="label"
+                                tick={<TruncatedTick />}
+                                axisLine={{ stroke: '#E2E8F0' }}
+                                tickLine={false}
+                                interval={0}
+                                angle={-40}
+                                textAnchor="end"
+                                height={78}
+                              />
+                              <YAxis
+                                allowDecimals={false}
+                                tick={{ fill: '#334155', fontSize: 13 }}
+                                axisLine={{ stroke: '#E2E8F0' }}
+                                tickLine={false}
+                                width={36}
+                              />
+                              <Tooltip
+                                contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}
+                                labelFormatter={(label) => label}
+                                formatter={(value, _name, props) => [
+                                  `${value} điểm — ${props?.payload?.passed ? 'Đạt' : 'Không đạt'}`,
+                                  props?.payload?.submittedAt,
+                                ]}
+                              />
+                              <Bar dataKey="score" name="Điểm" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                                {chartData.map((r, index) => (
+                                  <Cell key={index} fill={r.passed ? '#22C55E' : '#E53E3E'} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      {chartData.length > 4 && (
+                        <p className="text-xs text-slate-400 mt-2 sm:hidden">
+                          Vuốt ngang để xem thêm các kỳ thi khác →
+                        </p>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Lối tắt vào thi ngay từ Dashboard */}
                 <div className="bg-white rounded-xl shadow-z176 border border-[#E2E8F0] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
