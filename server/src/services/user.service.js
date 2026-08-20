@@ -289,18 +289,12 @@ export async function createUser({ adminId, username, roleId, ipAddress, employe
     await assignEmployeeToActiveExamIfAny(employee);
   }
 
-  // Audit
-  await auditService.writeAudit({
-    actorUserId: adminId,
-    action: 'Tạo tài khoản',
-    resourceType: 'User',
-    resourceId: newUser._id,
-    metadata: {
-      username: newUser.username,
-      ...(employee ? { employeeId: employee._id, fullname: employee.fullname } : {}),
-    },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — user.controller.js đã ghi audit log đúng
+  // chuẩn (action: 'CREATE_USER', kèm metadata.detail) ngay sau khi gọi hàm
+  // này. Log cũ ở đây dùng action dạng chữ thường ('Tạo tài khoản', không
+  // khớp mã ACTION_LABELS phía client) và không có metadata.detail, gây ra
+  // MỖI LẦN TẠO TÀI KHOẢN BỊ GHI TRÙNG 2 DÒNG LOG (1 dòng có chi tiết từ
+  // controller, 1 dòng "-" từ đây) — xem Nhật ký (Log) ở AuditLogTab.jsx.
 
   // Trả về kèm mật khẩu tạm để hiển thị 1 lần
   const userObj = newUser.toObject();
@@ -321,14 +315,9 @@ export async function updateUserRole({ adminId, userId, newRoleId, ipAddress }) 
   user.roleId = newRoleId;
   await user.save();
 
-  await auditService.writeAudit({
-    actorUserId: adminId,
-    action: 'Đổi quyền tài khoản',
-    resourceType: 'User',
-    resourceId: user._id,
-    metadata: { username: user.username, oldRoleId, newRoleId },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — user.controller.js đã ghi audit log đúng
+  // chuẩn (action: 'UPDATE_ROLE', kèm metadata.detail) ngay sau khi gọi hàm
+  // này, cùng lý do như createUser() ở trên — tránh trùng log.
 
   return user;
 }
@@ -347,14 +336,9 @@ export async function toggleUserLock({ adminId, userId, isActive, ipAddress }) {
   user.tokenVersion += 1;
   await user.save();
 
-  await auditService.writeAudit({
-    actorUserId: adminId,
-    action: isActive ? 'Mở khóa tài khoản' : 'Khóa tài khoản',
-    resourceType: 'User',
-    resourceId: user._id,
-    metadata: { username: user.username },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — user.controller.js đã ghi audit log đúng
+  // chuẩn (action: 'LOCK_USER'/'UNLOCK_USER', kèm metadata.detail) ngay sau
+  // khi gọi hàm này, cùng lý do như createUser() ở trên — tránh trùng log.
 
   return user;
 }
@@ -372,14 +356,9 @@ export async function resetUserPassword({ adminId, userId, ipAddress }) {
   user.tokenVersion += 1; // force logout out other sessions
   await user.save();
 
-  await auditService.writeAudit({
-    actorUserId: adminId,
-    action: 'Reset mật khẩu',
-    resourceType: 'User',
-    resourceId: user._id,
-    metadata: { username: user.username },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — user.controller.js đã ghi audit log đúng
+  // chuẩn (action: 'RESET_PASSWORD', kèm metadata.detail) ngay sau khi gọi
+  // hàm này, cùng lý do như createUser() ở trên — tránh trùng log.
 
   return { tempPassword };
 }

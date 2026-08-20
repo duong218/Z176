@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, Columns3, ChevronDown, Info, Download } from 'lucide-react';
+import { Search, Plus, Edit2, Lock, Unlock, KeyRound, Loader2, X, Eye, Copy, Check, Upload, FileSpreadsheet, AlertTriangle, AlertCircle, Columns3, ChevronDown, Info, Download } from 'lucide-react';
 import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, resetUserPassword, previewImportEmployeesExcel, confirmImportEmployeesExcel, downloadImportResultsCsv, downloadSingleAccountCredential, exportCandidateCredentialsExcel } from '../../services/admin.service';
-import { apiRequest } from '../../services/api';
-import { getAuthHeaders } from '../../services/auth.service';
+// Dùng lại đúng fetchDepartments()/createDepartment() đã có sẵn ở tab "Phòng ban"
+// (examiner/DepartmentTab.jsx) — không viết API mới, không gọi apiRequest trực tiếp nữa.
+import { fetchDepartments, createDepartment } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 
@@ -23,6 +24,10 @@ const ACCOUNT_COLUMNS = [
 
 const ACCOUNT_COLUMNS_STORAGE_KEY = 'z176_account_table_columns';
 
+// Giá trị đặc biệt cho dòng "+ Tạo phòng ban mới" trong dropdown Phòng ban —
+// không phải _id thật nên không bao giờ trùng với dữ liệu Mongo thật.
+const CREATE_NEW_DEPARTMENT_VALUE = '__create_new_department__';
+
 // File mẫu import nhân viên (tiếng Việt, có sheet hướng dẫn) — đặt sẵn tại
 // public/templates để nút tải dùng static path, giống quy ước file mẫu
 // import câu hỏi (Mau_Import_Cau_Hoi_Z176.xlsx) bên QuestionBankTab.
@@ -37,13 +42,6 @@ const IMPORT_EMPLOYEE_COLUMNS_GUIDE = [
   { label: 'Mã nhân viên', required: false, note: 'Không bắt buộc — để trống sẽ tự sinh mã tạm dạng TMP<số dòng>.' },
   { label: 'Ngày sinh / Giới tính / SĐT / Địa chỉ / Chức vụ', required: false, note: 'Không bắt buộc — chỉ lưu làm hồ sơ tham khảo.' },
 ];
-
-// TODO: nếu dự án đã có department.service.js riêng, thay hàm tạm này bằng
-// import fetchDepartments từ đó để đồng nhất convention thay vì gọi apiRequest trực tiếp ở đây.
-async function fetchDepartments() {
-  const res = await apiRequest('/departments', { headers: getAuthHeaders() });
-  return res.data;
-}
 
 export const AccountTab = ({ currentUser }) => {
   const { showToast } = useToast();
@@ -118,6 +116,19 @@ export const AccountTab = ({ currentUser }) => {
   const [newDepartmentId, setNewDepartmentId] = useState('');
   const [newEmployeeCode, setNewEmployeeCode] = useState('');
 
+  // MỚI — Modal con "+ Tạo phòng ban mới" ngay trong dropdown Phòng ban của
+  // form Thêm tài khoản mới (tránh phải thoát ra tab Phòng ban rồi quay lại).
+  // Dùng state loading riêng (deptActionLoading), không dùng chung actionLoading,
+  // để nút "Lưu" của form tạo tài khoản không bị disable nhầm khi đang tạo phòng ban.
+  const [isCreateDeptOpen, setIsCreateDeptOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptCode, setNewDeptCode] = useState('');
+  const [deptActionLoading, setDeptActionLoading] = useState(false);
+  // Lỗi hiện inline ngay trong modal con — nhất quán với handleSubmit của
+  // modal tạo phòng ban gốc trong DepartmentTab.jsx (dùng banner lỗi tại
+  // chỗ, không dùng toast).
+  const [deptFormError, setDeptFormError] = useState('');
+
   const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editingRoleId, setEditingRoleId] = useState('');
@@ -165,6 +176,21 @@ export const AccountTab = ({ currentUser }) => {
     loadData();
   }, [loadData]);
 
+  // MỚI — Chỉ tải lại riêng danh sách phòng ban (không setLoading(true) toàn
+  // trang như loadData) — dùng sau khi tạo phòng ban mới ngay trong modal
+  // "Thêm tài khoản mới", để modal đó không bị unmount giữa chừng do component
+  // return skeleton khi `loading` = true.
+  const refreshDepartments = useCallback(async () => {
+    try {
+      const departmentsData = await fetchDepartments();
+      setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
+      return Array.isArray(departmentsData) ? departmentsData : [];
+    } catch (err) {
+      showToast(err.message || 'Lỗi khi tải lại danh sách phòng ban', 'error');
+      return [];
+    }
+  }, [showToast]);
+
   // Xác định role đang chọn trong form tạo tài khoản có phải 'candidate' (thí sinh) không —
   // dùng để hiện/ẩn nhóm field Họ tên/Mã NV/Phòng ban.
   const isCandidateRoleSelected = roles.some(
@@ -177,6 +203,53 @@ export const AccountTab = ({ currentUser }) => {
     setNewFullname('');
     setNewDepartmentId('');
     setNewEmployeeCode('');
+    // Đóng và reset luôn modal con tạo phòng ban để tránh còn sót dữ liệu
+    // nhập dở khi mở lại form tạo tài khoản lần sau.
+    setIsCreateDeptOpen(false);
+    setNewDeptName('');
+    setNewDeptCode('');
+    setDeptFormError('');
+  };
+
+  // MỚI — Xử lý chọn dòng "+ Tạo phòng ban mới" trong dropdown Phòng ban:
+  // mở modal con thay vì gán sentinel value vào newDepartmentId thật.
+  const handleDepartmentSelectChange = (value) => {
+    if (value === CREATE_NEW_DEPARTMENT_VALUE) {
+      setNewDeptName('');
+      setNewDeptCode('');
+      setDeptFormError('');
+      setIsCreateDeptOpen(true);
+      return;
+    }
+    setNewDepartmentId(value);
+  };
+
+  // MỚI — Tạo phòng ban mới ngay trong form Thêm tài khoản, dùng lại đúng
+  // createDepartment() từ examiner.service.js (KHÔNG viết API mới). Sau khi
+  // tạo thành công: refresh lại danh sách departments trong AccountTab và tự
+  // động chọn luôn phòng ban vừa tạo vào dropdown. Xử lý lỗi bằng banner inline
+  // ngay trong modal con — nhất quán với handleSubmit của DepartmentTab.jsx,
+  // không dùng showToast ở đây.
+  const handleCreateDepartmentInline = async (e) => {
+    e.preventDefault();
+    if (!newDeptName.trim() || !newDeptCode.trim()) return;
+    setDeptActionLoading(true);
+    setDeptFormError('');
+    try {
+      const created = await createDepartment({
+        name: newDeptName.trim(),
+        code: newDeptCode.trim().toUpperCase(),
+      });
+      await refreshDepartments();
+      setNewDepartmentId(created._id);
+      setIsCreateDeptOpen(false);
+      setNewDeptName('');
+      setNewDeptCode('');
+    } catch (err) {
+      setDeptFormError(err.message || 'Lỗi khi tạo phòng ban mới');
+    } finally {
+      setDeptActionLoading(false);
+    }
   };
 
   const handleCreateUser = async (e) => {
@@ -718,17 +791,19 @@ export const AccountTab = ({ currentUser }) => {
                     <select
                       required
                       value={newDepartmentId}
-                      onChange={(e) => setNewDepartmentId(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                      onChange={(e) => handleDepartmentSelectChange(e.target.value)}
+                      className="w-full px-3.5 py-2 min-h-[44px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
                     >
                       <option value="">-- Chọn phòng ban --</option>
                       {departments.map(dept => (
                         <option key={dept._id} value={dept._id}>{dept.name}</option>
                       ))}
+                      {/* MỚI — Tạo phòng ban mới ngay tại đây, không phải thoát ra tab Phòng ban */}
+                      <option value={CREATE_NEW_DEPARTMENT_VALUE}>+ Tạo phòng ban mới</option>
                     </select>
                     {departments.length === 0 && (
                       <p className="text-xs text-amber-600 mt-1">
-                        Chưa có phòng ban nào trong hệ thống — tạo phòng ban trước ở Dashboard Người ra đề.
+                        Chưa có phòng ban nào trong hệ thống — chọn "+ Tạo phòng ban mới" ở trên để tạo ngay.
                       </p>
                     )}
                   </div>
@@ -761,6 +836,74 @@ export const AccountTab = ({ currentUser }) => {
                   className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Lưu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MỚI — MODAL CON: TẠO PHÒNG BAN MỚI (mở từ dropdown Phòng ban trong
+          form Thêm tài khoản). z-index cao hơn modal Thêm tài khoản (z-50)
+          vì modal này nằm chồng lên trên nó, giống cách ConfirmDialog dùng
+          z-[110] để chồng lên các modal thường. */}
+      {isCreateDeptOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-[10px] shadow-xl w-full max-w-sm overflow-hidden border border-slate-100">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-lg text-[#0F172A]">Tạo phòng ban mới</h3>
+              <button
+                type="button"
+                onClick={() => { setIsCreateDeptOpen(false); setNewDeptName(''); setNewDeptCode(''); setDeptFormError(''); }}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateDepartmentInline} className="p-5 space-y-4">
+              {deptFormError && (
+                <div className="p-3.5 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg flex items-center gap-2.5 text-sm">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span>{deptFormError}</span>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Mã bộ phận (Ví dụ: XDM1)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nhập mã viết tắt..."
+                  value={newDeptCode}
+                  onChange={(e) => setNewDeptCode(e.target.value)}
+                  className="w-full px-3.5 py-2.5 min-h-[44px] text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] uppercase"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Tên phòng ban</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nhập tên phòng ban..."
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 min-h-[44px] text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
+                />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setIsCreateDeptOpen(false); setNewDeptName(''); setNewDeptCode(''); setDeptFormError(''); }}
+                  className="flex-1 py-2.5 min-h-[44px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={deptActionLoading}
+                  className="flex-1 py-2.5 min-h-[44px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                >
+                  {deptActionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Lưu
                 </button>
               </div>

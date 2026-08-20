@@ -55,6 +55,12 @@ const ACTION_LABELS = {
   // Tài liệu ôn tập
   UPLOAD_STUDY_DOCUMENT: 'Đăng tài liệu ôn tập',
   DEACTIVATE_STUDY_DOCUMENT: 'Gỡ tài liệu ôn tập',
+  // Phòng ban (department.controller.js) — trước đây thiếu trong bảng này
+  // nên bị hiển thị thô nguyên mã action (vd "CREATE_DEPARTMENT") thay vì
+  // nhãn tiếng Việt.
+  CREATE_DEPARTMENT: 'Tạo phòng ban',
+  UPDATE_DEPARTMENT: 'Cập nhật phòng ban',
+  DEACTIVATE_DEPARTMENT: 'Ngừng sử dụng phòng ban',
 };
 
 // Các action mang tính cảnh báo/nhạy cảm — hiển thị nhấn mạnh bằng màu vàng-cam
@@ -73,6 +79,7 @@ const EMPHASIZED_ACTIONS = new Set([
   'question.bulk_deactivate',
   'DEACTIVATE_TOPIC',
   'DEACTIVATE_STUDY_DOCUMENT',
+  'DEACTIVATE_DEPARTMENT',
 ]);
 
 const RESOURCE_TYPE_OPTIONS = [

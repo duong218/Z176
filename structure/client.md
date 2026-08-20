@@ -55,8 +55,8 @@ client/
 │   │   └── UnitLogoDisplay.jsx             # Hiển thị logo đơn vị tùy chỉnh hoặc logo mặc định
 │   │
 │   │   ├── admin/
-│   │   │   ├── AccountTab.jsx              # Tab quản lý tài khoản: CRUD user, import/export Excel, phân role, khóa/mở, reset mật khẩu
-│   │   │   ├── AuditLogTab.jsx             # Tab nhật ký hệ thống: lọc, phân trang, xem chi tiết audit log
+│   │   │   ├── AccountTab.jsx              # Tab quản lý tài khoản: CRUD user, tạo nhanh phòng ban inline từ dropdown, import/export Excel, phân role, khóa/mở, reset mật khẩu
+│   │   │   ├── AuditLogTab.jsx             # Tab nhật ký hệ thống: lọc theo hành động/người dùng/thời gian, phân trang, xem chi tiết audit log (hỗ trợ đầy đủ nhãn hành động Backup, Câu hỏi, Chủ đề, Tài liệu, Phòng ban)
 │   │   │   ├── BackupTab.jsx               # Tab quản lý sao lưu: danh sách file backup trên Drive, tải về, khôi phục an toàn
 │   │   │   └── OverviewTab.jsx             # Tab tổng quan admin: thống kê user, kỳ thi, câu hỏi
 │   │   │
@@ -64,8 +64,8 @@ client/
 │   │   │   ├── DepartmentTab.jsx           # Tab quản lý phòng ban: CRUD phòng ban, mã phòng ban
 │   │   │   ├── ExamProposalTab.jsx         # Tab đề xuất kỳ thi: tạo, chỉnh sửa, đệ trình đề thi
 │   │   │   ├── OverviewTab.jsx             # Tab tổng quan examiner: thống kê câu hỏi, chủ đề, đề xuất
-│   │   │   ├── QuestionBankTab.jsx         # Tab ngân hàng câu hỏi: CRUD câu hỏi, import Excel, lọc theo chủ đề/phòng ban/độ khó
-│   │   │   ├── StudyDocumentTab.jsx        # Tab quản lý tài liệu ôn tập: upload/xóa file, phân quyền phòng ban
+│   │   │   ├── QuestionBankTab.jsx         # Tab ngân hàng câu hỏi: CRUD câu hỏi, import Excel, lọc theo chủ đề/phòng ban/độ khó (dùng searchRef tối ưu tìm kiếm), xóa hàng loạt
+│   │   │   ├── StudyDocumentTab.jsx        # Tab quản lý tài liệu ôn tập: upload/xóa file (hỗ trợ ConfirmDialog), phân quyền phòng ban
 │   │   │   └── TopicTab.jsx                # Tab quản lý chủ đề: CRUD chủ đề thi
 │   │   │
 │   │   └── leader/
@@ -140,8 +140,8 @@ client/
 
 | Component | Chức năng |
 |---|---|
-| `admin/AccountTab.jsx` | Tab quản lý tài khoản: tạo tài khoản đơn lẻ, import danh sách nhân viên từ Excel (preview → confirm 2 bước), xuất danh sách tài khoản + mật khẩu tạm ra Excel, phân role, khóa/mở khóa, reset mật khẩu. |
-| `admin/AuditLogTab.jsx` | Tab nhật ký hệ thống: lọc theo hành động/người dùng/thời gian, phân trang, xem chi tiết. |
+| `admin/AccountTab.jsx` | Tab quản lý tài khoản: tạo tài khoản đơn lẻ, tạo nhanh phòng ban inline từ modal con trong dropdown phòng ban (dùng lại `createDepartment()` từ `examiner.service`), import danh sách nhân viên từ Excel (preview → confirm 2 bước), xuất danh sách tài khoản + mật khẩu tạm ra Excel, phân role, khóa/mở khóa, reset mật khẩu. |
+| `admin/AuditLogTab.jsx` | Tab nhật ký hệ thống: lọc theo hành động/người dùng/thời gian/loại tài nguyên (User, Exam, Question, Topic, Department, Backup), phân trang, xem chi tiết metadata; hiển thị đầy đủ nhãn hành động tiếng Việt chuẩn hóa. |
 | `admin/BackupTab.jsx` | Tab quản lý sao lưu & khôi phục: tải file từ Google Drive, ghi đè/khôi phục lại CSDL với tính năng % tiến trình (progress) và chặn thao tác an toàn. |
 | `admin/OverviewTab.jsx` | Tab tổng quan: thống kê nhanh số user, kỳ thi, câu hỏi trong hệ thống. |
 
@@ -152,8 +152,8 @@ client/
 | `examiner/DepartmentTab.jsx` | Tab quản lý phòng ban: CRUD phòng ban, mã phòng ban. |
 | `examiner/ExamProposalTab.jsx` | Tab đề xuất kỳ thi: tạo đề thi mới (chọn chủ đề, cấu hình số câu, thời gian), chỉnh sửa, đệ trình lên Leader duyệt. |
 | `examiner/OverviewTab.jsx` | Tab tổng quan: thống kê câu hỏi, chủ đề, trạng thái đề xuất. |
-| `examiner/QuestionBankTab.jsx` | Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm (đơn/nhiều đáp án), upload ảnh minh hoạ, import hàng loạt từ Excel, lọc theo chủ đề/phòng ban/độ khó/phạm vi, xóa hàng loạt. |
-| `examiner/StudyDocumentTab.jsx` | Tab quản lý tài liệu ôn tập: upload file (PDF/Word/Excel), gắn chủ đề, phạm vi chung/riêng phòng ban, xem/tải/xóa. |
+| `examiner/QuestionBankTab.jsx` | Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm (đơn/nhiều đáp án), upload ảnh minh hoạ, import hàng loạt từ Excel, lọc theo chủ đề/phòng ban/độ khó/phạm vi, xóa hàng loạt (tối ưu hóa `useRef` + `useCallback` tránh re-render thừa khi gõ tìm kiếm). |
+| `examiner/StudyDocumentTab.jsx` | Tab quản lý tài liệu ôn tập: upload file (PDF/Word/Excel), gắn chủ đề, phạm vi chung/riêng phòng ban, xem/tải/xóa (sử dụng `ConfirmDialog` cho xác nhận gỡ tài liệu). |
 | `examiner/TopicTab.jsx` | Tab quản lý chủ đề: CRUD chủ đề thi. |
 
 ### Components — Leader (Người duyệt đề)

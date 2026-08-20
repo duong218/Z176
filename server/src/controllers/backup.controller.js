@@ -12,7 +12,7 @@ export const createBackup = asyncHandler(async (req, res) => {
   // Mongoose ObjectId, nên không gán vào resourceId (schema AuditLog validate
   // resourceId là ObjectId) — chỉ đặt trong metadata để tránh lỗi validation.
   await auditService.writeAudit({
-    actorUserId: req.user?.id,
+    actorUserId: req.auth.userId,
     action: 'BACKUP_MANUAL_CREATE',
     resourceType: 'Backup',
     metadata: { driveFileId: driveFile.id, fileName: driveFile.name, kept, deleted },
@@ -48,7 +48,7 @@ export const downloadBackup = asyncHandler(async (req, res) => {
 
   // fileId là Drive file id (string), không phải ObjectId -> để trong metadata
   await auditService.writeAudit({
-    actorUserId: req.user?.id,
+    actorUserId: req.auth.userId,
     action: 'BACKUP_DOWNLOAD',
     resourceType: 'Backup',
     metadata: { driveFileId: fileId, fileName },
@@ -79,7 +79,7 @@ export const restoreBackup = asyncHandler(async (req, res) => {
   }
 
   await auditService.writeAudit({
-    actorUserId: req.user?.id,
+    actorUserId: req.auth.userId,
     action: 'BACKUP_RESTORE',
     resourceType: 'Backup',
     metadata: { originalFileName: req.file.originalname },

@@ -17,7 +17,6 @@ import { ApiError, assertFound } from '../utils/api-error.js';
 import { findDepartmentByName, findOrCreateDepartmentByName, upsertDepartmentForImport } from './department.service.js';
 import { normalizeDeptName } from '../models/department.model.js';
 import { findOrCreateTopicByName } from './topic.service.js';
-import { writeAudit } from './audit.service.js';
 import { env } from '../config/env.js';
 
 cloudinary.config({
@@ -339,14 +338,10 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
     await deleteQuestionImage(previousCloudinaryId);
   }
 
-  await writeAudit({
-    actorUserId,
-    action: 'question.update',
-    resourceType: 'Question',
-    resourceId: question._id,
-    metadata: { questionId: question._id.toString() },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
+  // đúng chuẩn (action: 'UPDATE_QUESTION', kèm metadata.detail) ngay sau khi
+  // gọi hàm này. Log dạng 'question.update' ở đây bị trùng với log đó (2
+  // dòng log cho cùng 1 lần cập nhật câu hỏi).
 
   return getQuestionById(question._id);
 }
@@ -357,14 +352,9 @@ export async function deactivateQuestion(id, actorUserId, ipAddress) {
   question.isActive = false;
   await question.save();
 
-  await writeAudit({
-    actorUserId,
-    action: 'question.deactivate',
-    resourceType: 'Question',
-    resourceId: question._id,
-    metadata: { questionId: question._id.toString() },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
+  // đúng chuẩn (action: 'DELETE_QUESTION', kèm metadata.detail) ngay sau khi
+  // gọi hàm này, cùng lý do như updateQuestion() ở trên — tránh trùng log.
 
   return { id: question._id.toString(), isActive: false };
 }
@@ -410,13 +400,10 @@ export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId
 
   await Question.updateMany({ _id: { $in: matchedIds } }, { $set: { isActive: false } });
 
-  await writeAudit({
-    actorUserId,
-    action: 'question.bulk_deactivate',
-    resourceType: 'Question',
-    metadata: { count: matchedIds.length, mode: ids ? 'by_ids' : 'by_filter' },
-    ipAddress,
-  });
+  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
+  // đúng chuẩn (action: 'BULK_DELETE_QUESTIONS', kèm metadata.detail) ngay
+  // sau khi gọi hàm này, cùng lý do như updateQuestion() ở trên — tránh
+  // trùng log.
 
   return { deactivatedCount: matchedIds.length, questionIds: matchedIds.map((id) => id.toString()) };
 }
@@ -772,15 +759,13 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
     /* ignore cleanup */
   }
 
-  if (created.length > 0) {
-    await writeAudit({
-      actorUserId,
-      action: 'question.import',
-      resourceType: 'Question',
-      metadata: { count: created.length, failedRows: errors.length, skippedDuplicates: skippedDuplicates.length },
-      ipAddress,
-    });
-  }
+  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
+  // đúng chuẩn (action: 'IMPORT_QUESTIONS', kèm metadata.detail đầy đủ cả
+  // số dòng thành công/lỗi/bỏ qua trùng) ngay sau khi gọi hàm này, cùng lý
+  // do như updateQuestion() ở trên — tránh trùng log. Giữ nguyên logic
+  // created.length > 0 không còn cần thiết vì controller luôn ghi log dù
+  // created.length = 0 hay không, để không mất dấu vết các lần import lỗi
+  // toàn bộ.
 
   return {
     imported: created.length,
