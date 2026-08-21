@@ -1,4 +1,4 @@
-import { Topic } from '../models/index.js';
+import { Topic, Question } from '../models/index.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 
 export async function listTopics({ activeOnly = true } = {}) {
@@ -78,11 +78,21 @@ export async function updateTopic(id, { name, description, isActive } = {}) {
 
 // Xóa mềm: chỉ tắt isActive, KHÔNG xóa hẳn khỏi DB, vì Question đang tham
 // chiếu topicId tới chủ đề này (giống lý do áp dụng cho Department).
+//
+// CASCADE: câu hỏi thuộc chủ đề (Question.topicId) cũng bị chuyển
+// isActive:false theo — để chúng ẩn khỏi ngân hàng câu hỏi luôn (giống hệt
+// hành vi "xóa câu hỏi" bình thường), tránh trường hợp câu hỏi vẫn active
+// nhưng chủ đề đã bị ẩn khỏi dropdown nên không bao giờ chọn được vào đề
+// thi mới nữa. Chỉ update field isActive (updateMany), KHÔNG xóa cứng dữ
+// liệu câu hỏi.
 export async function deactivateTopic(id) {
   const topic = await Topic.findById(id);
   assertFound(topic, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
   topic.isActive = false;
   await topic.save();
+
+  await Question.updateMany({ topicId: topic._id, isActive: true }, { isActive: false });
+
   return { id: topic._id.toString(), isActive: false };
 }
 

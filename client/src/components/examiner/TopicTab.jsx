@@ -82,7 +82,7 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
 
   const handleDelete = async (topic) => {
     const ok = await confirmAction(
-      `Bạn có chắc chắn muốn ngừng sử dụng chủ đề "${topic.name}"? Các câu hỏi đang gắn với chủ đề này sẽ không bị xóa, nhưng chủ đề sẽ không còn hiển thị để chọn nữa.`,
+      `Bạn có chắc chắn muốn ngừng sử dụng chủ đề "${topic.name}"? Các câu hỏi đang gắn với chủ đề này sẽ tự động bị ẩn khỏi ngân hàng câu hỏi (không xóa dữ liệu), và chủ đề sẽ không còn hiển thị để chọn nữa.`,
       { title: 'Ngừng sử dụng chủ đề', confirmLabel: 'Ngừng sử dụng' }
     );
     if (!ok) return;
