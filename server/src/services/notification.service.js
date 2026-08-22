@@ -92,6 +92,41 @@ export const notificationService = {
     });
   },
 
+  /**
+   * Gán đề thi tự động cho 1 nhân viên mới THẤT BẠI (thường do ngân hàng câu
+   * hỏi không đủ cho phòng ban của họ, kể cả sau khi đã bù từ pool câu
+   * chung — xem validateQuestionAvailability() trong
+   * exam-code-generation.service.js) -> báo cho Examiner đã tạo kỳ thi VÀ
+   * MỌI Admin đang active, để họ chủ động bổ sung câu hỏi cho phòng ban đó.
+   * Không có bước này thì nhân viên sẽ âm thầm không có đề để thi mà không
+   * ai biết, cho tới khi chính họ phàn nàn không thi được.
+   */
+  async notifyExamAssignmentFailed({ exam, employee, department, reason }) {
+    const adminRole = await Role.findOne({ code: 'admin' }).select('_id').lean();
+    const admins = adminRole?._id
+      ? await User.find({ isActive: true, roleId: adminRole._id }).select('_id').lean()
+      : [];
+
+    const recipientIds = admins.map((u) => u._id);
+    if (exam.createdBy) {
+      const createdByStr = exam.createdBy.toString();
+      if (!recipientIds.some((id) => id.toString() === createdByStr)) {
+        recipientIds.push(exam.createdBy);
+      }
+    }
+    if (recipientIds.length === 0) return [];
+
+    const employeeLabel = employee?.fullname || employee?.employeeCode || 'Nhân viên mới';
+    const departmentLabel = department?.name || 'phòng ban của nhân viên này';
+
+    return this.createMany(recipientIds, {
+      type: 'exam_assignment_failed',
+      title: 'Có thí sinh chưa được phát đề thi',
+      message: `Thí sinh "${employeeLabel}" (phòng ban "${departmentLabel}") chưa được phát đề cho kỳ thi "${exam.title}" do ngân hàng câu hỏi không đủ số lượng${reason ? ` (${reason})` : ''}. Vui lòng import/bổ sung thêm câu hỏi cho phòng ban này để hệ thống tự động gán đề.`,
+      examId: exam._id,
+    });
+  },
+
   async listForUser(userId, { limit = 30 } = {}) {
     return Notification.find({ recipientUserId: userId })
       .sort({ createdAt: -1 })

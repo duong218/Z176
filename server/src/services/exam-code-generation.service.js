@@ -11,6 +11,7 @@ import {
   QUESTION_SCOPE,
 } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
+import { notificationService } from './notification.service.js';
 
 /** Trộn ngẫu nhiên mảng (Fisher–Yates), không sửa mảng gốc. */
 function shuffle(arr) {
@@ -240,14 +241,16 @@ export async function generateExamCodesAndAssignCandidates(exam) {
  * tài khoản (đây không phải điều kiện bắt buộc để tạo user).
  */
 export async function assignEmployeeToActiveExamIfAny(employee) {
+  let exam;
+  let department;
   try {
-    const exam = await Exam.findOne({ status: EXAM_STATUS.PUBLISHED });
+    exam = await Exam.findOne({ status: EXAM_STATUS.PUBLISHED });
     if (!exam) return null;
 
     const alreadyAssigned = await ExamCandidate.findOne({ examId: exam._id, employeeId: employee._id });
     if (alreadyAssigned) return alreadyAssigned;
 
-    const department = await Department.findById(employee.departmentId);
+    department = await Department.findById(employee.departmentId);
     if (!department || !department.isActive) return null;
 
     const examCode = await ensureExamCodeForDepartment(exam, department);
@@ -262,6 +265,28 @@ export async function assignEmployeeToActiveExamIfAny(employee) {
     console.error(
       `[exam-code-generation] Không thể tự động gán đề thi cho nhân viên ${employee._id}: ${err.message}`,
     );
+
+    // MỚI — báo cho Examiner đã tạo kỳ thi + mọi Admin biết nhân viên này
+    // CHƯA được gán đề (thường do ngân hàng câu hỏi không đủ cho phòng ban
+    // của họ), thay vì chỉ console.error âm thầm — không ai trên giao diện
+    // biết được cho tới khi chính nhân viên phàn nàn không thi được. Không
+    // throw ra ngoài — đây không phải điều kiện bắt buộc để tạo tài khoản
+    // nhân viên, và lỗi khi GỬI thông báo cũng không được làm hỏng luồng
+    // tạo nhân viên chính (catch lồng riêng bên dưới).
+    if (exam) {
+      try {
+        await notificationService.notifyExamAssignmentFailed({
+          exam,
+          employee,
+          department,
+          reason: err.message,
+        });
+      } catch (notifyErr) {
+        // eslint-disable-next-line no-console
+        console.error('notifyExamAssignmentFailed failed:', notifyErr);
+      }
+    }
+
     return null;
   }
 }
