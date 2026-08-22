@@ -58,6 +58,20 @@ export default function AppShell() {
   );
 }
 
+// Map roleCode -> tab dashboard tương ứng. Dùng chung cho cả auto-login
+// (khôi phục phiên khi mở lại tab) và đăng nhập thủ công qua LoginModal, để
+// 2 luồng này luôn nhất quán — tránh trường hợp chỉ đăng nhập thủ công mới
+// được tự chuyển sang Dashboard còn auto-login thì không.
+// Đặt ở module scope (không phải trong component) vì đây là mapping TĨNH,
+// không phụ thuộc props/state nào — giữ tham chiếu ổn định giữa các lần
+// render, tránh phải liệt kê vào dependency array của useEffect bên dưới.
+const DASHBOARD_TAB_BY_ROLE = {
+  admin: 'admin-dashboard',
+  examiner: 'examiner-dashboard',
+  leader: 'leader-dashboard',
+  candidate: 'candidate-dashboard',
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -74,17 +88,6 @@ function App() {
   // để người dùng tiếp tục thao tác trên phiên đã không còn hợp lệ.
   const [sessionRevokedMessage, setSessionRevokedMessage] = useState(null);
 
-  // Map roleCode -> tab dashboard tương ứng. Dùng chung cho cả auto-login
-  // (khôi phục phiên khi mở lại tab) và đăng nhập thủ công qua LoginModal,
-  // để 2 luồng này luôn nhất quán — tránh trường hợp chỉ đăng nhập thủ công
-  // mới được tự chuyển sang Dashboard còn auto-login thì không.
-  const dashboardTabByRole = {
-    admin: 'admin-dashboard',
-    examiner: 'examiner-dashboard',
-    leader: 'leader-dashboard',
-    candidate: 'candidate-dashboard',
-  };
-
   // Auto-login: kiểm tra accessToken khi mount
   useEffect(() => {
     const token = getAccessToken();
@@ -97,7 +100,7 @@ function App() {
         setCurrentUser(user);
         // Đã có phiên đăng nhập hợp lệ (token còn hạn) -> vào thẳng Dashboard
         // theo role, thay vì hiện Trang chủ rồi bắt người dùng tự bấm lại.
-        const dashboardTab = dashboardTabByRole[user?.roleCode];
+        const dashboardTab = DASHBOARD_TAB_BY_ROLE[user?.roleCode];
         if (dashboardTab) {
           setActiveTab(dashboardTab);
         }
@@ -173,7 +176,6 @@ function App() {
       cancelled = true;
       clearInterval(intervalId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   // Tự động mở lại ExamModal nếu tài khoản đang có lượt thi dở dang (vd sau khi
@@ -429,8 +431,17 @@ function App() {
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}
         onClose={() => setIsChangePasswordOpen(false)}
-        username={currentUser?.username}
-        onPasswordChanged={(updatedUser) => setCurrentUser(updatedUser)}
+        onPasswordChanged={() => {
+          // MỚI — không còn nhận updatedUser để "vá" currentUser tại chỗ nữa.
+          // Đổi mật khẩu xong server đã thu hồi token cũ (tokenVersion++) và
+          // kỳ vọng đăng nhập lại (xem AUTH_PASSWORD_CHANGED). Đưa hẳn về
+          // trang chủ + yêu cầu đăng nhập lại để mọi dashboard con (đặc biệt
+          // CandidateDashboard) mount mới hoàn toàn, tránh giữ lại state cũ
+          // (fetchMyExam lỗi do token vừa bị thu hồi -> canStartExam sai).
+          setCurrentUser(null);
+          setActiveTab('home');
+          setIsLoginOpen(true);
+        }}
         preventClose={currentUser?.mustChangePassword === true}
       />
 

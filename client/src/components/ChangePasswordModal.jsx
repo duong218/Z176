@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { X, KeyRound, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { changePassword, loginUser } from '../services/auth.service';
+import { changePassword } from '../services/auth.service';
 
-export const ChangePasswordModal = ({ isOpen, onClose, username, onPasswordChanged, preventClose = false }) => {
+export const ChangePasswordModal = ({ isOpen, onClose, onPasswordChanged, preventClose = false }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,20 +33,28 @@ export const ChangePasswordModal = ({ isOpen, onClose, username, onPasswordChang
 
     setLoading(true);
     try {
-      // 1. Gửi request đổi mật khẩu
+      // Gửi request đổi mật khẩu — server thu hồi toàn bộ token cũ (tăng
+      // tokenVersion) và chủ động yêu cầu đăng nhập lại (xem message trả về
+      // từ AUTH_PASSWORD_CHANGED). TRƯỚC ĐÂY modal tự động gọi loginUser()
+      // ngay sau đó để lấy token mới, khiến CandidateDashboard KHÔNG bị
+      // remount (chỉ đổi currentUser prop) — nếu đúng lúc đó có request cũ
+      // (vd fetchMyExam) đang bay bằng token vừa bị thu hồi, nó dính lỗi và
+      // set examStatus = null vĩnh viễn cho tới khi có trigger khác (bug: nút
+      // "VÀO THI CHÍNH THỨC" bị disable + hiện nhầm "đã hoàn thành lượt thi"
+      // dù thí sinh chưa hề thi). Fix: KHÔNG tự đăng nhập lại — bắt người
+      // dùng đăng nhập lại thủ công, để có 1 phiên hoàn toàn mới/sạch, mọi
+      // component (kể cả CandidateDashboard) mount lại từ đầu với token
+      // chuẩn ngay từ request đầu tiên.
       await changePassword(currentPassword, newPassword);
-      
-      // 2. Tự động đăng nhập lại bằng mật khẩu mới để lấy token mới (tránh bị 401 do token cũ bị thu hồi)
-      const loginRes = await loginUser(username, newPassword);
-      
+
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        onPasswordChanged(loginRes.user);
         onClose();
+        onPasswordChanged(); // App.jsx: đăng xuất về trang chủ, yêu cầu đăng nhập lại
       }, 2000);
     } catch (err) {
       setError(err.message || 'Có lỗi xảy ra khi đổi mật khẩu.');
@@ -80,7 +88,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, username, onPasswordChang
               <CheckCircle className="w-10 h-10" />
             </div>
             <h4 className="text-xl font-bold text-slate-800">Đổi mật khẩu thành công!</h4>
-            <p className="text-sm text-slate-500">Mật khẩu mới đã được cập nhật và kích hoạt tự động.</p>
+            <p className="text-sm text-slate-500">Vui lòng đăng nhập lại bằng mật khẩu mới để tiếp tục.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4">

@@ -83,7 +83,7 @@ const SIDEBAR_ITEMS = [
   { id: 'materials', label: 'Tài liệu ôn tập', icon: BookOpen },
 ];
 
-export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, activeExam }) => {
+export const CandidateDashboard = ({ onOpenExam, examModalOpen, activeExam }) => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,6 +102,12 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
   //   (backend trả lỗi EXAM_NOT_ACTIVE — coi như chưa có gì để thi).
   const [examStatus, setExamStatus] = useState(null);
   const [examStatusLoading, setExamStatusLoading] = useState(true);
+  // MỚI — Bug fix: trước đây mọi lỗi từ fetchMyExam() (kể cả
+  // CANDIDATE_NOT_ASSIGNED — chưa từng được gán đề, khác hẳn "đã hết lượt
+  // thi") đều bị gộp chung thành examStatus = null, khiến UI hiển thị nhầm
+  // "Bạn đã hoàn thành lượt thi..." cho thí sinh CHƯA HỀ được thi. Lưu riêng
+  // mã lỗi để phần render bên dưới phân biệt đúng 3 trường hợp.
+  const [examStatusErrorCode, setExamStatusErrorCode] = useState(null);
 
   // MỚI — Tài liệu ôn tập: 2 danh sách riêng — theo kỳ thi đang active (lọc
   // theo topicId) và toàn bộ tài liệu cũ đã đăng (không lọc topicId). Tải lười
@@ -163,6 +169,7 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
     fetchMyExam()
       .then((data) => {
         if (cancelled) return;
+        setExamStatusErrorCode(null);
         setExamStatus({
           attemptsUsed: data?.attemptsUsed ?? 0,
           maxAttempts: data?.maxAttempts ?? 1,
@@ -170,11 +177,15 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
           attempt: data?.attempt ?? null,
         });
       })
-      .catch(() => {
-        // EXAM_NOT_ACTIVE hoặc CANDIDATE_NOT_ASSIGNED — coi như chưa có kỳ thi
-        // nào để thi, không hiện lỗi (đã có UI riêng xử lý trường hợp !activeExam).
+      .catch((err) => {
+        // EXAM_NOT_ACTIVE: coi như chưa có kỳ thi nào để thi, không hiện lỗi
+        // (đã có UI riêng xử lý trường hợp !activeExam). Các mã khác (đặc
+        // biệt CANDIDATE_NOT_ASSIGNED) được giữ lại để phần render phân biệt
+        // đúng thông báo, thay vì trước đây gộp chung mọi lỗi thành
+        // "đã hoàn thành lượt thi" — sai và gây hiểu lầm cho thí sinh.
         if (cancelled) return;
         setExamStatus(null);
+        setExamStatusErrorCode(err?.code ?? 'UNKNOWN_ERROR');
       })
       .finally(() => {
         if (!cancelled) setExamStatusLoading(false);
@@ -562,10 +573,29 @@ export const CandidateDashboard = ({ currentUser, onOpenExam, examModalOpen, act
                     <span>VÀO THI CHÍNH THỨC</span>
                   </button>
 
+                  {/* MỚI — Bug fix: trước đây chỉ 1 câu thông báo chung cho MỌI
+                      trường hợp !canStartExam, kể cả khi thí sinh CHƯA TỪNG
+                      được gán đề thi (CANDIDATE_NOT_ASSIGNED) — khiến họ tưởng
+                      nhầm là "đã thi rồi" dù chưa hề làm bài. Giờ tách rõ 3
+                      trường hợp theo đúng bản chất lỗi. */}
                   {activeExam && !examStatusLoading && !canStartExam && (
                     <p className="text-center text-sm text-slate-500">
-                      Bạn đã hoàn thành lượt thi chính thức cho kỳ thi "{activeExam.title}". Nếu cần thi lại, vui lòng liên hệ
-                      Người duyệt đề để được xem xét cấp phép cho lượt thi mới.
+                      {examStatusErrorCode === 'CANDIDATE_NOT_ASSIGNED' ? (
+                        <>
+                          Bạn chưa được phân bổ đề thi cho kỳ thi "{activeExam.title}". Vui lòng liên hệ
+                          Người ra đề hoặc Quản trị viên để được hỗ trợ.
+                        </>
+                      ) : examStatusErrorCode && examStatusErrorCode !== 'EXAM_NOT_ACTIVE' ? (
+                        <>
+                          Không thể tải trạng thái lượt thi ({examStatusErrorCode}). Vui lòng thử tải lại trang, hoặc
+                          liên hệ Quản trị viên nếu lỗi vẫn tiếp diễn.
+                        </>
+                      ) : (
+                        <>
+                          Bạn đã hoàn thành lượt thi chính thức cho kỳ thi "{activeExam.title}". Nếu cần thi lại, vui lòng liên hệ
+                          Người duyệt đề để được xem xét cấp phép cho lượt thi mới.
+                        </>
+                      )}
                     </p>
                   )}
                 </div>
