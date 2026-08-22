@@ -9,9 +9,13 @@ import {
   DIFFICULTY,
   QUESTION_KIND,
   QUESTION_SCOPE,
+  EXAM_STATUS,
   Answer,
   Question,
   Department,
+  Exam,
+  ExamCode,
+  ExamCodeQuestion,
 } from '../models/index.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 import { findDepartmentByName, findOrCreateDepartmentByName, upsertDepartmentForImport } from './department.service.js';
@@ -346,9 +350,47 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
   return getQuestionById(question._id);
 }
 
+// Trả về Exam đang PUBLISHED (nếu có) đang dùng ÍT NHẤT 1 trong các câu hỏi
+// truyền vào — dùng chung cho cả xóa đơn lẻ và xóa hàng loạt.
+//
+// Khác với Topic (Exam.topicId trỏ thẳng tới Topic), Question không có liên
+// kết trực tiếp tới Exam: phải đi qua ExamCodeQuestion (snapshot câu hỏi lúc
+// publish) -> ExamCode -> Exam. Lý do CHẶN giống hệt lý do đã áp dụng cho
+// Topic (xem deactivateTopic() bên topic.service.js): xóa mềm 1 câu hỏi đang
+// nằm trong ExamCodeQuestion của kỳ thi đang published không làm hỏng đề thi
+// của thí sinh hiện tại (query lấy câu hỏi không lọc isActive), NHƯNG nếu có
+// nhân viên mới được gán vào 1 phòng ban chưa từng có ExamCode, hệ thống sẽ
+// thử sinh ExamCode mới và query lại Question với isActive:true — lúc đó câu
+// hỏi vừa bị tắt sẽ không đủ số lượng, ném lỗi INSUFFICIENT_QUESTIONS bị nuốt
+// lặng lẽ (chỉ console.error) trong assignEmployeeToActiveExamIfAny() —
+// nhân viên đó vĩnh viễn không được gán đề mà không ai biết.
+async function findActiveExamUsingQuestions(questionIds) {
+  const codeQuestions = await ExamCodeQuestion.find({ questionId: { $in: questionIds } })
+    .select('examCodeId')
+    .lean();
+  if (codeQuestions.length === 0) return null;
+
+  const examCodeIds = [...new Set(codeQuestions.map((cq) => cq.examCodeId.toString()))];
+  const examCodes = await ExamCode.find({ _id: { $in: examCodeIds } }).select('examId').lean();
+  if (examCodes.length === 0) return null;
+
+  const examIds = [...new Set(examCodes.map((ec) => ec.examId.toString()))];
+  return Exam.findOne({ _id: { $in: examIds }, status: EXAM_STATUS.PUBLISHED });
+}
+
 export async function deactivateQuestion(id, actorUserId, ipAddress) {
   const question = await Question.findById(id);
   assertFound(question, 'Không tìm thấy câu hỏi', 'QUESTION_NOT_FOUND');
+
+  const activeExam = await findActiveExamUsingQuestions([question._id]);
+  if (activeExam) {
+    throw new ApiError(
+      409,
+      `Không thể ngừng sử dụng câu hỏi này vì đang được dùng cho kỳ thi "${activeExam.title}" đang diễn ra. Vui lòng đợi kỳ thi kết thúc rồi thử lại.`,
+      'QUESTION_HAS_ACTIVE_EXAM',
+    );
+  }
+
   question.isActive = false;
   await question.save();
 
@@ -395,17 +437,58 @@ export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId
 
   const matchedIds = await Question.find(query).distinct('_id');
   if (matchedIds.length === 0) {
-    return { deactivatedCount: 0, questionIds: [] };
+    return { deactivatedCount: 0, questionIds: [], skippedActiveExam: null };
   }
 
-  await Question.updateMany({ _id: { $in: matchedIds } }, { $set: { isActive: false } });
+  // Xóa hàng loạt có thể gộp câu hỏi từ nhiều chủ đề/phòng ban khác nhau —
+  // nếu CHỈ 1 câu trong số đó đang được kỳ thi published dùng, chặn toàn bộ
+  // thao tác sẽ rất khó chịu cho người xóa hàng loạt (họ không biết câu nào
+  // là "thủ phạm" để bỏ ra khỏi lựa chọn). Thay vào đó: loại các câu đang bị
+  // dùng bởi kỳ thi active ra khỏi danh sách xóa, xóa phần còn lại, và báo
+  // rõ tên kỳ thi + có bao nhiêu câu bị giữ lại để người dùng tự xử lý.
+  const codeQuestions = await ExamCodeQuestion.find({ questionId: { $in: matchedIds } })
+    .select('questionId examCodeId')
+    .lean();
+
+  let blockedIds = new Set();
+  let activeExam = null;
+  if (codeQuestions.length > 0) {
+    const examCodeIds = [...new Set(codeQuestions.map((cq) => cq.examCodeId.toString()))];
+    const examCodes = await ExamCode.find({ _id: { $in: examCodeIds } }).select('examId').lean();
+    const examIds = [...new Set(examCodes.map((ec) => ec.examId.toString()))];
+    activeExam = await Exam.findOne({ _id: { $in: examIds }, status: EXAM_STATUS.PUBLISHED });
+
+    if (activeExam) {
+      const examCodeIdsOfActiveExam = new Set(
+        examCodes.filter((ec) => ec.examId.toString() === activeExam._id.toString()).map((ec) => ec._id.toString()),
+      );
+      blockedIds = new Set(
+        codeQuestions
+          .filter((cq) => examCodeIdsOfActiveExam.has(cq.examCodeId.toString()))
+          .map((cq) => cq.questionId.toString()),
+      );
+    }
+  }
+
+  const idsToDeactivate = matchedIds.filter((id) => !blockedIds.has(id.toString()));
+
+  if (idsToDeactivate.length > 0) {
+    await Question.updateMany({ _id: { $in: idsToDeactivate } }, { $set: { isActive: false } });
+  }
 
   // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
   // đúng chuẩn (action: 'BULK_DELETE_QUESTIONS', kèm metadata.detail) ngay
   // sau khi gọi hàm này, cùng lý do như updateQuestion() ở trên — tránh
   // trùng log.
 
-  return { deactivatedCount: matchedIds.length, questionIds: matchedIds.map((id) => id.toString()) };
+  return {
+    deactivatedCount: idsToDeactivate.length,
+    questionIds: idsToDeactivate.map((id) => id.toString()),
+    skippedActiveExam:
+      blockedIds.size > 0
+        ? { examTitle: activeExam.title, skippedCount: blockedIds.size }
+        : null,
+  };
 }
 
 function resolveEnum(map, raw, fieldLabel) {

@@ -177,13 +177,27 @@ export const bulkRemove = asyncHandler(async (req, res) => {
     actorUserId: req.auth.userId,
     action: 'BULK_DELETE_QUESTIONS',
     resourceType: 'Question',
-    metadata: { detail: `Xóa hàng loạt câu hỏi (${data.deactivatedCount} câu)` },
+    metadata: {
+      detail: data.skippedActiveExam
+        ? `Xóa hàng loạt câu hỏi (${data.deactivatedCount} câu; giữ lại ${data.skippedActiveExam.skippedCount} câu vì đang dùng cho kỳ thi "${data.skippedActiveExam.examTitle}" đang diễn ra)`
+        : `Xóa hàng loạt câu hỏi (${data.deactivatedCount} câu)`,
+    },
     ipAddress: clientIp(req),
   });
+
+  // Có câu hỏi bị giữ lại vì đang dùng cho kỳ thi đang publish -> vẫn trả
+  // 200 (thao tác xóa phần còn lại đã thành công), nhưng đổi message để
+  // người dùng biết rõ không phải TOÀN BỘ số câu đã chọn đều bị xóa, tránh
+  // hiểu nhầm giống bug đã gặp ở Bug 2 (gộp chung mọi trường hợp thành 1 câu
+  // thông báo sai bản chất).
+  const message = data.skippedActiveExam
+    ? `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi. Giữ lại ${data.skippedActiveExam.skippedCount} câu vì đang được dùng cho kỳ thi "${data.skippedActiveExam.examTitle}" đang diễn ra — vui lòng đợi kỳ thi kết thúc rồi thử lại.`
+    : `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi`;
+
   res.json({
     success: true,
-    message: `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi`,
-    code: 'QUESTION_BULK_DEACTIVATED',
+    message,
+    code: data.skippedActiveExam ? 'QUESTION_BULK_DEACTIVATED_PARTIAL' : 'QUESTION_BULK_DEACTIVATED',
     data,
   });
 });

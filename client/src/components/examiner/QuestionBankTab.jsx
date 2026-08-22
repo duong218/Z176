@@ -299,11 +299,19 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
     const ok = await confirmAction('Bạn có chắc chắn muốn ngừng sử dụng câu hỏi này?', { title: 'Ngừng sử dụng câu hỏi', confirmLabel: 'Ngừng sử dụng' });
     if (!ok) return;
     setActionLoading(true);
+    setError('');
     try {
       await deleteQuestion(id);
       await loadData(pagination.page);
     } catch (err) {
-      setError(err.message || 'Lỗi khi xóa câu hỏi');
+      const message = err.message || 'Lỗi khi xóa câu hỏi';
+      setError(message);
+      // Thêm toast lỗi song song với banner (đồng bộ pattern TopicTab.jsx) —
+      // lỗi bị CHẶN (vd câu hỏi đang dùng cho kỳ thi published) cần nổi bật
+      // ngay, tránh người dùng chỉ thấy nút hết loading rồi tưởng đã ngừng
+      // sử dụng thành công mà không để ý banner ở đầu trang (đặc biệt khi
+      // danh sách câu hỏi dài, banner nằm trên cùng dễ bị lướt qua).
+      showToast(message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -336,9 +344,22 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       const res = await bulkDeleteQuestions({ ids: selectedIds });
       setSelectedIds([]);
       await loadData(1);
-      showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi.`, 'success');
+      // res.skippedActiveExam khác null khi có câu hỏi bị GIỮ LẠI vì đang
+      // dùng cho kỳ thi published (xem question.service.js/deactivateManyQuestions)
+      // — dùng 'warning' (vàng) thay vì 'success' (xanh) vì đây không phải
+      // thành công hoàn toàn như người dùng mong đợi khi chọn N câu để xóa.
+      if (res.skippedActiveExam) {
+        showToast(
+          `Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi. Giữ lại ${res.skippedActiveExam.skippedCount} câu vì đang được dùng cho kỳ thi "${res.skippedActiveExam.examTitle}" đang diễn ra — vui lòng đợi kỳ thi kết thúc rồi thử lại.`,
+          'warning',
+        );
+      } else {
+        showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi.`, 'success');
+      }
     } catch (err) {
-      setError(err.message || 'Lỗi khi xóa hàng loạt câu hỏi');
+      const message = err.message || 'Lỗi khi xóa hàng loạt câu hỏi';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -374,9 +395,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
       });
       setSelectedIds([]);
       await loadData(1);
-      showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc.`, 'success');
+      if (res.skippedActiveExam) {
+        showToast(
+          `Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc. Giữ lại ${res.skippedActiveExam.skippedCount} câu vì đang được dùng cho kỳ thi "${res.skippedActiveExam.examTitle}" đang diễn ra — vui lòng đợi kỳ thi kết thúc rồi thử lại.`,
+          'warning',
+        );
+      } else {
+        showToast(`Đã ngừng sử dụng ${res.deactivatedCount} câu hỏi khớp bộ lọc.`, 'success');
+      }
     } catch (err) {
-      setError(err.message || 'Lỗi khi xóa tất cả theo bộ lọc');
+      const message = err.message || 'Lỗi khi xóa tất cả theo bộ lọc';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setActionLoading(false);
     }
