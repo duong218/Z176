@@ -58,7 +58,27 @@ export const update = asyncHandler(async (req, res) => {
 
 export const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const data = await topicService.deactivateTopic(id);
+
+  let data;
+  try {
+    data = await topicService.deactivateTopic(id);
+  } catch (err) {
+    // Bị chặn vì đang có kỳ thi published dùng chủ đề này — vẫn ghi log cho
+    // admin biết có người thử ngừng sử dụng chủ đề trong lúc kỳ thi đang
+    // diễn ra (dù bị chặn, không thực hiện), rồi ném lỗi ra ngoài bình
+    // thường để asyncHandler trả về đúng response lỗi cho client.
+    if (err instanceof ApiError && err.code === 'TOPIC_HAS_ACTIVE_EXAM') {
+      await writeAudit({
+        actorUserId: req.auth.userId,
+        action: 'DEACTIVATE_TOPIC_BLOCKED',
+        resourceType: 'Topic',
+        resourceId: id,
+        metadata: { detail: `Bị chặn ngừng sử dụng chủ đề (đang có kỳ thi published): ${err.message}` },
+        ipAddress: req.ip,
+      });
+    }
+    throw err;
+  }
 
   await writeAudit({
     actorUserId: req.auth.userId,

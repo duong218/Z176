@@ -1,4 +1,4 @@
-import { Topic, Question } from '../models/index.js';
+import { Topic, Question, Exam, EXAM_STATUS } from '../models/index.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 
 export async function listTopics({ activeOnly = true } = {}) {
@@ -79,15 +79,35 @@ export async function updateTopic(id, { name, description, isActive } = {}) {
 // Xóa mềm: chỉ tắt isActive, KHÔNG xóa hẳn khỏi DB, vì Question đang tham
 // chiếu topicId tới chủ đề này (giống lý do áp dụng cho Department).
 //
-// CASCADE: câu hỏi thuộc chủ đề (Question.topicId) cũng bị chuyển
-// isActive:false theo — để chúng ẩn khỏi ngân hàng câu hỏi luôn (giống hệt
-// hành vi "xóa câu hỏi" bình thường), tránh trường hợp câu hỏi vẫn active
-// nhưng chủ đề đã bị ẩn khỏi dropdown nên không bao giờ chọn được vào đề
-// thi mới nữa. Chỉ update field isActive (updateMany), KHÔNG xóa cứng dữ
-// liệu câu hỏi.
+// CHẶN nếu đang có 1 kỳ thi ở trạng thái PUBLISHED (đang diễn ra) dùng
+// chính chủ đề này (Exam.topicId). Lý do: hệ thống chỉ cho phép TỐI ĐA 1
+// kỳ thi published tại 1 thời điểm (mỗi lần publishExam() sẽ archive kỳ
+// thi published trước đó — xem exam.service.js). Nếu vẫn cho ngừng sử dụng
+// chủ đề trong lúc kỳ thi đang chạy: thí sinh ĐÃ được gán đề từ trước
+// (ExamCode/ExamCodeQuestion/AttemptQuestion đã snapshot cố định questionId)
+// KHÔNG bị ảnh hưởng — nhưng nếu có NHÂN VIÊN MỚI được thêm vào 1 phòng ban
+// CHƯA từng có ExamCode (vd phòng ban đó lúc publish chưa có ai),
+// generateExamCodesAndAssignCandidates() sẽ thử tạo ExamCode mới cho phòng
+// ban đó và query lại Question với isActive:true — lúc này toàn bộ câu hỏi
+// của chủ đề đã bị cascade tắt (isActive:false) nên không đủ câu hỏi, ném
+// lỗi INSUFFICIENT_QUESTIONS. Lỗi đó lại bị NUỐT LẶNG LẼ trong
+// assignEmployeeToActiveExamIfAny() (chỉ console.error, không báo ai) —
+// nhân viên mới đó sẽ VĨNH VIỄN không được gán đề, không thể thi, mà không
+// ai biết. Chặn hẳn ở đây (thay vì vá từng điểm gọi lại) là cách an toàn
+// nhất: đơn giản, chặn đúng gốc, không bỏ sót đường gọi nào khác.
 export async function deactivateTopic(id) {
   const topic = await Topic.findById(id);
   assertFound(topic, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
+
+  const activeExam = await Exam.findOne({ topicId: topic._id, status: EXAM_STATUS.PUBLISHED });
+  if (activeExam) {
+    throw new ApiError(
+      409,
+      `Không thể ngừng sử dụng chủ đề "${topic.name}" vì chủ đề này đang được dùng cho kỳ thi "${activeExam.title}" đang diễn ra. Vui lòng đợi kỳ thi kết thúc rồi thử lại.`,
+      'TOPIC_HAS_ACTIVE_EXAM',
+    );
+  }
+
   topic.isActive = false;
   await topic.save();
 

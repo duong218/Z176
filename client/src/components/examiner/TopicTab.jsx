@@ -92,7 +92,13 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
       await deleteTopic(topic._id);
       await loadTopics();
     } catch (err) {
-      setError(err.message || 'Lỗi khi ngừng sử dụng chủ đề');
+      const message = err.message || 'Lỗi khi ngừng sử dụng chủ đề';
+      setError(message);
+      // Thêm toast lỗi song song với banner — lỗi bị CHẶN (vd đang có kỳ thi
+      // published dùng chủ đề này) cần nổi bật ngay, tránh người dùng chỉ
+      // thấy nút hết loading rồi tưởng đã ngừng sử dụng thành công mà không
+      // để ý banner phía trên đầu trang.
+      showToast(message, 'error');
     } finally {
       setActionLoading(false);
     }
