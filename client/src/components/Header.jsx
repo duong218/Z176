@@ -34,7 +34,10 @@ export const Header = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const menuItems = variant === 'dashboard' ? [] : [
-    { id: 'home', label: 'Trang chủ', icon: <Home className="w-5 h-5 shrink-0" /> },
+    // "Trang chủ" chỉ hiện khi CHƯA đăng nhập — khi đã đăng nhập, logo Z176
+    // ở đầu header đã đảm nhiệm việc đưa user về trang chủ (xem onClick của
+    // nút logo bên dưới), nên nút này bị dư và được ẩn đi để menu gọn hơn.
+    ...(!currentUser ? [{ id: 'home', label: 'Trang chủ', icon: <Home className="w-5 h-5 shrink-0" /> }] : []),
     { id: 'rules', label: 'Quy chế', icon: <FileText className="w-5 h-5 shrink-0" /> },
     { id: 'results', label: 'Kết quả', icon: <Award className="w-5 h-5 shrink-0" /> },
     { id: 'exam', label: 'Vào thi', icon: <CheckSquare className="w-5 h-5 shrink-0" /> },
@@ -97,49 +100,55 @@ export const Header = ({
           </div>
         </button>
 
-        {/* Desktop Navigation Menu */}
-        <nav className="hidden md:flex items-center gap-2 xl:gap-5" aria-label="Menu chính">
+        {/* Desktop Navigation Menu — chỉ hiện từ lg (>=1024px) trở lên: ở
+            variant='public' đã đăng nhập, thanh nav phải chứa cả menuItems
+            lẫn user pill/chuông/nút đổi mật khẩu/đăng xuất, nên nếu bật từ
+            md (768px) thì không đủ chỗ và bị xô/chồng lên nhau. Từ md tới
+            dưới lg giờ dùng chung menu rút gọn (hamburger) như mobile. */}
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-3 min-w-0" aria-label="Menu chính">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 lg:px-5 rounded-lg font-medium text-sm lg:text-base transition-all duration-200 whitespace-nowrap min-touch-target ${isActive
-                  ? 'bg-[#008BC5]/15 text-[#38BDF8] border border-[#008BC5]/30 font-semibold shadow-[0_0_12px_rgba(56,189,248,0.15)]'
-                  : 'text-slate-300 hover:text-white hover:bg-[#334155]/40 border border-transparent'
+                className={`flex items-center gap-1.5 px-2.5 py-2 xl:px-4 rounded-lg font-medium text-sm xl:text-base transition-colors duration-200 whitespace-nowrap min-touch-target border ${isActive
+                  ? 'bg-[#008BC5]/15 text-[#38BDF8] border-[#008BC5]/30 shadow-[0_0_12px_rgba(56,189,248,0.15)]'
+                  : 'text-slate-300 hover:text-white hover:bg-[#334155]/40 border-transparent'
                   }`}
               >
-                <span className="hidden lg:inline-block">{item.icon}</span>
+                <span className="hidden xl:inline-block">{item.icon}</span>
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* Desktop Auth Area */}
-        <div className="hidden md:flex items-center gap-2">
+        {/* Desktop Auth Area — cùng breakpoint lg với nav ở trên, và co gọn
+            dần theo chiều rộng: role label chỉ hiện từ xl, các nút phụ
+            (đổi mật khẩu/đăng xuất) rút còn icon cho tới xl mới hiện chữ. */}
+        <div className="hidden lg:flex items-center gap-1.5 xl:gap-2 shrink-0">
           {authLoading ? (
             <div className="w-6 h-6 border-2 border-slate-600 border-t-[#008BC5] rounded-full animate-spin" />
           ) : currentUser ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 xl:gap-2">
               {/* Chuông thông báo */}
               <NotificationBell currentUser={currentUser} />
 
               {/* User info pill */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="w-7 h-7 rounded-full bg-[#008BC5]/20 flex items-center justify-center">
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800 rounded-lg border border-slate-700 max-w-[9rem] xl:max-w-none">
+                <div className="w-7 h-7 rounded-full bg-[#008BC5]/20 flex items-center justify-center shrink-0">
                   <Shield className="w-4 h-4 text-[#38BDF8]" />
                 </div>
-                <div className="flex flex-col leading-tight">
-                  <span className="text-sm font-semibold text-white">{currentUser.username}</span>
-                  <span className="text-xs text-[#64748B]">{roleLabel}</span>
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="text-sm font-semibold text-white truncate">{currentUser.username}</span>
+                  <span className="hidden xl:block text-xs text-[#64748B] whitespace-nowrap">{roleLabel}</span>
                 </div>
               </div>
               {/* Change password button */}
               <button
                 onClick={onOpenChangePassword}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-[#F6AD37] hover:bg-orange-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-orange-500/20 whitespace-nowrap"
+                className="flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium text-slate-400 hover:text-[#F6AD37] hover:bg-orange-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-orange-500/20 whitespace-nowrap shrink-0"
                 title="Đổi mật khẩu"
               >
                 <KeyRound className="w-4 h-4" />
@@ -147,11 +156,11 @@ export const Header = ({
               {/* Logout button */}
               <button
                 onClick={onLogout}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-red-500/20 whitespace-nowrap"
+                className="flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-transparent hover:border-red-500/20 whitespace-nowrap shrink-0"
                 title="Đăng xuất"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Thoát</span>
+                <span className="hidden xl:inline">Thoát</span>
               </button>
             </div>
           ) : (
@@ -165,8 +174,8 @@ export const Header = ({
           )}
         </div>
 
-        {/* Mobile Right Area: Chuông (nếu đăng nhập) + Hamburger Toggle (<640px) */}
-        <div className="flex items-center gap-1 md:hidden">
+        {/* Mobile/Tablet Right Area: Chuông (nếu đăng nhập) + Hamburger Toggle (<1024px) */}
+        <div className="flex items-center gap-1 lg:hidden">
           {!authLoading && currentUser && <NotificationBell currentUser={currentUser} />}
           <button
             onClick={() => setDrawerOpen(true)}
@@ -180,7 +189,7 @@ export const Header = ({
 
       {/* Mobile Drawer Slide-in */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 lg:hidden flex">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 transition-opacity"
