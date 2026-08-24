@@ -42,7 +42,7 @@ export const RegulationsSection = ({ onStartExam }) => {
             <div>
               <h3 className="font-bold text-base text-[#0F172A]">Tỷ lệ đạt yêu cầu</h3>
               <p className="text-sm text-[#334155] font-medium">
-                Trả lời đúng từ <strong className="text-[#22C55E] font-bold">75% tổng số câu</strong> trở lên được tính là ĐẠT.
+                Trả lời đúng từ <strong className="text-[#22C55E] font-bold">60% tổng số câu</strong> trở lên được tính là ĐẠT.
               </p>
             </div>
           </div>

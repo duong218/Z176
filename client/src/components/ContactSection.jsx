@@ -22,7 +22,7 @@ export const ContactSection = () => {
           <div className="bg-white p-4 rounded-[10px] border border-slate-200 shadow-z176 space-y-2">
             <div className="flex items-center gap-2 text-[#008BC5] font-bold text-base">
               <Headphones className="w-5 h-5" />
-              <span>Hỗ trợ Kỹ thuật & Mạng (Tổ IT)</span>
+              <span>Hỗ trợ Kỹ thuật & Mạng (Phòng ban CNTT)</span>
             </div>
             <p className="text-sm text-[#334155]">Hỗ trợ xử lý lỗi không truy cập được bài thi, quên mật khẩu, gián đoạn kết nối mạng.</p>
             <a

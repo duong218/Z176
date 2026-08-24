@@ -1,5 +1,5 @@
 import { Z176_COMPANY_INFO } from '../data';
-import { ShieldCheck, PhoneCall, Mail, MapPin } from 'lucide-react';
+import { PhoneCall, Mail, MapPin } from 'lucide-react';
 
 export const Footer = () => {
   return (
@@ -7,8 +7,8 @@ export const Footer = () => {
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-[#008BC5] text-white flex items-center justify-center font-bold shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0 p-1">
+              <img src="/logo/logo.svg" alt="Logo Z176" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="font-bold text-base text-white">{Z176_COMPANY_INFO.name}</div>

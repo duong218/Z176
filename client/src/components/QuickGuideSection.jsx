@@ -96,7 +96,7 @@ export const QuickGuideSection = ({ onStartExam }) => {
         <div className="bg-[#EAF6FF] border border-[#008BC5]/30 rounded-[10px] p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-center sm:text-left">
             <span className="font-bold text-base text-[#0F172A] block">
-              Dễ dàng, không phức tạp — Bắt đầu ngay!
+              Dễ dàng, không phức tạp — Bắt đầu  ngay!
             </span>
             <span className="text-xs text-[#334155] font-medium">
               Chỉ mất 1 phút đăng nhập, thời gian làm bài theo đúng quy định của đề thi

@@ -201,12 +201,14 @@ export const Header = ({
           <div className="relative w-4/5 max-w-xs bg-[#0F172A] text-white h-full shadow-2xl flex flex-col z-10 border-r border-[#334155]">
             {/* Drawer Header */}
             <div className="p-4 border-b border-[#334155] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#008BC5] text-white flex items-center justify-center font-bold">
-                  Z
-                </div>
+              <button
+                onClick={() => handleNavClick('home')}
+                className="flex items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-[#008BC5] rounded-md -ml-1 p-1"
+                aria-label="Về trang chủ Z176"
+              >
+                <UnitLogoDisplay config={unitLogo} sizeClassName="w-8 h-8" iconSizeClassName="w-5 h-5" />
                 <span className="font-bold text-base text-white">Menu hệ thống Z176</span>
-              </div>
+              </button>
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="p-2 text-gray-300 hover:text-white rounded-lg min-touch-target flex items-center justify-center"
