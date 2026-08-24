@@ -18,7 +18,7 @@ const ACTION_LABELS = {
   EXPORT_CANDIDATE_CREDENTIALS: 'Xuất danh sách tài khoản nhân viên',
   // Đề thi
   CREATE_EXAM: 'Tạo đề thi',
-  SUBMIT_EXAM: 'Đệ trình đề thi',
+  SUBMIT_EXAM: 'Gửi đề thi để phê duyệt',
   APPROVE_EXAM: 'Duyệt đề thi',
   REJECT_EXAM: 'Từ chối đề thi',
   PUBLISH_EXAM: 'Phát hành đề thi',
@@ -52,6 +52,11 @@ const ACTION_LABELS = {
   RESTORE_TOPIC: 'Khôi phục chủ đề',
   UPDATE_TOPIC: 'Cập nhật chủ đề',
   DEACTIVATE_TOPIC: 'Ngừng sử dụng chủ đề',
+  // MỚI — trường hợp NGỪNG SỬ DỤNG chủ đề bị CHẶN vì đang có kỳ thi published
+  // dùng chủ đề đó (xem deactivateTopic() trong topic.service.js, ném
+  // ApiError('TOPIC_HAS_ACTIVE_EXAM')) — khác với DEACTIVATE_TOPIC ở trên
+  // (ghi khi thao tác THÀNH CÔNG), action này ghi lại lần thử BỊ TỪ CHỐI.
+  DEACTIVATE_TOPIC_BLOCKED: 'Bị chặn ngừng sử dụng chủ đề',
   // Tài liệu ôn tập
   UPLOAD_STUDY_DOCUMENT: 'Đăng tài liệu ôn tập',
   DEACTIVATE_STUDY_DOCUMENT: 'Gỡ tài liệu ôn tập',
@@ -61,6 +66,11 @@ const ACTION_LABELS = {
   CREATE_DEPARTMENT: 'Tạo phòng ban',
   UPDATE_DEPARTMENT: 'Cập nhật phòng ban',
   DEACTIVATE_DEPARTMENT: 'Ngừng sử dụng phòng ban',
+  // MỚI — Tác vụ hệ thống tự động (không do người dùng bấm), thực hiện bởi
+  // actor "Hệ thống" (xem cột "Người thực hiện" trong bảng) — dọn các file
+  // đã upload tạm (vd ảnh câu hỏi) nhưng không được gắn vào bản ghi nào
+  // trong 1 khoảng thời gian, tránh rác tồn đọng trên storage.
+  UPLOAD_TMP_CLEANUP: 'Dọn dẹp file tạm chưa sử dụng',
 };
 
 // Các action mang tính cảnh báo/nhạy cảm — hiển thị nhấn mạnh bằng màu vàng-cam
@@ -78,6 +88,7 @@ const EMPHASIZED_ACTIONS = new Set([
   'question.deactivate',
   'question.bulk_deactivate',
   'DEACTIVATE_TOPIC',
+  'DEACTIVATE_TOPIC_BLOCKED',
   'DEACTIVATE_STUDY_DOCUMENT',
   'DEACTIVATE_DEPARTMENT',
 ]);

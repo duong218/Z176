@@ -21,6 +21,15 @@ export const Header = ({
   currentUser,
   authLoading,
   onLogout,
+  // MỚI — danh sách tab con của dashboard hiện tại (vd 4 tab của
+  // AdminDashboard: Tổng quan/Tài khoản/Nhật ký/Sao lưu) + tab đang chọn +
+  // callback đổi tab. Chỉ có giá trị khi variant === 'dashboard' và trang đó
+  // có hỗ trợ điều này (hiện tại: AdminDashboard). Dùng để hiển thị các tab
+  // này ngay trong menu 3 gạch ở mobile, thay vì bắt người dùng vuốt ngang
+  // 1 thanh tab riêng trong nội dung trang — khó thao tác trên màn hình nhỏ.
+  dashboardTabs = [],
+  dashboardActiveTab,
+  onSelectDashboardTab,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -53,6 +62,14 @@ export const Header = ({
     } else {
       onSelectTab(tab);
     }
+    setDrawerOpen(false);
+  };
+
+  // MỚI — chọn 1 tab con của dashboard (vd "Tài khoản" trong AdminDashboard)
+  // từ trong drawer mobile, và đóng drawer lại luôn (giống hành vi
+  // handleNavClick ở trên) để không phải tự tay bấm nút X.
+  const handleDashboardTabClick = (tabId) => {
+    onSelectDashboardTab(tabId);
     setDrawerOpen(false);
   };
 
@@ -189,6 +206,36 @@ export const Header = ({
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {/* MỚI — Tab con của dashboard hiện tại (vd 4 tab của
+                AdminDashboard). Chỉ hiện khi variant='dashboard' VÀ trang đó
+                có truyền dashboardTabs xuống (hiện tại chỉ AdminDashboard làm
+                điều này) — nếu không có thì không hiện gì, không ảnh hưởng
+                các dashboard khác (Examiner/Leader/Candidate) vốn chưa được
+                chuyển qua cơ chế này. */}
+            {variant === 'dashboard' && dashboardTabs.length > 0 && (
+              <div className="p-4 space-y-2 border-b border-[#334155]">
+                <p className="px-1 text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  Chuyển mục
+                </p>
+                {dashboardTabs.map((tab) => {
+                  const isActive = dashboardActiveTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleDashboardTabClick(tab.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left text-base font-medium transition-colors min-touch-target ${isActive
+                        ? 'bg-[#008BC5] text-white font-bold'
+                        : 'text-gray-100 hover:bg-[#334155] active:bg-[#334155]'
+                        }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Menu Items strictly in order */}
             <div className="p-4 flex-1 overflow-y-auto space-y-2">

@@ -28,6 +28,20 @@ function StatusBadge({ status }) {
   );
 }
 
+// Nhãn text thuần cho MỌI trạng thái có thể có của Exam (không chỉ 3 trạng
+// thái trong STATUS_BADGE ở trên, vốn chỉ dùng cho bảng "Lịch sử duyệt kỳ
+// thi") — dùng để ghép vào câu thông báo lỗi khi thao tác bị chặn do kỳ thi
+// đã đổi trạng thái ở nơi khác (tab/thiết bị khác), xem
+// reportStaleStatusError() bên dưới.
+const STATUS_TEXT_LABELS = {
+  draft: 'Nháp',
+  pending_review: 'Chờ duyệt',
+  approved: 'Đã duyệt (chờ phát hành)',
+  rejected: 'Đã từ chối',
+  published: 'Đang phát hành',
+  archived: 'Đã lưu trữ',
+};
+
 export const ExamReviewTab = () => {
   const { showToast } = useToast();
   const confirmAction = useConfirm();
@@ -71,6 +85,30 @@ export const ExamReviewTab = () => {
     loadData();
   }, []);
 
+  // Dùng chung cho handleApprove/handleReject/handleArchive bên dưới — khi
+  // action bị chặn vì kỳ thi không còn ở trạng thái mong đợi nữa (thường do
+  // đã bị thao tác từ 1 tab/thiết bị khác đang mở song song), tự tải lại 3
+  // danh sách để tìm đúng trạng thái THẬT hiện tại của kỳ thi đó, rồi ghép
+  // vào thông báo lỗi cho rõ ràng, thay vì chỉ hiện message chung chung của
+  // backend khiến người dùng phải tự đoán vì sao thao tác bị từ chối.
+  const reportStaleStatusError = async (id, fallbackMessage) => {
+    const [pending, approved, history] = await Promise.all([
+      fetchPendingExams().catch(() => []),
+      fetchApprovedExams().catch(() => []),
+      fetchExamHistory().catch(() => []),
+    ]);
+    const freshExam = [...pending, ...approved, ...history].find((e) => e._id === id);
+    const statusText = freshExam ? STATUS_TEXT_LABELS[freshExam.status] || freshExam.status : null;
+
+    showToast(
+      statusText
+        ? `Kỳ thi này đã ở trạng thái "${statusText}" (có thể vừa được thao tác từ tab hoặc thiết bị khác) nên không thể thực hiện thao tác này nữa. Danh sách đã được tải lại cho đúng trạng thái mới nhất.`
+        : fallbackMessage,
+      'warning',
+    );
+    loadData();
+  };
+
   const handleApprove = async (e) => {
     e.preventDefault();
     try {
@@ -81,6 +119,11 @@ export const ExamReviewTab = () => {
       showToast('Đã phê duyệt kỳ thi thành công.', 'success');
       loadData();
     } catch (error) {
+      if (error.code === 'EXAM_INVALID_STATUS') {
+        setIsApproveModalOpen(false);
+        await reportStaleStatusError(approveId, error.message || 'Lỗi khi duyệt kỳ thi');
+        return;
+      }
       showToast(error.message || 'Lỗi khi duyệt kỳ thi', 'error');
     }
   };
@@ -94,6 +137,11 @@ export const ExamReviewTab = () => {
       showToast('Đã từ chối đề xuất kỳ thi.', 'warning');
       loadData();
     } catch (error) {
+      if (error.code === 'EXAM_INVALID_STATUS') {
+        setIsRejectModalOpen(false);
+        await reportStaleStatusError(rejectId, error.message || 'Lỗi khi từ chối kỳ thi');
+        return;
+      }
       showToast(error.message || 'Lỗi khi từ chối kỳ thi', 'error');
     }
   };
@@ -139,7 +187,11 @@ export const ExamReviewTab = () => {
       showToast('Đã lưu trữ kỳ thi.', 'success');
       loadData();
     } catch (error) {
-      showToast(error.message || 'Lỗi khi bỏ qua kỳ thi', 'error');
+      if (error.code === 'EXAM_INVALID_STATUS') {
+        await reportStaleStatusError(id, error.message || 'Lỗi khi bỏ qua kỳ thi');
+      } else {
+        showToast(error.message || 'Lỗi khi bỏ qua kỳ thi', 'error');
+      }
     } finally {
       setArchivingId(null);
     }

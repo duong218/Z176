@@ -22,9 +22,9 @@ import { ConfirmProvider } from './components/ConfirmDialog';
 import { fetchMe, logoutUser, getAccessToken } from './services/auth.service';
 import { SESSION_EXPIRED_EVENT } from './services/api';
 import { fetchMyExam } from './services/exam-attempt.service';
-import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { ExaminerDashboard } from './pages/examiner/ExaminerDashboard';
-import { LeaderDashboard } from './pages/leader/LeaderDashboard';
+import { AdminDashboard, ADMIN_DASHBOARD_TABS } from './pages/admin/AdminDashboard';
+import { ExaminerDashboard, EXAMINER_DASHBOARD_TABS } from './pages/examiner/ExaminerDashboard';
+import { LeaderDashboard, LEADER_DASHBOARD_TABS } from './pages/leader/LeaderDashboard';
 import { CandidateDashboard } from './pages/candidate/CandidateDashboard';
 import { fetchActiveExam } from './services/exam-review.service';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
@@ -74,6 +74,12 @@ const DASHBOARD_TAB_BY_ROLE = {
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
+  // Tab con đang chọn trong từng dashboard (Admin/Examiner/Leader) — nâng
+  // lên đây (thay vì state nội bộ của từng dashboard) để Header.jsx có thể
+  // hiển thị + đổi được từ menu 3 gạch trên mobile.
+  const [adminSubTab, setAdminSubTab] = useState('overview');
+  const [examinerSubTab, setExaminerSubTab] = useState('overview');
+  const [leaderSubTab, setLeaderSubTab] = useState('overview');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isExamOpen, setIsExamOpen] = useState(false);
 
@@ -341,6 +347,33 @@ function App() {
         currentUser={currentUser}
         authLoading={authLoading}
         onLogout={handleLogout}
+        dashboardTabs={
+          activeTab === 'admin-dashboard'
+            ? ADMIN_DASHBOARD_TABS
+            : activeTab === 'examiner-dashboard'
+              ? EXAMINER_DASHBOARD_TABS
+              : activeTab === 'leader-dashboard'
+                ? LEADER_DASHBOARD_TABS
+                : []
+        }
+        dashboardActiveTab={
+          activeTab === 'admin-dashboard'
+            ? adminSubTab
+            : activeTab === 'examiner-dashboard'
+              ? examinerSubTab
+              : activeTab === 'leader-dashboard'
+                ? leaderSubTab
+                : undefined
+        }
+        onSelectDashboardTab={
+          activeTab === 'admin-dashboard'
+            ? setAdminSubTab
+            : activeTab === 'examiner-dashboard'
+              ? setExaminerSubTab
+              : activeTab === 'leader-dashboard'
+                ? setLeaderSubTab
+                : undefined
+        }
       />
 
       {/* Main Content Area */}
@@ -366,11 +399,11 @@ function App() {
         )}
 
         {activeTab === 'admin-dashboard' && currentUser?.roleCode === 'admin' ? (
-          <AdminDashboard currentUser={currentUser} />
+          <AdminDashboard currentUser={currentUser} activeTab={adminSubTab} onTabChange={setAdminSubTab} />
         ) : activeTab === 'examiner-dashboard' && currentUser?.roleCode === 'examiner' ? (
-          <ExaminerDashboard />
+          <ExaminerDashboard activeTab={examinerSubTab} onTabChange={setExaminerSubTab} />
         ) : activeTab === 'leader-dashboard' && currentUser?.roleCode === 'leader' ? (
-          <LeaderDashboard onLogout={handleLogout} />
+          <LeaderDashboard onLogout={handleLogout} activeTab={leaderSubTab} onTabChange={setLeaderSubTab} />
         ) : activeTab === 'candidate-dashboard' && currentUser?.roleCode === 'candidate' ? (
           <CandidateDashboard
             currentUser={currentUser}

@@ -1,20 +1,23 @@
-import { useState } from 'react';
 import { OverviewTab } from '../../components/admin/OverviewTab';
 import { AccountTab } from '../../components/admin/AccountTab';
 import { AuditLogTab } from '../../components/admin/AuditLogTab';
 import { BackupTab } from '../../components/admin/BackupTab';
 import { LayoutDashboard, Users, Activity, Database } from 'lucide-react';
 
-export const AdminDashboard = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+// Xuất ra ngoài để App.jsx dùng lại đúng 1 nguồn danh sách tab này khi
+// truyền xuống Header.jsx (hiển thị trong menu 3 gạch ở mobile) — tránh
+// định nghĩa lặp lại 2 nơi khiến label/icon lệch nhau nếu sau này đổi tab.
+export const ADMIN_DASHBOARD_TABS = [
+  { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { id: 'accounts', label: 'Tài khoản', icon: <Users className="w-5 h-5" /> },
+  { id: 'audit', label: 'Nhật ký (Log)', icon: <Activity className="w-5 h-5" /> },
+  { id: 'backup', label: 'Sao lưu & Phục hồi', icon: <Database className="w-5 h-5" /> },
+];
 
-  const tabs = [
-    { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'accounts', label: 'Tài khoản', icon: <Users className="w-5 h-5" /> },
-    { id: 'audit', label: 'Nhật ký (Log)', icon: <Activity className="w-5 h-5" /> },
-    { id: 'backup', label: 'Sao lưu & Phục hồi', icon: <Database className="w-5 h-5" /> },
-  ];
-
+// activeTab/onTabChange giờ là props từ App.jsx (thay vì state nội bộ) —
+// để Header.jsx (menu 3 gạch ở mobile) có thể đọc/đổi được đúng tab đang
+// chọn ở đây, tránh 2 nơi giữ 2 state tab riêng biệt lệch nhau.
+export const AdminDashboard = ({ currentUser, activeTab, onTabChange }) => {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 mt-16 min-h-screen">
       <div className="mb-8">
@@ -23,12 +26,13 @@ export const AdminDashboard = ({ currentUser }) => {
       </div>
 
       <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
-        {/* Tab Navigation */}
-        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50 scrollbar-hide">
-          {tabs.map(tab => (
+        {/* Tab Navigation — CHỈ hiện từ md trở lên. Trên mobile, chuyển hẳn
+            sang menu 3 gạch (Header.jsx) để không phải vuốt ngang nữa. */}
+        <div className="hidden md:flex overflow-x-auto border-b border-slate-200 bg-slate-50 scrollbar-hide">
+          {ADMIN_DASHBOARD_TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => onTabChange(tab.id)}
               className={`flex items-center gap-2 px-6 py-4 font-medium text-sm whitespace-nowrap transition-colors border-b-2 outline-none focus:bg-slate-100 ${
                 activeTab === tab.id
                   ? 'border-[#008BC5] text-[#008BC5] bg-white'

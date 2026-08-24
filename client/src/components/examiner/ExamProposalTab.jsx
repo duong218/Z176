@@ -120,6 +120,18 @@ export const ExamProposalTab = () => {
     }
   };
 
+  // Nhãn text thuần (không kèm icon/màu) cho từng trạng thái — dùng để ghép
+  // vào câu thông báo lỗi (mục đích khác với getStatusBadge() vốn để render
+  // JSX trong bảng), tránh lặp lại chuỗi tiếng Việt ở 2 nơi dễ lệch nhau.
+  const STATUS_TEXT_LABELS = {
+    draft: 'Nháp',
+    pending_review: 'Chờ duyệt',
+    rejected: 'Bị từ chối',
+    approved: 'Đã duyệt',
+    published: 'Đã đăng',
+    archived: 'Đã lưu trữ',
+  };
+
   const handleSubmitReview = async (id) => {
     const ok = await confirmAction(
       'Bạn có chắc chắn muốn gửi đề xuất này cho Người duyệt đề duyệt?',
@@ -131,6 +143,26 @@ export const ExamProposalTab = () => {
       showToast('Đã gửi đề xuất cho Người duyệt đề.', 'success');
       loadData();
     } catch (error) {
+      // EXAM_INVALID_STATUS: kỳ thi không còn ở trạng thái draft/rejected nữa
+      // (vd đã được gửi duyệt từ 1 tab/thiết bị khác đang mở song song trước
+      // đó — backend chặn đúng để tránh gửi duyệt trùng lặp). Trường hợp này
+      // KHÔNG phải lỗi thật, chỉ là dữ liệu trên UI đang cũ hơn DB — nên cần
+      // tự tải lại danh sách để badge trạng thái cập nhật đúng ngay, và nói
+      // rõ trạng thái THẬT hiện tại thay vì message chung chung của backend,
+      // để người dùng hiểu ngay tại sao không gửi được nữa mà không cần tự đoán.
+      if (error.code === 'EXAM_INVALID_STATUS') {
+        const freshExams = await fetchMyExamProposals().catch(() => null);
+        const freshExam = Array.isArray(freshExams) ? freshExams.find((e) => e._id === id) : null;
+        const statusText = freshExam ? STATUS_TEXT_LABELS[freshExam.status] || freshExam.status : null;
+        showToast(
+          statusText
+            ? `Kỳ thi này đã ở trạng thái "${statusText}" (có thể vừa được thao tác từ tab hoặc thiết bị khác) nên không thể gửi duyệt lại. Danh sách đã được tải lại cho đúng trạng thái mới nhất.`
+            : 'Kỳ thi không còn ở trạng thái phù hợp để gửi duyệt (có thể vừa được thao tác từ tab hoặc thiết bị khác). Danh sách đã được tải lại cho đúng trạng thái mới nhất.',
+          'warning',
+        );
+        loadData();
+        return;
+      }
       showToast(error.message || 'Lỗi khi gửi duyệt', 'error');
     }
   };

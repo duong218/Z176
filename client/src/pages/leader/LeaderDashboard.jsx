@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { LayoutDashboard, Building2, FileBarChart, PieChart, CheckCircle, BookOpen } from 'lucide-react';
 import { OverviewTab } from '../../components/leader/OverviewTab';
 import { DepartmentReportTab } from '../../components/leader/DepartmentReportTab';
@@ -6,17 +5,20 @@ import { ExamReportTab } from '../../components/leader/ExamReportTab';
 import { DetailedResultsTab } from '../../components/leader/DetailedResultsTab';
 import { ExamReviewTab } from '../../components/leader/ExamReviewTab';
 
-export const LeaderDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+// Xuất ra ngoài để App.jsx dùng lại khi truyền xuống Header.jsx (hiển thị
+// trong menu 3 gạch ở mobile), cùng pattern đã áp dụng cho ADMIN_DASHBOARD_TABS
+// và EXAMINER_DASHBOARD_TABS.
+export const LEADER_DASHBOARD_TABS = [
+  { id: 'overview', label: 'Tổng quan', icon: <PieChart className="w-5 h-5" /> },
+  { id: 'department', label: 'Theo phòng ban', icon: <Building2 className="w-5 h-5" /> },
+  { id: 'exam', label: 'Theo bài thi', icon: <BookOpen className="w-5 h-5" /> },
+  { id: 'detailed', label: 'Kết quả chi tiết', icon: <FileBarChart className="w-5 h-5" /> },
+  { id: 'review', label: 'Duyệt kỳ thi', icon: <CheckCircle className="w-5 h-5" /> },
+];
 
-  const tabs = [
-    { id: 'overview', label: 'Tổng quan', icon: <PieChart className="w-5 h-5" /> },
-    { id: 'department', label: 'Theo phòng ban', icon: <Building2 className="w-5 h-5" /> },
-    { id: 'exam', label: 'Theo bài thi', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'detailed', label: 'Kết quả chi tiết', icon: <FileBarChart className="w-5 h-5" /> },
-    { id: 'review', label: 'Duyệt kỳ thi', icon: <CheckCircle className="w-5 h-5" /> },
-  ];
-
+// activeTab/onTabChange giờ là props từ App.jsx (thay vì state nội bộ) — để
+// Header.jsx (menu 3 gạch ở mobile) đọc/đổi được đúng tab đang chọn ở đây.
+export const LeaderDashboard = ({ activeTab, onTabChange }) => {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 mt-16 min-h-screen">
       <div className="mb-8">
@@ -28,12 +30,13 @@ export const LeaderDashboard = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-z176 border border-slate-200 overflow-hidden">
-        {/* Tab Navigation */}
-        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50 scrollbar-hide">
-          {tabs.map((tab) => (
+        {/* Tab Navigation — CHỈ hiện từ md trở lên. Trên mobile, chuyển hẳn
+            sang menu 3 gạch (Header.jsx) để không phải vuốt ngang nữa. */}
+        <div className="hidden md:flex overflow-x-auto border-b border-slate-200 bg-slate-50 scrollbar-hide">
+          {LEADER_DASHBOARD_TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => onTabChange(tab.id)}
               className={`
                 flex items-center gap-2 px-6 py-4 font-semibold text-sm transition-colors whitespace-nowrap outline-none
                 ${
