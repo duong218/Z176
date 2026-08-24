@@ -33,7 +33,7 @@ server/
     │   └── user.controller.js                      # Xử lý request quản lý tài khoản: CRUD user, import Excel 2 bước, xuất Excel credentials, phân role, khóa/mở, reset password
     ├── middlewares/
     │   ├── auth.middleware.js                       # Xác thực JWT (authenticate), kiểm tra tokenVersion phát hiện đăng nhập nơi khác, phân quyền role (requireRoleCodes)
-    │   ├── rate-limit.middleware.js                 # Giới hạn tần suất: loginRateLimiter (chống brute force), examAttemptRateLimiter (chống spam thao tác thi)
+    │   ├── rate-limit.middleware.js                 # Giới hạn tần suất: loginRateLimiter (chống brute force), examAttemptRateLimiter (theo userId, chống spam phòng thi lớn)
     │   ├── require-password-changed.middleware.js   # Chặn truy cập API nghiệp vụ nếu tài khoản chưa đổi mật khẩu mặc định (mustChangePassword = true)
     │   └── upload.middleware.js                     # Multer middleware: uploadExcel (file .xlsx/.xls), uploadQuestionImage (ảnh câu hỏi), uploadStudyDocument (tài liệu ôn tập)
     ├── models/
@@ -57,7 +57,7 @@ server/
     │   ├── schedule.model.js                       # Schema lịch thi: examId, startDate, endDate
     │   ├── study-document.model.js                 # Schema tài liệu ôn tập: title, topicId, scope, departmentId, fileUrl, publicId, originalName, mimeType, uploadedBy
     │   ├── topic.model.js                          # Schema chủ đề thi: name, description, isActive
-    │   └── user.model.js                           # Schema tài khoản người dùng: username, password (hash), roleId, isLocked, mustChangePassword, tokenVersion
+    │   └── user.model.js                           # Schema tài khoản người dùng: username, password (hash), roleId, isActive, lockedAt, lockUntil, mustChangePassword, tokenVersion
     ├── routes/
     │   ├── index.js                                # Router tổng: định tuyến tất cả sub-routers vào tiền tố /api/*
     │   ├── auth.routes.js                          # Tuyến API xác thực: /login, /refresh, /logout, /me, /change-password
@@ -77,8 +77,11 @@ server/
     │   ├── backup-cli.js                           # CLI script sao lưu CSDL thủ công (dump -> nén .gz -> upload Drive và xoay vòng)
     │   ├── cleanup-tmp-employees.js                # Script dọn dẹp dữ liệu nhân viên tạm (tạo trong quá trình import)
     │   ├── get-google-refresh-token.js             # Script tạo và lấy Google Drive Refresh Token OAuth2 lần đầu
-    │   └── seed-cli.js                             # CLI script khởi tạo 4 vai trò mặc định và tài khoản Admin ban đầu
+    │   ├── seed-cli.js                             # CLI script khởi tạo 4 vai trò mặc định và tài khoản Admin ban đầu
+    │   └── test-account-purge.js                   # Script test tự động kịch bản xóa cứng tài khoản khóa quá 6 tháng (chạy trên DB test)
     ├── services/
+    │   ├── account-purge.service.js                # Logic xóa cứng tài khoản: quét user khóa >6 tháng (lockedAt), loại trừ user có vết lịch sử thi/audit
+    │   ├── account-purge.scheduler.js              # Cron scheduler: Tự động xóa cứng tài khoản khóa lâu lúc 04:00 hàng ngày (Asia/Ho_Chi_Minh)
     │   ├── audit.service.js                        # Ghi log vết hành động, truy vấn/lọc/phân trang nhật ký hệ thống
     │   ├── auth.service.js                         # Logic xác thực: kiểm tra bcrypt, tạo JWT Access/Refresh tokens, set cookie, tăng tokenVersion
     │   ├── backup.service.js                       # Logic sao lưu: mongodump nén .gz, kết nối Google Drive API v3, upload, xoay vòng lưu trữ tối đa 5 bản, khôi phục mongorestore --drop
@@ -95,7 +98,7 @@ server/
     │   ├── seed.service.js                         # Logic seed: tạo 4 role (admin/examiner/leader/candidate) và tài khoản Admin mặc định khi hệ thống khởi động
     │   ├── study-document.service.js               # Logic tài liệu ôn tập: upload Cloudinary (resource_type: raw), phân quyền xem theo phòng ban, stream tải/xem tài liệu
     │   ├── topic.service.js                        # Logic chủ đề: CRUD, xóa mềm (cascade ẩn câu hỏi thuộc chủ đề), tự động khôi phục khi tạo trùng tên
-    │   └── user.service.js                         # Logic người dùng: CRUD, import Excel 2 bước (preview phân loại -> confirm ghi DB), xuất Excel tài khoản kèm mật khẩu tạm ngẫu nhiên, khóa/mở, reset mật khẩu
+    │   └── user.service.js                         # Logic người dùng: CRUD, import Excel 2 bước (preview phân loại -> confirm ghi DB), xuất Excel tài khoản kèm mật khẩu tạm ngẫu nhiên, khóa/mở (cập nhật lockedAt), reset mật khẩu
     └── utils/
         ├── api-error.js                            # Class ApiError tùy biến chuẩn hóa HTTP statusCode và mã lỗi hệ thống (code), helper assertFound
         └── async-handler.js                        # Wrapper bọc các async controller functions, tự động bắt exception đẩy vào next(err)
@@ -110,7 +113,8 @@ server/
   3. `runStartupSeed()`: Nếu cấu hình `SEED_ON_START=true`, kiểm tra và khởi tạo 4 vai trò mặc định cùng tài khoản Admin quản trị ban đầu.
   4. `initBackupScheduler()`: Đăng ký tiến trình cron chạy tự động vào **03:00 hàng ngày** để dump database, nén `.gz`, đẩy lên Google Drive và giữ lại tối đa 5 bản sao lưu mới nhất.
   5. `initUploadCleanupScheduler()`: Đăng ký tiến trình cron chạy **mỗi 1 giờ** để quét và xóa sạch các file tạm còn tồn đọng trong thư mục upload quá 6 tiếng.
-  6. `app.listen()`: Mở cổng Express nhận kết nối.
+  6. `initAccountPurgeScheduler()`: Đăng ký tiến trình cron chạy vào **04:00 hàng ngày** để quét và xóa cứng các tài khoản bị khóa liên tục quá 6 tháng (`lockedAt <= now - 6m`) và không có dấu vết lịch sử (chưa từng thi, chưa từng ghi audit log).
+  7. `app.listen()`: Mở cổng Express nhận kết nối.
 
 ### 2. Mô hình Dữ liệu và Các mối quan hệ (Schema Relations)
 - **Tài khoản & Nhân sự**:
@@ -287,8 +291,9 @@ server/
 - **CORS**: Chỉ chấp nhận các request từ `CLIENT_ORIGIN` được định nghĩa trong cấu hình môi trường.
 - **Bảo mật Phiên làm việc (Single Active Session)**: Quản lý qua trường `tokenVersion` trên model `User`. Khi người dùng đăng nhập tại thiết bị mới hoặc đổi mật khẩu, `tokenVersion` được tăng lên -> Vô hiệu hóa toàn bộ token của các phiên trước đó.
 - **Bảo vệ Endpoint Nhạy cảm**:
-  - `loginRateLimiter`: Giới hạn tần suất đăng nhập ngăn chặn tấn công dò mật khẩu (Brute Force).
-  - `examAttemptRateLimiter`: Kiểm soát lưu lượng request trong phòng thi ngăn chặn hành vi spam hoặc DDOS API nộp bài/heartbeat.
+  - `loginRateLimiter`: Giới hạn tần suất đăng nhập ngăn chặn tấn công dò mật khẩu (Brute Force) theo IP.
+  - `examAttemptRateLimiter`: Kiểm soát lưu lượng request trong phòng thi (`start`, `answer`, `heartbeat`, `submit`) theo **userId** (`keyGenerator: (req) => req.auth?.userId ?? req.ip`) — đảm bảo mỗi thí sinh có hạn ngạch độc lập, không bị nghẽn hay chặn nhầm khi hàng trăm thí sinh thi cùng lúc sau 1 địa chỉ IP/NAT mạng LAN.
+- **Tự động Dọn dẹp Tài khoản Khóa (`account-purge`)**: Scheduler 04:00 hàng ngày tự động xóa cứng các tài khoản bị khóa liên tục quá 6 tháng (`lockedAt <= now - 6m`) và chưa từng có vết lịch sử (chưa từng tham gia kỳ thi, chưa từng ghi audit log), đồng thời ghi vết `ACCOUNT_PURGE_AUTO`.
 - **Quản lý Mật khẩu**: Băm mật khẩu bằng `bcryptjs` với salt rounds chuẩn bảo mật cao (12 rounds).
 - **Global Error Handling**: Tất cả các lỗi bất đồng bộ được gom lại qua `asyncHandler` và xử lý tập trung tại error middleware ở cuối `app.js`, ẩn toàn bộ stacktrace nội bộ khi chạy trên môi trường production.
 
@@ -319,7 +324,7 @@ Kiến trúc tuân thủ mô hình **Controller-Service-Repository** (Mongoose �
 Dữ liệu được tổ chức theo tính toàn vẹn thông qua tham chiếu (Ref):
 
 - **Tổ chức nhân sự**: `Department` (1) ↔ (N) `Employee` (1) ↔ (1) `User` ↔ (1) `Role`.
-  - Một user gắn với một role cụ thể. User liên kết tới thông tin nhân sự (Employee) qua mã nhân viên.
+  - Một user gắn với một role cụ thể. User liên kết tới thông tin nhân sự (Employee) qua mã nhân viên. `User.lockedAt` lưu mốc thời gian lần khóa gần nhất.
 - **Kỳ thi và Đề thi**: `Exam` (1) ↔ (N) `ExamCode` (1) ↔ (N) `ExamCodeQuestion` ↔ (1) `Question`.
   - `Exam` (Kỳ thi) là container. Khi duyệt và phát hành, `ExamCode` (Mã đề thi) được sinh ra từ việc trộn ngẫu nhiên `Question`.
 - **Lượt thi và Kết quả**: `User (Candidate)` ↔ `ExamCandidate` ↔ `ExamAttempt` ↔ `AttemptQuestion` ↔ `Answer`.
@@ -337,8 +342,8 @@ Dữ liệu được tổ chức theo tính toàn vẹn thông qua tham chiếu 
 - **Helmet**: Tự động set HTTP headers chống XSS, Clickjacking.
 - **CORS**: Chỉ cho phép `CLIENT_ORIGIN` được quyền gọi API, bảo vệ resource cross-origin.
 - **Rate Limit**: Áp dụng chặt chẽ cho endpoint nhạy cảm:
-  - `/login`: Giới hạn lần đăng nhập ở production (ngừa brute force).
-  - `/start`, `/submit`, `/heartbeat`: Chống DDOS/spam khi làm bài thi.
+  - `/login`: Giới hạn lần đăng nhập ở production (ngừa brute force) theo IP.
+  - `/start`, `/answer`, `/submit`, `/heartbeat`: Áp dụng `examAttemptRateLimiter` theo `userId` (100 req/phút/user), giúp phòng thi nhiều máy tính sau cùng 1 IP NAT không bị chặn nhầm.
 - **JWT**: Sử dụng chiến lược *Access Token (ngắn hạn, trong Header)* và *Refresh Token (dài hạn, HTTP-Only Cookie)* để chống XSS đánh cắp token.
 - **Mật khẩu**: Băm bằng `bcryptjs` (hash + salt), bắt buộc đổi mật khẩu khi cấp tài khoản mới (`mustChangePassword`).
 - **Ngăn chặn phiên (Session Revocation)**: Sử dụng trường `tokenVersion` trên model `User`. Đăng nhập mới sẽ tăng phiên bản, làm access token cũ lập tức trở nên bất hợp lệ.

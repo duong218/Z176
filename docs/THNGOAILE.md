@@ -209,6 +209,20 @@ Tránh N+1 query bằng cách dùng `Set` thay vì query DB từng dòng.
 
 ---
 
+### A23. Tự động xóa cứng tài khoản bị khóa liên tục quá 6 tháng (Account Purge Scheduler)
+
+**Tình huống:** Tài khoản nhân viên đã nghỉ việc bị khóa lâu ngày tích tụ làm tăng dung lượng cơ sở dữ liệu. Tuy nhiên, nếu xóa cứng bừa bãi sẽ làm mồ côi hoặc gãy liên kết dữ liệu lịch sử thi cử (`ExamCandidate`) và nhật ký hệ thống (`AuditLog`).
+
+**Cách khắc phục:**
+- Khi khóa tài khoản (`toggleUserLock`), hệ thống ghi nhận thời điểm khóa vào trường `User.lockedAt`. Nếu tài khoản được mở khóa, `lockedAt` được xóa về `undefined` (đảm bảo đồng hồ 6 tháng tự động reset nếu bị khóa lại).
+- Scheduler `account-purge.scheduler.js` chạy lúc **04:00 hàng ngày** gọi `purgeExpiredLockedAccounts`:
+  1. Lọc các tài khoản `isActive: false` và có `lockedAt <= now - 6 tháng` liên tục.
+  2. Kiểm tra dấu vết lịch sử (`hasHistoricalFootprint`): Nếu tài khoản **đã từng tham gia kỳ thi** (`ExamCandidate > 0`) hoặc **từng là actor trong nhật ký hệ thống** (`AuditLog > 0`) → **Tuyệt đối không xóa**, giữ lại vĩnh viễn để bảo vệ tính toàn vẹn báo cáo/kiểm toán.
+  3. Chỉ xóa cứng cả `User` và `Employee` đối với tài khoản không có vết lịch sử, đồng thời ghi 1 dòng audit log tổng hợp `ACCOUNT_PURGE_AUTO` để truy vết.
+  4. Các tài khoản khóa từ trước khi có tính năng này (`lockedAt` là `null`) sẽ được giữ an toàn, không xóa tự động.
+
+---
+
 ## PHẦN B — HẠN CHẾ HIỆN TẠI CỦA DỰ ÁN
 
 ### B1. Chỉ hỗ trợ tối đa 1 kỳ thi `published` tại 1 thời điểm
@@ -239,14 +253,13 @@ Các thao tác liên quan nhiều collection (tạo User + Employee + gán ExamC
 
 ---
 
-### B4. Chỉ xóa mềm, không có cơ chế xóa cứng dữ liệu lịch sử
+### B4. Chỉ xóa mềm các thực thể nghiệp vụ (Phòng ban, Chủ đề, Câu hỏi)
 
-Toàn bộ các thực thể (Department, Topic, Question, User/Employee) chỉ xóa mềm (`isActive: false`). Không có công cụ hoặc API để xóa cứng (purge) dữ liệu đã vô hiệu hóa.
+Đối với các thực thể cốt lõi như Phòng ban (`Department`), Chủ đề (`Topic`), và Câu hỏi (`Question`), hệ thống chỉ hỗ trợ xóa mềm (`isActive: false`) để bảo toàn tính toàn vẹn tham chiếu với các đề thi đã phát hành và kết quả thi trong quá khứ. Chưa có công cụ quản trị (Purge Tool) để xóa cứng các danh mục này. (Riêng tài khoản người dùng đã có cơ chế tự động dọn dẹp an toàn sau 6 tháng khóa — xem Mục A23).
 
 **Hệ quả:**
-- Cơ sở dữ liệu tích lũy dần theo thời gian, không có cơ chế dọn dẹp tự động.
-- Các bản ghi đã xóa mềm vẫn chiếm dung lượng và có thể ảnh hưởng hiệu năng query nếu lượng dữ liệu lớn.
-- Unique index trên trường như `slug` (Department) hoặc `name` (Topic) vẫn giữ bản ghi cũ → tạo mới trùng tên phải đi qua nhánh "khôi phục" thay vì tạo hoàn toàn mới.
+- Các danh mục câu hỏi, chủ đề, phòng ban đã xóa mềm vẫn chiếm dung lượng và tồn tại trong cơ sở dữ liệu.
+- Ràng buộc duy nhất (Unique index) trên trường như `slug` (Department) hoặc `name` (Topic) vẫn lưu giữ bản ghi cũ → khi tạo mới trùng tên, hệ thống phải kích hoạt luồng "khôi phục" thay vì tạo bản ghi hoàn toàn mới.
 
 ---
 
