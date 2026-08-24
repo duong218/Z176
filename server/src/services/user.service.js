@@ -130,6 +130,12 @@ async function reactivateLockedAccount({
   existingUser.isActive = true;
   existingUser.failedLoginAttempts = 0;
   existingUser.lockUntil = undefined;
+  // Đồng bộ với toggleUserLock(): mở khóa (kể cả qua nhánh tái sử dụng này)
+  // phải xóa lockedAt, nếu không mốc đếm 6 tháng xóa cứng cũ sẽ còn sót lại
+  // dù tài khoản đã active — vô hại cho job purge (chỉ quét isActive:false)
+  // nhưng để lại dữ liệu rác, dễ gây hiểu nhầm nếu field này được dùng ở nơi
+  // khác sau này.
+  existingUser.lockedAt = undefined;
   existingUser.tokenVersion += 1;
   await existingUser.save();
 
@@ -332,6 +338,11 @@ export async function toggleUserLock({ adminId, userId, isActive, ipAddress }) {
   if (!user) throw new ApiError(404, 'Không tìm thấy người dùng', 'USER_NOT_FOUND');
 
   user.isActive = isActive;
+  // MỚI — Theo dõi mốc thời gian lần khóa gần nhất để phục vụ xóa cứng tự
+  // động sau 6 tháng (account-purge.service.js). Khóa -> ghi lại thời điểm
+  // khóa. Mở khóa -> xóa mốc này, để nếu sau đó bị khóa lại thì đồng hồ 6
+  // tháng tính lại từ đầu (không cộng dồn thời gian đã khóa trước đó).
+  user.lockedAt = isActive ? undefined : new Date();
   // Tăng tokenVersion để lập tức invalid token hiện tại
   user.tokenVersion += 1;
   await user.save();

@@ -4,6 +4,7 @@ import { connectDatabase } from './config/db.js';
 import { runStartupSeed } from './services/seed.service.js';
 import { initBackupScheduler } from './services/backup.scheduler.js';
 import { initUploadCleanupScheduler } from './services/upload-cleanup.scheduler.js';
+import { initAccountPurgeScheduler } from './services/account-purge.scheduler.js';
 
 async function main() {
   assertRuntimeEnv();
@@ -29,6 +30,11 @@ async function main() {
   // dở, tài liệu ôn tập chưa xử lý xong...) — chạy mỗi giờ, xoá file quá 6
   // tiếng tuổi. Ghi audit khi có xoá.
   initUploadCleanupScheduler();
+
+  // Đăng ký cron xóa cứng tài khoản đã khóa quá 6 tháng liên tục (không tính
+  // thời gian đã khóa trước lần mở khóa gần nhất) và chưa từng có dấu vết
+  // lịch sử (chưa từng thi, chưa từng ghi audit log) — chạy 04:00 mỗi ngày.
+  initAccountPurgeScheduler();
 
   const app = createApp();
   app.listen(env.port, () => {
