@@ -134,6 +134,11 @@ Quy trình vận hành thực tế của hệ thống diễn ra khép kín qua c
 *   Chạy ngay 1 lần lúc khởi động server để dọn rác tồn đọng từ trước khi server bị restart.
 *   Ghi audit `UPLOAD_TMP_CLEANUP` mỗi khi có file bị xoá.
 
+### 4.9. Tự động xóa cứng tài khoản bị khóa lâu ngày (Account Purge)
+*   Cron job chạy lúc **04:00 mỗi ngày** (múi giờ `Asia/Ho_Chi_Minh`), tự động quét và xóa cứng các tài khoản bị khóa liên tục quá **6 tháng** (`lockedAt <= now - 6 tháng`).
+*   **Nguyên tắc bảo vệ dữ liệu lịch sử**: Hệ thống kiểm tra dấu vết trước khi xóa. Nếu tài khoản đã từng tham gia kỳ thi (`ExamCandidate > 0`) hoặc từng là actor trong nhật ký hệ thống (`AuditLog > 0`) thì **tuyệt đối không xóa**, giữ lại vĩnh viễn nhằm đảm bảo toàn vẹn báo cáo kiểm toán.
+*   Tài khoản đủ điều kiện sẽ được xóa cứng cả `User` và `Employee`, đồng thời ghi 1 bản ghi audit log tổng hợp `ACCOUNT_PURGE_AUTO` để phục vụ truy vết.
+
 ---
 
 ## 5. MÔ HÌNH DỮ LIỆU THỰC TẾ (DATABASE SCHEMA MAPPING)
@@ -143,7 +148,7 @@ Dữ liệu được lưu trữ tập trung trên MongoDB thông qua các thực
 | Model | Collection | Chức năng chính |
 | :--- | :--- | :--- |
 | `Role` | `roles` | Lưu thông tin các vai trò hệ thống: name, code (admin, examiner, leader, candidate), description, isActive. |
-| `User` | `users` | Tài khoản đăng nhập: username (unique, lowercase), passwordHash, roleId, mustChangePassword, isActive, failedLoginAttempts, lockUntil (cơ chế khóa tạm tài khoản khi đăng nhập sai nhiều lần) và tokenVersion (thu hồi phiên cũ). |
+| `User` | `users` | Tài khoản đăng nhập: username (unique, lowercase), passwordHash, roleId, mustChangePassword, isActive, lockedAt (mốc thời gian lần khóa gần nhất), failedLoginAttempts, lockUntil (cơ chế khóa tạm tài khoản khi đăng nhập sai nhiều lần) và tokenVersion (thu hồi phiên cũ). |
 | `Employee` | `employees` | Hồ sơ cá nhân nhân viên: fullname, employeeCode (unique, sparse), dob (String — giữ format gốc), gender, phone, address, position, isActive. Liên kết 1-1 với `User` và `Department`. |
 | `Department` | `departments` | Danh mục phòng ban: name (unique), code (mã phòng ban, unique, sparse, chuẩn hóa hoa + bỏ dấu), slug (tên chuẩn hóa bỏ dấu/lowercase dùng khớp import), description, isActive. |
 | `Topic` | `topics` | Danh mục các chủ đề lớn của kỳ thi: name (unique), description, isActive. |
@@ -173,6 +178,6 @@ Dữ liệu được lưu trữ tập trung trên MongoDB thông qua các thực
 - **Bảo mật file tài liệu**: Tài liệu ôn tập lưu trên đĩa server nội bộ, không có URL tĩnh công khai. API tải file yêu cầu xác thực JWT và kiểm tra quyền truy cập theo phòng ban (candidate chỉ xem tài liệu Common + đúng phòng ban của mình). Server stream file nhị phân trực tiếp, đảm bảo chỉ nhân viên có tài khoản hợp lệ mới xem được tài liệu.
 - **Rate Limiting**: 
     - **Đăng nhập**: Giới hạn `LOGIN_RATE_LIMIT_MAX` (mặc định 5) request trong cửa sổ `LOGIN_RATE_LIMIT_WINDOW_MINUTES` (mặc định 15 phút) trên mỗi IP. Chỉ active ở production.
-    - **Lượt thi**: Giới hạn 100 request/phút/IP cho toàn bộ luồng thao tác bài thi (start, answer, heartbeat, submit) — chặn trường hợp gọi thẳng API bằng script/Postman spam liên tục. Client bình thường chỉ gửi heartbeat mỗi 15s + vài lần đổi đáp án, nên ngưỡng này không ảnh hưởng người dùng thật. Chỉ active ở production.
-- **Audit Logging**: Mọi hành vi nhạy cảm của người dùng (tạo/sửa/xóa tài khoản, import nhân viên, khóa/mở khóa tài khoản, thay đổi quyền, đổi logo hệ thống, chỉnh sửa ngân hàng đề, tạo/đệ trình/phê duyệt/từ chối/phát hành/lưu trữ kỳ thi, sao lưu/khôi phục dữ liệu, dọn file tạm) đều được hệ thống ghi vết vào bộ sưu tập `auditlogs` kèm `actorUserId`, `ipAddress`, và `metadata` chi tiết, phục vụ thanh tra an ninh bảo mật nội bộ. Các job tự động (backup cron, upload cleanup) ghi audit với `actorUserId = null`.
+    - **Lượt thi**: Giới hạn 100 request/phút theo **userId** (`keyGenerator: (req) => req.auth?.userId ?? req.ip`) cho toàn bộ luồng thao tác bài thi (start, answer, heartbeat, submit) — đảm bảo mỗi thí sinh có hạn ngạch độc lập, giải quyết triệt để tình trạng nghẽn/chặn nhầm khi hàng chục, hàng trăm thí sinh thi cùng lúc sau 1 địa chỉ IP/NAT mạng LAN công ty. Chỉ active ở production.
+- **Audit Logging**: Mọi hành vi nhạy cảm của người dùng (tạo/sửa/xóa tài khoản, import nhân viên, khóa/mở khóa tài khoản, thay đổi quyền, đổi logo hệ thống, chỉnh sửa ngân hàng đề, tạo/đệ trình/phê duyệt/từ chối/phát hành/lưu trữ kỳ thi, sao lưu/khôi phục dữ liệu, dọn file tạm) đều được hệ thống ghi vết vào bộ sưu tập `auditlogs` kèm `actorUserId`, `ipAddress`, và `metadata` chi tiết, phục vụ thanh tra an ninh bảo mật nội bộ. Các job tự động (backup cron, upload cleanup, account purge) ghi audit với `actorUserId = null`.
 - **Seed Admin tự động**: Khi khởi động server lần đầu (hoặc khi `SEED_ON_START=true`), hệ thống tự tạo tài khoản admin với mật khẩu tạm và cờ `mustChangePassword = true` (production), đảm bảo luôn có quyền quản trị ban đầu mà không lộ mật khẩu mặc định.

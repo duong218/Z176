@@ -108,7 +108,7 @@ Với số lượng câu hỏi đã tính toán từ plan ở Bước 2:
 > `ExamCode` và `ExamCodeQuestion` đại diện cho bộ câu hỏi chung cố định của một phòng ban. Khi từng cá nhân thí sinh bước vào phòng thi, hệ thống sẽ thực hiện một bước xáo thứ tự câu hỏi và đáp án độc lập khác (`AttemptQuestion`) trong `exam-attempt.service.js`.
 
 ### Bước 4 — Gán Thí sinh vào Mã đề (`ExamCandidate`)
-- Với mỗi nhân viên thuộc phòng ban, hệ thống tạo bản ghi `ExamCandidate` liên kết `examId`, `userId`, `examCodeId`.
+- Với mỗi nhân viên thuộc phòng ban, hệ thống tạo bản ghi `ExamCandidate` liên kết `examId`, `employeeId`, `examCodeId`.
 - Mặc định khởi tạo `attemptsUsed = 0` và `extraAttemptsGranted = 0`.
 
 ---
@@ -129,6 +129,9 @@ Khi Quản trị viên tạo tài khoản nhân viên mới (tạo đơn lẻ ho
 2. Kiểm tra xem phòng ban của nhân viên mới đã có `ExamCode` của kỳ thi đó hay chưa:
    - **Đã có mã đề**: Sử dụng lại `ExamCode` có sẵn của phòng ban để gán cho nhân viên mới vào `ExamCandidate`.
    - **Chưa có mã đề** (do lúc publish phòng ban này chưa có nhân viên nào): Hệ thống tự động kích hoạt logic sinh `ExamCode` mới riêng cho phòng ban này và gán nhân viên vào.
-3. **Cơ chế Nuốt lỗi An toàn**: Nếu việc gán đề cho nhân viên mới thất bại (ví dụ ngân hàng câu hỏi của phòng ban mới không đủ), lỗi sẽ chỉ được ghi cảnh báo vào hệ thống nhật ký, **không ném lỗi chặn việc tạo tài khoản nhân viên**.
+3. **Cơ chế Nuốt lỗi An toàn & Thông báo (`notifyExamAssignmentFailed`)**: Nếu việc gán đề cho nhân viên mới thất bại (ví dụ ngân hàng câu hỏi của phòng ban mới không đủ), lỗi sẽ **không ném ra ngoài để chặn việc tạo tài khoản nhân viên**. Thay vào đó:
+   - Ghi cảnh báo ra log hệ thống.
+   - Tự động gửi thông báo hệ thống (`Notification`) tới **tất cả Admin đang active** và **Examiner đã tạo kỳ thi** để kịp thời bổ sung câu hỏi cho phòng ban đó.
 4. **Xử lý Xung đột Đồng thời (Concurrency Lock - Error 11000)**: Khi có 2 request tạo nhân viên cùng phòng ban chạy đồng thời, cả 2 có thể cùng phát hiện "chưa có mã đề" và cùng tạo `ExamCode`. Khi đó MongoDB sẽ trả về lỗi trùng lặp mã duy nhất `E11000`. Hệ thống chủ động bắt mã lỗi này, tự động chuyển sang đọc lại mã đề vừa được tạo bởi request kia và hoàn tất gán thí sinh mà không gặp bất kỳ lỗi nào.
+
 

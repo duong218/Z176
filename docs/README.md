@@ -8,9 +8,10 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật và mô hình dữ l
 - **[server/](file:///c:/Users/duong/Desktop/HethongZ176/server)** — Ứng dụng server-side Express API + MongoDB/Mongoose. Chi tiết: [server.md](file:///c:/Users/duong/Desktop/HethongZ176/structure/server.md).
 - **[docs/](file:///c:/Users/duong/Desktop/HethongZ176/docs)** — Tài liệu phân tích và thiết kế hệ thống.
   - [MONGOOSE_SCHEMA.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/MONGOOSE_SCHEMA.md) — Mô hình cơ sở dữ liệu MongoDB/Mongoose.
-  - [AUTH_API.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/AUTH_API.md) — Mô tả cơ chế xác thực JWT và phân quyền.
+  - [AUTH_API.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/AUTH_API.md) — Mô tả cơ chế xác thực JWT, phân quyền và Rate Limiting.
   - [sinh-de-tu-dong.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/sinh-de-tu-dong.md) — Thuật toán sinh đề và tạo mã đề thi.
   - [luong-lam-bai-thi.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/luong-lam-bai-thi.md) — Thiết kế luồng làm bài thi realtime và cơ chế giám sát.
+  - [THNGOAILE.md](file:///c:/Users/duong/Desktop/HethongZ176/docs/THNGOAILE.md) — Tổng hợp 23 tình huống ngoại lệ đã khắc phục & các hạn chế kỹ thuật của hệ thống.
 - **[mock-data/](file:///c:/Users/duong/Desktop/HethongZ176/mock-data)** — Thư mục chứa dữ liệu mẫu chuẩn hóa để hỗ trợ phát triển (seed database) và cung cấp cấu trúc cho các AI Agent trợ lý.
 
 ## Chạy nhanh (Môi trường Dev)

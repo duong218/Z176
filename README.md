@@ -33,8 +33,11 @@ Hệ thống được phát triển theo mô hình Client-Server phân lớp rõ
     *   Xác thực kép **JWT** (`accessToken` lưu client, `refreshToken` trong `httpOnly cookie`).
     *   Cơ chế **`tokenVersion`** thu hồi phiên tức thì trên mọi thiết bị khi phát hiện đăng nhập mới hoặc đổi mật khẩu.
     *   `Helmet` bảo vệ các HTTP headers, `CORS` cấu hình an toàn cho phép giao tiếp Client-Server.
-    *   `express-rate-limit` giới hạn tần suất các yêu cầu nhạy cảm (Đăng nhập và Thao tác thi).
-*   **Sao lưu đám mây**: **Google Drive API (OAuth2)** — Tự động sao lưu CSDL hàng ngày lúc 3h sáng (giữ tối đa 5 bản lưu xoay vòng) và hỗ trợ khôi phục an toàn.
+    *   `express-rate-limit` giới hạn tần suất các yêu cầu nhạy cảm: Đăng nhập theo IP và Thao tác thi theo **userId** (chống nghẽn phòng thi lớn dùng chung NAT/IP).
+*   **Tiến trình tự động (Cron Schedulers)**:
+    *   **Sao lưu đám mây**: Tự động backup CSDL lên Google Drive lúc 03:00 hàng ngày (giữ tối đa 5 bản lưu xoay vòng) và hỗ trợ khôi phục an toàn.
+    *   **Dọn file tạm**: Tự động dọn dẹp file tạm quá 6 tiếng trong thư mục upload mỗi giờ.
+    *   **Dọn tài khoản khóa lâu**: Tự động quét và xóa cứng các tài khoản bị khóa liên tục quá 6 tháng không có vết lịch sử thi/audit lúc 04:00 hàng ngày.
 *   **Xử lý tệp tin & Đa phương tiện**: `exceljs` & `xlsx` (đọc/xuất báo cáo Excel chuyên nghiệp); `multer` + `Cloudinary` hỗ trợ tải ảnh minh họa câu hỏi và tài liệu ôn tập.
 
 ---
@@ -83,8 +86,9 @@ Hệ thống phân chia rõ ràng 4 nhóm vai trò nghiệp vụ khác nhau:
 *   ⚡ **Hệ thống làm bài thi thông minh**: Tự động lưu đáp án ngay khi chọn (Autosave), đếm ngược thời gian, kiểm tra nhịp tim (Heartbeat 15s/lần) và tự động thu bài nếu thí sinh rời ca thi quá 1 phút.
 *   🎲 **Xáo trộn mã đề ngẫu nhiên**: Khi duyệt phát hành, hệ thống tự động trộn ngẫu nhiên thứ tự câu hỏi và thứ tự các phương án trả lời để tạo ra các mã đề khác nhau cho thí sinh.
 *   📊 **Báo cáo & Xuất dữ liệu chuyên nghiệp**: Thống kê tỉ lệ đạt/không đạt trực quan bằng biểu đồ Recharts, xuất báo cáo kết quả và danh sách tài khoản thí sinh ra định dạng Excel chuẩn.
-*   🛡️ **Bảo mật & Kiểm toán toàn diện**: Phát hiện và chặn đăng nhập đồng thời qua `tokenVersion`, ghi vết toàn bộ hoạt động nhạy cảm vào Audit Log với nhãn tiếng Việt chuẩn hóa.
+*   🛡️ **Bảo mật & Kiểm toán toàn diện**: Phát hiện và chặn đăng nhập đồng thời qua `tokenVersion`, rate limit theo `userId` chống nghẽn phòng thi, ghi vết toàn bộ hoạt động nhạy cảm vào Audit Log với nhãn tiếng Việt chuẩn hóa.
 *   💾 **Sao lưu đám mây tự động & Khôi phục an toàn**: Tự động backup CSDL lên Google Drive lúc 3h sáng mỗi ngày, hỗ trợ Admin tải bản sao lưu và khôi phục CSDL trực tiếp có thanh tiến trình % trực quan.
+*   🧹 **Tự động dọn dẹp hệ thống**: Cron job định kỳ dọn file tạm rác trong thư mục upload và xóa cứng an toàn các tài khoản bị khóa liên tục quá 6 tháng không có vết lịch sử thi.
 
 ---
 

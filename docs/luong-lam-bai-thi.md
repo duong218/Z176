@@ -23,15 +23,16 @@ Quy trình tổ chức thi trắc nghiệm tại Nhà máy Z176 đòi hỏi tín
 ---
 
 ## Bảng API Endpoints Phòng thi
-
+ 
 | Method | Đường dẫn | Quyền hạn | Chức năng | Rate Limit |
 |---|---|---|---|---|
 | `GET` | `/api/exam-attempts/my-exam` | Candidate | Lấy đề thi, cấu hình và trạng thái lượt thi hiện tại của thí sinh | Không |
-| `POST` | `/api/exam-attempts/start` | Candidate | Bắt đầu lượt thi mới hoặc tiếp tục lượt thi đang dở (`resumed`) | 100 req/min (prod) |
-| `PATCH` | `/api/exam-attempts/:id/answer` | Candidate | Tự động lưu đáp án 1 câu hỏi tức thì (Autosave) | 100 req/min (prod) |
-| `POST` | `/api/exam-attempts/:id/heartbeat` | Candidate | Gửi tín hiệu duy trì phòng thi (Heartbeat mỗi 15s) | 100 req/min (prod) |
-| `POST` | `/api/exam-attempts/:id/submit` | Candidate | Nộp bài thi chính thức và kích hoạt chấm điểm tự động | 100 req/min (prod) |
+| `POST` | `/api/exam-attempts/start` | Candidate | Bắt đầu lượt thi mới hoặc tiếp tục lượt thi đang dở (`resumed`) | 100 req/min/user (prod) |
+| `PATCH` | `/api/exam-attempts/:id/answer` | Candidate | Tự động lưu đáp án 1 câu hỏi tức thì (Autosave) | 100 req/min/user (prod) |
+| `POST` | `/api/exam-attempts/:id/heartbeat` | Candidate | Gửi tín hiệu duy trì phòng thi (Heartbeat mỗi 15s) | 100 req/min/user (prod) |
+| `POST` | `/api/exam-attempts/:id/submit` | Candidate | Nộp bài thi chính thức và kích hoạt chấm điểm tự động | 100 req/min/user (prod) |
 | `POST` | `/api/exam-attempts/candidates/:id/grant-attempt` | Leader | Cấp thêm lượt thi chính thức cho thí sinh | Không |
+
 
 ---
 
