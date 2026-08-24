@@ -201,6 +201,14 @@ Tránh N+1 query bằng cách dùng `Set` thay vì query DB từng dòng.
 
 ---
 
+### A22. Rate Limiting theo userId thay vì IP — tránh chặn nhầm phòng thi lớn
+
+**Tình huống:** Trong phòng thi lớn (50–100+ thí sinh cùng mạng LAN công ty), tất cả thí sinh đều chia sẻ chung 1 IP công cộng (NAT). Rate limiter mặc định (`express-rate-limit`) đếm theo IP → heartbeat mỗi 15s + autosave mỗi lần đổi đáp án từ hàng chục thí sinh cộng dồn vào **cùng 1 bộ đếm** → dễ chạm giới hạn 100 req/phút/IP → một số thí sinh bị từ chối tạm thời (HTTP 429) dù hành vi cá nhân hoàn toàn hợp lệ.
+
+**Cách khắc phục:** Middleware `examAttemptRateLimiter` trong `rate-limit.middleware.js` sử dụng `keyGenerator: (req) => req.auth?.userId ?? req.ip` — đếm rate limit theo **userId** thay vì IP. Vì hệ thống chỉ cho phép 1 phiên đăng nhập/tài khoản tại 1 thời điểm (xem A13 — `tokenVersion`), `userId` là định danh ổn định và duy nhất cho mỗi thí sinh → mỗi người có bộ đếm riêng, không bị ảnh hưởng bởi người khác cùng mạng. Fallback về `req.ip` khi chưa có `req.auth` (phòng trường hợp thứ tự middleware bị đổi trong tương lai, dù `examAttemptRateLimiter` luôn đặt sau `authenticate` trên route).
+
+---
+
 ## PHẦN B — HẠN CHẾ HIỆN TẠI CỦA DỰ ÁN
 
 ### B1. Chỉ hỗ trợ tối đa 1 kỳ thi `published` tại 1 thời điểm
@@ -296,15 +304,7 @@ API danh sách câu hỏi (`listQuestions`) sử dụng `skip(offset).limit(page
 
 ---
 
-### B11. Rate Limiting chỉ giới hạn theo IP, không theo user
-
-Middleware `rate-limit.middleware.js` giới hạn 100 request/phút/IP (chỉ bật ở production). Nếu nhiều thí sinh cùng ngồi sau 1 NAT (cùng IP công ty), toàn bộ sẽ chung 1 bộ đếm rate limit.
-
-**Hệ quả:** Trong phòng thi lớn (>50 thí sinh cùng mạng LAN), heartbeat + autosave gửi đồng thời có thể chạm giới hạn 100 req/phút/IP → một số request bị từ chối tạm thời (HTTP 429).
-
----
-
-### B12. Không có phân quyền chi tiết theo phòng ban cho Examiner
+### B11. Không có phân quyền chi tiết theo phòng ban cho Examiner
 
 Mọi Examiner đều có thể tạo, sửa, xóa câu hỏi **bất kỳ phòng ban nào** (không giới hạn theo phòng ban mà Examiner quản lý). Tương tự, Examiner có thể tạo đề xuất kỳ thi cho bất kỳ chủ đề nào.
 
@@ -312,7 +312,7 @@ Mọi Examiner đều có thể tạo, sửa, xóa câu hỏi **bất kỳ phòn
 
 ---
 
-### B13. Không hỗ trợ câu hỏi tự luận hoặc media ngoài ảnh tĩnh
+### B12. Không hỗ trợ câu hỏi tự luận hoặc media ngoài ảnh tĩnh
 
 Hệ thống chỉ hỗ trợ câu hỏi trắc nghiệm:
 - **Đơn đáp án** (`single`): Chọn đúng 1 đáp án đúng.
@@ -322,7 +322,7 @@ Không hỗ trợ: câu hỏi tự luận, câu hỏi kéo-thả, câu hỏi s�
 
 ---
 
-### B14. Mật khẩu tạm 6 chữ số (độ an toàn thấp cho giai đoạn chuyển giao)
+### B13. Mật khẩu tạm 6 chữ số (độ an toàn thấp cho giai đoạn chuyển giao)
 
 Mật khẩu tạm sinh bằng `crypto.randomInt(100000, 999999)` — chỉ 6 chữ số, dễ gõ nhưng không mạnh. Thí sinh bắt buộc phải đổi mật khẩu lần đầu đăng nhập (`mustChangePassword`), nhưng nếu file Excel xuất danh sách tài khoản (`exportCandidateCredentialsExcel`) bị lộ trước khi nhân viên đổi mật khẩu → toàn bộ tài khoản trong file bị lộ.
 
@@ -330,7 +330,7 @@ Mật khẩu tạm sinh bằng `crypto.randomInt(100000, 999999)` — chỉ 6 ch
 
 ---
 
-### B15. Không có log truy cập hệ thống (Access Log) chi tiết
+### B14. Không có log truy cập hệ thống (Access Log) chi tiết
 
 Audit log chỉ ghi các hành động nghiệp vụ (tạo tài khoản, xóa câu hỏi, backup...). Không ghi log truy cập HTTP chi tiết (IP, User-Agent, thời gian phản hồi, status code) cho mọi request.
 
