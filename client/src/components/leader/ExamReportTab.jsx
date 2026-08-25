@@ -7,6 +7,10 @@ export const ExamReportTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Phân trang 10 dòng/trang
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -18,6 +22,7 @@ export const ExamReportTab = () => {
       if (res.success) {
         const responseData = res.data || [];
         setData(Array.isArray(responseData) ? responseData : []);
+        setPage(1);
       } else {
         setError(res.message);
       }
@@ -86,6 +91,12 @@ export const ExamReportTab = () => {
         </div>
       ) : (
         <>
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+            const safePage = Math.min(page, totalPages);
+            const pagedData = data.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+            return (
+              <>
           {/* Desktop Table */}
           <div className="animate-fade-in-up hidden sm:block bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ '--stagger-delay': '80ms' }}>
             <div className="overflow-x-auto">
@@ -103,7 +114,7 @@ export const ExamReportTab = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E2E8F0]">
-                  {data.map((item) => (
+                  {pagedData.map((item) => (
                     <tr key={item._id} className="hover:bg-[#F6F8FA] transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -127,7 +138,7 @@ export const ExamReportTab = () => {
 
           {/* Mobile Card List */}
           <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '80ms' }}>
-            {data.map((item) => (
+            {pagedData.map((item) => (
               <div key={item._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -167,6 +178,36 @@ export const ExamReportTab = () => {
               </div>
             ))}
           </div>
+
+          {/* Phân trang: 10 dòng/trang */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 text-sm text-[#334155]">
+              <span>
+                Trang {safePage}/{totalPages} · {data.length} bài thi
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F6F8FA] min-touch-target"
+                >
+                  Trước
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F6F8FA] min-touch-target"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
+              </>
+            );
+          })()}
         </>
       )}
     </div>
