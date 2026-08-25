@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from 'recharts';
 import {
   fetchQuestions,
@@ -22,9 +23,13 @@ import {
 // pagination.total, fetchTopics, fetchDepartments, fetchMyExamProposals) rồi
 // tự tính số liệu ở client — không bịa thêm field/API nào không tồn tại.
 
-// Nhãn hiển thị cho trạng thái đề xuất kỳ thi — khớp đúng enum EXAM_STATUS
-// thật ở server/src/models/constants.js (draft, pending_review, rejected,
-// approved, published, archived).
+// Nhãn hiển thị + thứ tự cố định cho trạng thái đề xuất kỳ thi — khớp đúng
+// enum EXAM_STATUS thật ở server/src/models/constants.js (draft,
+// pending_review, rejected, approved, published, archived). Sắp theo đúng
+// vòng đời (nháp -> chờ duyệt -> (từ chối|duyệt) -> phát hành -> lưu trữ) để
+// biểu đồ đọc như 1 phễu quy trình, thay vì thứ tự ngẫu nhiên xuất hiện
+// trong dữ liệu.
+const STATUS_ORDER = ['draft', 'pending_review', 'rejected', 'approved', 'published', 'archived'];
 const STATUS_META = {
   draft: { label: 'Bản nháp', color: '#64748B' },
   pending_review: { label: 'Chờ duyệt', color: '#F6AD37' },
@@ -101,18 +106,23 @@ export const OverviewTab = () => {
     );
   }
 
-  // Đếm số đề xuất theo từng trạng thái, giữ thứ tự xuất hiện tự nhiên trong
-  // dữ liệu thay vì áp thứ tự cố định — tránh giả định enum không chắc chắn.
+  // Đếm số đề xuất theo từng trạng thái. Luôn liệt kê đủ 6 trạng thái trong
+  // STATUS_ORDER (kể cả trạng thái đang bằng 0) thay vì chỉ vẽ những trạng
+  // thái thực sự xuất hiện trong dữ liệu — nếu chỉ vẽ 1-2 cột có dữ liệu
+  // giữa 1 biểu đồ rộng thì nhìn rất trống; đủ 6 cột vừa lấp đầy không gian
+  // vừa cho thấy toàn cảnh quy trình duyệt đề (bao nhiêu đang chờ duyệt, bị
+  // từ chối... ) chỉ trong 1 lần nhìn.
   const statusCounts = data.proposals.reduce((acc, p) => {
     const key = p.status || 'unknown';
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const chartData = Object.entries(statusCounts).map(([status, count]) => ({
+  const extraStatuses = Object.keys(statusCounts).filter((s) => !STATUS_ORDER.includes(s));
+  const chartData = [...STATUS_ORDER, ...extraStatuses].map((status) => ({
     status,
     label: statusMeta(status).label,
     color: statusMeta(status).color,
-    count,
+    count: statusCounts[status] || 0,
   }));
   const hasProposals = data.proposals.length > 0;
 
@@ -143,41 +153,57 @@ export const OverviewTab = () => {
 
       {/* MỚI — Biểu đồ đề xuất kỳ thi theo trạng thái, giúp Người ra đề thấy
           ngay có bao nhiêu đề xuất đang chờ duyệt / đã duyệt / bị từ chối mà
-          không cần mở tab "Đề xuất kỳ thi" để đếm thủ công. */}
+          không cần mở tab "Đề xuất kỳ thi" để đếm thủ công. Vẽ dạng cột
+          ngang, luôn đủ 6 trạng thái (kể cả 0) theo đúng thứ tự vòng đời để
+          đọc như 1 phễu quy trình, có nhãn số ngay đầu mỗi cột. */}
       <div className="animate-fade-in-up bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 shadow-sm" style={{ '--stagger-delay': '180ms' }}>
-        <p className="text-sm font-medium text-slate-500 mb-3 px-1">Đề xuất kỳ thi theo trạng thái</p>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-sm font-medium text-slate-500">Đề xuất kỳ thi theo trạng thái</p>
+          {hasProposals && (
+            <p className="text-xs text-slate-400">Tổng <span className="font-semibold text-slate-600">{data.proposals.length}</span> đề xuất</p>
+          )}
+        </div>
         {!hasProposals ? (
           <div className="py-10 text-center text-slate-400 text-sm">Bạn chưa tạo đề xuất kỳ thi nào.</div>
         ) : (
-          <div className="h-56 sm:h-64">
+          <div className="h-72 sm:h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ top: 8, right: 28, bottom: 8, left: 0 }}
+                barCategoryGap="28%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
                 <XAxis
-                  dataKey="label"
-                  tick={{ fill: '#334155', fontSize: 11 }}
-                  axisLine={{ stroke: '#E2E8F0' }}
-                  tickLine={false}
-                  interval={0}
-                  angle={-20}
-                  textAnchor="end"
-                  height={46}
-                />
-                <YAxis
+                  type="number"
                   allowDecimals={false}
                   tick={{ fill: '#334155', fontSize: 12 }}
                   axisLine={{ stroke: '#E2E8F0' }}
                   tickLine={false}
-                  width={28}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tick={{ fill: '#334155', fontSize: 12, fontWeight: 500 }}
+                  axisLine={{ stroke: '#E2E8F0' }}
+                  tickLine={false}
+                  width={92}
                 />
                 <Tooltip
+                  cursor={{ fill: '#F1F5F9' }}
                   contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }}
                   formatter={(value, _name, props) => [`${value} đề xuất`, props?.payload?.label]}
                 />
-                <Bar dataKey="count" name="Số đề xuất" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                <Bar dataKey="count" name="Số đề xuất" radius={[0, 6, 6, 0]} maxBarSize={26}>
                   {chartData.map((entry) => (
-                    <Cell key={entry.status} fill={entry.color} />
+                    <Cell key={entry.status} fill={entry.color} fillOpacity={entry.count === 0 ? 0.25 : 1} />
                   ))}
+                  <LabelList
+                    dataKey="count"
+                    position="right"
+                    style={{ fill: '#334155', fontSize: 12, fontWeight: 600 }}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
