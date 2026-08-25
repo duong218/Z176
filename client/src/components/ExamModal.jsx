@@ -533,13 +533,19 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-300 hover:text-white rounded-lg min-touch-target flex items-center justify-center"
-            aria-label="Đóng giao diện thi"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          {/* Nút đóng: ẩn khi đang làm bài (step === 'testing') để tránh
+              thí sinh bấm nhầm thoát ra giữa lúc đang thi và bị tính thời
+              gian/mất trạng thái làm bài. Các step khác (confirm, loading,
+              error, result...) vẫn cho đóng bình thường. */}
+          {step !== 'testing' && (
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-300 hover:text-white rounded-lg min-touch-target flex items-center justify-center"
+              aria-label="Đóng giao diện thi"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          )}
         </div>
 
         {/* LOADING */}
