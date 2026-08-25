@@ -16,6 +16,8 @@ import {
   FileText,
   Eye,
   Download,
+  Calendar,
+  Info,
 } from 'lucide-react';
 import {
   BarChart,
@@ -44,6 +46,16 @@ const formatDateTime = (value) => {
     hour: '2-digit',
     minute: '2-digit',
   });
+};
+
+// MỚI — Format chỉ riêng ngày (không kèm giờ), dùng cho card "Kỳ thi đang
+// diễn ra" trên Dashboard — đồng bộ định dạng dd/mm/yyyy với
+// TimeAndCountdown.jsx ở trang chủ.
+const formatDateOnly = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
 // MỚI — Custom tick cho trục X của biểu đồ "Điểm số qua các lần thi". Tên kỳ
@@ -90,6 +102,36 @@ export const CandidateDashboard = ({ onOpenExam, examModalOpen, activeExam }) =>
   const [employee, setEmployee] = useState(null);
   const [results, setResults] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  // MỚI — Đếm ngược thời gian còn lại của kỳ thi đang active, hiển thị ngay
+  // trên Dashboard (đồng bộ logic tính toán với TimeAndCountdown.jsx ở trang
+  // chủ) để thí sinh không cần chuyển sang mục "Thi trực tuyến" mới biết còn
+  // bao lâu là hết hạn.
+  const [examTimeLeft, setExamTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    if (!activeExam?.endDate) return undefined;
+
+    const targetDate = new Date(activeExam.endDate).getTime();
+
+    const tick = () => {
+      const difference = targetDate - Date.now();
+      if (difference > 0) {
+        setExamTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((difference % (1000 * 60)) / 1000),
+        });
+      } else {
+        setExamTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [activeExam?.endDate]);
 
   // MỚI — Thay cho việc tự tính lượt thi ở client (hằng số cứng MAX_ATTEMPTS=1
   // + đếm Result), lấy thẳng trạng thái lượt thi THẬT từ backend qua
@@ -387,6 +429,89 @@ export const CandidateDashboard = ({ onOpenExam, examModalOpen, activeExam }) =>
                     </div>
                   </div>
                 </div>
+
+                {/* MỚI — Kỳ thi đang diễn ra: hiển thị ngay trên Dashboard tên
+                    kỳ thi, khoảng thời gian mở thi và đếm ngược thời gian còn
+                    lại, để thí sinh không phải chuyển sang mục "Thi trực
+                    tuyến" mới biết. Đồng bộ nguồn dữ liệu (activeExam) và
+                    cách tính đếm ngược với TimeAndCountdown.jsx ở trang chủ.
+                    Nền gradient tối + layout ngang trên desktop (thông tin
+                    bên trái, khối đếm ngược bên phải) để không bị trống trải
+                    khi khung nhìn rộng — trên mobile tự xếp dọc như cũ. */}
+                {activeExam ? (
+                  <div
+                    className="animate-fade-in-up relative overflow-hidden rounded-xl shadow-z176 bg-gradient-to-br from-[#0F172A] via-[#0F172A] to-[#0C4A6E] p-6 lg:p-7"
+                    style={{ '--stagger-delay': '30ms' }}
+                  >
+                    {/* Hoạ tiết trang trí góc phải — thuần thẩm mỹ, không ảnh hưởng nội dung */}
+                    <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 rounded-full bg-[#008BC5]/20 blur-3xl" />
+                    <div className="pointer-events-none absolute -right-4 bottom-0 w-32 h-32 rounded-full bg-sky-400/10 blur-2xl" />
+
+                    <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                      {/* Thông tin kỳ thi */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#22C55E]/15 text-[#4ADE80] text-xs font-bold uppercase tracking-wide border border-[#22C55E]/30 w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80] animate-pulse" />
+                            Đang mở
+                          </span>
+                        </div>
+                        <h2 className="text-xl lg:text-2xl font-bold text-white mb-2 flex items-start gap-2">
+                          <Calendar className="w-6 h-6 text-sky-300 shrink-0 mt-0.5" />
+                          <span>{activeExam.title}</span>
+                        </h2>
+                        <div className="text-sm text-slate-300 pl-8">
+                          Từ ngày <strong className="text-white font-semibold">{formatDateOnly(activeExam.startDate)}</strong> đến hết{' '}
+                          <strong className="text-white font-semibold">{formatDateOnly(activeExam.endDate)}</strong>
+                        </div>
+                      </div>
+
+                      {/* Khối đếm ngược */}
+                      <div className="shrink-0">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-2 flex items-center gap-1.5 lg:justify-end">
+                          <Clock className="w-3.5 h-3.5 text-sky-300" />
+                          Thời gian còn lại
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 lg:gap-2.5">
+                          {[
+                            { value: examTimeLeft.days, label: 'Ngày' },
+                            { value: examTimeLeft.hours, label: 'Giờ' },
+                            { value: examTimeLeft.minutes, label: 'Phút' },
+                            { value: examTimeLeft.seconds, label: 'Giây' },
+                          ].map((unit) => (
+                            <div key={unit.label} className="flex flex-col rounded-[10px] overflow-hidden shadow-lg w-16 lg:w-[4.5rem]">
+                              <div className="bg-[#0693E3] text-white font-bold text-center py-2 text-xl lg:text-2xl tracking-wider leading-none">
+                                {unit.value < 10 ? `0${unit.value}` : unit.value}
+                              </div>
+                              <div className="bg-white/10 backdrop-blur text-slate-200 text-[11px] font-medium text-center py-1 leading-none">
+                                {unit.label}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="text-sm text-slate-300">
+                        {activeExam
+                          ? `Bạn còn ${attemptsLeft} lượt thi cho kỳ thi này.`
+                          : null}
+                      </div>
+                      <button
+                        onClick={() => setActiveSection('exam')}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-white text-[#0F172A] font-bold text-sm rounded-lg hover:bg-slate-100 transition-colors shrink-0 min-touch-target"
+                      >
+                        Vào thi ngay
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="animate-fade-in-up flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-500 text-sm" style={{ '--stagger-delay': '30ms' }}>
+                    <Info className="w-5 h-5 text-slate-400 shrink-0" />
+                    Hiện chưa có kỳ thi nào đang diễn ra.
+                  </div>
+                )}
 
                 <div className="animate-fade-in-up grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ '--stagger-delay': '60ms' }}>
                   <div className="bg-white rounded-xl shadow-z176 border border-slate-200 p-5 flex items-center gap-4">
