@@ -444,7 +444,7 @@ export const AccountTab = ({ currentUser }) => {
       {/* Toolbar — mobile: xếp dọc, mỗi nút full-width cao 48px, luôn có nhãn chữ.
           Desktop (sm:): quay lại bố cục 1 hàng như cũ.
           MỚI — animate-fade-in-up: hiệu ứng xuất hiện khi tab vừa tải xong. */}
-      <div className="animate-fade-in-up flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6" style={{ '--stagger-delay': '0ms' }}>
+      <div className="animate-fade-in-up relative z-30 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6" style={{ '--stagger-delay': '0ms' }}>
         <div className="relative w-full sm:w-80">
           <input
             type="text"
