@@ -63,6 +63,11 @@ export const ExamReviewTab = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Phân trang cho bảng "Lịch sử duyệt kỳ thi" — danh sách này không giới
+  // hạn từ server nên có thể rất dài theo thời gian, chỉ hiện 10 dòng/trang.
+  const HISTORY_PAGE_SIZE = 10;
+  const [historyPage, setHistoryPage] = useState(1);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -74,6 +79,7 @@ export const ExamReviewTab = () => {
       setPendingExams(Array.isArray(pending) ? pending : []);
       setApprovedExams(Array.isArray(approved) ? approved : []);
       setHistoryExams(Array.isArray(history) ? history : []);
+      setHistoryPage(1);
     } catch (error) {
       console.error(error);
     } finally {
@@ -395,7 +401,16 @@ export const ExamReviewTab = () => {
           Lịch sử duyệt kỳ thi
         </h2>
 
-        {loading ? (
+        {(() => {
+          const totalHistoryPages = Math.max(1, Math.ceil(historyExams.length / HISTORY_PAGE_SIZE));
+          const safeHistoryPage = Math.min(historyPage, totalHistoryPages);
+          const pagedHistoryExams = historyExams.slice(
+            (safeHistoryPage - 1) * HISTORY_PAGE_SIZE,
+            safeHistoryPage * HISTORY_PAGE_SIZE,
+          );
+          return (
+
+        loading ? (
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center text-base text-[#64748B]">Đang tải...</div>
         ) : historyExams.length === 0 ? (
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center text-base text-[#64748B]">
@@ -406,7 +421,14 @@ export const ExamReviewTab = () => {
             {/* Desktop Table */}
             <div className="animate-fade-in-up hidden sm:block bg-white border border-[#E2E8F0] rounded-xl overflow-hidden" style={{ '--stagger-delay': '200ms' }}>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left table-fixed">
+                  <colgroup>
+                    <col className="w-[26%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[26%]" />
+                  </colgroup>
                   <thead className="bg-[#F6F8FA] text-[#334155] text-base border-b border-[#E2E8F0]">
                     <tr>
                       <th className="p-4 font-semibold">Kỳ thi</th>
@@ -417,24 +439,24 @@ export const ExamReviewTab = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0] text-base">
-                    {historyExams.map(exam => {
+                    {pagedHistoryExams.map(exam => {
                       const processedAt = exam.publishedAt || exam.approvedAt || exam.updatedAt || exam.createdAt;
                       return (
                         <tr key={exam._id} className="hover:bg-[#F6F8FA] transition-colors">
-                          <td className="p-4 font-medium text-[#0F172A]">{exam.title}</td>
-                          <td className="p-4 text-[#334155]">{exam.topicId?.name}</td>
+                          <td className="p-4 font-medium text-[#0F172A] truncate" title={exam.title}>{exam.title}</td>
+                          <td className="p-4 text-[#334155] truncate" title={exam.topicId?.name}>{exam.topicId?.name}</td>
                           <td className="p-4">
                             <StatusBadge status={exam.status} />
                           </td>
                           <td className="p-4 text-[#334155] text-sm">
                             {processedAt ? new Date(processedAt).toLocaleString('vi-VN') : '—'}
                           </td>
-                          <td className="p-4 text-sm max-w-xs">
+                          <td className="p-4 text-sm break-words">
                             {exam.status === 'rejected' ? (
                               <span className="text-[#C53030]">{exam.rejectionReason || 'Không có lý do'}</span>
                             ) : exam.status === 'archived' ? (
                               <span className="flex items-center gap-1 text-[#64748B]">
-                                <Archive className="w-4 h-4" /> Đã bị thay thế bởi kỳ thi khác hoặc bị bỏ qua
+                                <Archive className="w-4 h-4 shrink-0" /> <span className="truncate">Đã bị thay thế bởi kỳ thi khác hoặc bị bỏ qua</span>
                               </span>
                             ) : (
                               '—'
@@ -450,7 +472,7 @@ export const ExamReviewTab = () => {
 
             {/* Mobile Card List */}
             <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '200ms' }}>
-              {historyExams.map(exam => {
+              {pagedHistoryExams.map(exam => {
                 const processedAt = exam.publishedAt || exam.approvedAt || exam.updatedAt || exam.createdAt;
                 return (
                   <div key={exam._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-2">
@@ -478,8 +500,37 @@ export const ExamReviewTab = () => {
                 );
               })}
             </div>
+
+            {/* Phân trang: 10 dòng/trang */}
+            {totalHistoryPages > 1 && (
+              <div className="flex items-center justify-between gap-3 mt-4 text-sm text-[#334155]">
+                <span>
+                  Trang {safeHistoryPage}/{totalHistoryPages} · {historyExams.length} kỳ thi
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={safeHistoryPage <= 1}
+                    className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F6F8FA] min-touch-target"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+                    disabled={safeHistoryPage >= totalHistoryPages}
+                    className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] bg-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F6F8FA] min-touch-target"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            )}
           </>
-        )}
+        )
+        );
+        })()}
       </div>
 
       {/* Modals */}
