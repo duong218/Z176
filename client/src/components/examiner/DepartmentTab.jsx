@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, X, AlertCircle, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Loader2, X, AlertCircle, Edit2, Trash2, Search, BookOpen } from 'lucide-react';
 import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../services/examiner.service';
 import { useConfirm } from '../ConfirmDialog';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
-export const DepartmentTab = () => {
+export const DepartmentTab = ({ onViewQuestions } = {}) => {
   const confirmAction = useConfirm();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,6 +183,16 @@ export const DepartmentTab = () => {
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              {onViewQuestions && (
+                <button
+                  type="button"
+                  onClick={() => onViewQuestions(dept._id)}
+                  className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-400 hover:text-[#008BC5] active:bg-blue-100 rounded-lg transition-colors"
+                  title="Xem câu hỏi riêng của bộ phận này"
+                >
+                  <BookOpen className="w-4 h-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleOpenEdit(dept)}
@@ -220,26 +230,37 @@ export const DepartmentTab = () => {
               </div>
               <p className="text-sm text-slate-500 line-clamp-3">{dept.description || 'Không có mô tả'}</p>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
-              <span>Trạng thái: {dept.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEdit(dept)}
-                  className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-400 hover:text-[#008BC5] hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
-                  title="Sửa bộ phận"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(dept)}
-                  className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
-                  title="Ngừng sử dụng bộ phận"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span>Trạng thái: {dept.isActive ? 'Hoạt động' : 'Tạm khóa'}</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(dept)}
+                    className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-400 hover:text-[#008BC5] hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors"
+                    title="Sửa bộ phận"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(dept)}
+                    className="p-2 min-h-[38px] min-w-[38px] flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors"
+                    title="Ngừng sử dụng bộ phận"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
+              {onViewQuestions && (
+                <button
+                  type="button"
+                  onClick={() => onViewQuestions(dept._id)}
+                  className="w-full text-right text-xs font-semibold text-[#008BC5] hover:underline py-1.5 min-h-[32px]"
+                >
+                  Xem câu hỏi riêng bộ phận →
+                </button>
+              )}
             </div>
           </div>
         ))}

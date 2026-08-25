@@ -21,15 +21,21 @@ export const EXAMINER_DASHBOARD_TABS = [
 // activeTab/onTabChange giờ là props từ App.jsx (thay vì state nội bộ) — để
 // Header.jsx (menu 3 gạch ở mobile) đọc/đổi được đúng tab đang chọn ở đây.
 export const ExaminerDashboard = ({ activeTab, onTabChange }) => {
-  // Khi bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở tab Chủ đề, lưu topicId + mốc
-  // thời gian (seed) vào đây rồi chuyển sang tab Ngân hàng câu hỏi. Kèm seed
-  // để nếu người dùng bấm lại đúng chủ đề cũ lần nữa, QuestionBankTab vẫn
-  // nhận biết được đây là 1 yêu cầu áp filter MỚI (không chỉ so sánh topicId
-  // không đổi mà bỏ qua).
+  // Khi bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở tab Chủ đề, hoặc trên 1 thẻ bộ
+  // phận ở tab Bộ phận/Phòng ban, lưu filter tương ứng + mốc thời gian
+  // (seed) vào đây rồi chuyển sang tab Ngân hàng câu hỏi. Kèm seed để nếu
+  // người dùng bấm lại đúng mục cũ lần nữa, QuestionBankTab vẫn nhận biết
+  // được đây là 1 yêu cầu áp filter MỚI (không chỉ so sánh id không đổi mà
+  // bỏ qua).
   const [questionsFilterSeed, setQuestionsFilterSeed] = useState(null);
 
   const handleViewQuestionsByTopic = (topicId) => {
     setQuestionsFilterSeed({ topicId, ts: Date.now() });
+    onTabChange('questions');
+  };
+
+  const handleViewQuestionsByDepartment = (departmentId) => {
+    setQuestionsFilterSeed({ departmentId, ts: Date.now() });
     onTabChange('questions');
   };
 
@@ -65,7 +71,7 @@ export const ExaminerDashboard = ({ activeTab, onTabChange }) => {
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'questions' && <QuestionBankTab initialFilter={questionsFilterSeed} />}
           {activeTab === 'topics' && <TopicTab onViewQuestions={handleViewQuestionsByTopic} />}
-          {activeTab === 'departments' && <DepartmentTab />}
+          {activeTab === 'departments' && <DepartmentTab onViewQuestions={handleViewQuestionsByDepartment} />}
           {activeTab === 'proposals' && <ExamProposalTab />}
           {activeTab === 'materials' && <StudyDocumentTab />}
         </div>

@@ -115,15 +115,24 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   }, [selectedTopic, selectedScope, selectedDept, selectedDifficulty, selectedAnswerType, loadData]);
 
   // Khi nhận filter từ bên ngoài (vd bấm "Xem câu hỏi" trên 1 thẻ chủ đề ở
-  // tab Chủ đề), áp topicId đó vào bộ lọc. Dùng initialFilter?.ts (mốc thời
-  // gian) trong dependency thay vì chỉ topicId, để nếu người dùng bấm lại
-  // đúng chủ đề vừa xem, effect vẫn chạy lại (đảm bảo tab luôn được kéo về
+  // tab Chủ đề, hoặc trên 1 thẻ bộ phận ở tab Bộ phận/Phòng ban), áp filter
+  // đó vào ngân hàng câu hỏi. Dùng initialFilter?.ts (mốc thời gian) trong
+  // dependency thay vì chỉ topicId/departmentId, để nếu người dùng bấm lại
+  // đúng mục vừa xem, effect vẫn chạy lại (đảm bảo tab luôn được kéo về
   // đúng trạng thái đã lọc, kể cả khi giữa chừng người dùng đã tự đổi filter
   // khác đi).
   useEffect(() => {
-    if (!initialFilter?.topicId) return;
-    setSelectedTopic(initialFilter.topicId);
-  }, [initialFilter?.topicId, initialFilter?.ts]);
+    if (!initialFilter?.ts) return;
+    if (initialFilter.topicId) setSelectedTopic(initialFilter.topicId);
+    if (initialFilter.departmentId) {
+      // Bấm "Xem câu hỏi" từ 1 bộ phận cụ thể -> chỉ muốn xem câu hỏi RIÊNG
+      // của đúng bộ phận đó, không lẫn câu hỏi Chung -> khóa luôn scope, và
+      // bỏ filter Chủ đề đang chọn dở (nếu có) để không lọc chồng nhầm ý.
+      setSelectedTopic('');
+      setSelectedDept(initialFilter.departmentId);
+      setSelectedScope('DepartmentSpecific');
+    }
+  }, [initialFilter?.topicId, initialFilter?.departmentId, initialFilter?.ts]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
