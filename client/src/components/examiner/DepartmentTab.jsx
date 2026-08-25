@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Loader2, X, AlertCircle, Edit2, Trash2, Search } from 'lucide-react';
 import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../services/examiner.service';
 import { useConfirm } from '../ConfirmDialog';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export const DepartmentTab = () => {
   const confirmAction = useConfirm();
@@ -16,6 +17,8 @@ export const DepartmentTab = () => {
 
   // Modal State
   const [isOpen, setIsOpen] = useState(false);
+
+  useScrollLock(isOpen);
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');

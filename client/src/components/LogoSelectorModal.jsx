@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, Upload, Check, RefreshCw, Sparkles } from 'lucide-react';
 import { PRESET_LOGOS, UnitLogoDisplay } from './UnitLogoDisplay';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 export const LogoSelectorModal = ({
   isOpen,
@@ -12,6 +13,8 @@ export const LogoSelectorModal = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 

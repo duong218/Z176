@@ -3,6 +3,7 @@ import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics,
 import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 // MỚI — Danh sách đề xuất kỳ thi hiện tải hết 1 lần (không phân trang phía
 // server, xem fetchMyExamProposals). Về sau số lượng đề xuất tăng dần theo
@@ -17,6 +18,8 @@ export const ExamProposalTab = () => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useScrollLock(isModalOpen);
   // MỚI — Trang hiện tại của danh sách đề xuất (phân trang client-side, 10
   // kỳ thi/trang). Reset về trang 1 mỗi khi tải lại danh sách (xem loadData).
   const [page, setPage] = useState(1);

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 const ConfirmContext = createContext(null);
 
@@ -10,6 +11,8 @@ const ConfirmContext = createContext(null);
 export function ConfirmProvider({ children }) {
   const [state, setState] = useState(null);
   // state: { message, title, confirmLabel, cancelLabel, danger, resolve }
+
+  useScrollLock(Boolean(state));
 
   const confirmAction = useCallback((message, options = {}) => {
     return new Promise((resolve) => {

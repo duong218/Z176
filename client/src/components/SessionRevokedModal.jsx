@@ -1,10 +1,13 @@
 import { AlertTriangle } from 'lucide-react';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 // Modal CHẶN thao tác — không có nút X, không đóng khi bấm ra ngoài, không
 // đóng bằng phím Esc. Dùng riêng cho trường hợp phiên bị thu hồi do đăng
 // nhập nơi khác: người dùng bắt buộc phải bấm "Đăng nhập lại" mới được tiếp
 // tục, tránh thao tác nhầm trên dữ liệu cũ đã không còn hợp lệ.
 export function SessionRevokedModal({ isOpen, message, onConfirm }) {
+  useScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (

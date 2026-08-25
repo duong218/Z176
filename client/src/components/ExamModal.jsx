@@ -26,6 +26,7 @@ import {
   answerExamQuestion,
   sendExamHeartbeat,
 } from '../services/exam-attempt.service';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 // ── Lưu tạm tiến trình đang làm dở vào localStorage ─────────────────────────
 // Chỉ để tránh mất lựa chọn khi reload trang giữa chừng TRÊN CÙNG THIẾT BỊ.
@@ -89,6 +90,8 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const LEAVE_WARNING_SECONDS = 10;
 
 export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
+  useScrollLock(isOpen);
+
   // step: 'loading' | 'confirm' | 'testing' | 'submitting' | 'result' | 'auto-submitted' | 'error'
   const [step, setStep] = useState('loading');
   const [loadError, setLoadError] = useState(null);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, KeyRound, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { changePassword } from '../services/auth.service';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 export const ChangePasswordModal = ({ isOpen, onClose, onPasswordChanged, preventClose = false }) => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -9,6 +10,8 @@ export const ChangePasswordModal = ({ isOpen, onClose, onPasswordChanged, preven
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 

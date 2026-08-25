@@ -11,6 +11,7 @@ import {
 import { CheckCircle, XCircle, Clock, Globe, Calendar, History, Archive } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 // Cấu hình hiển thị badge trạng thái cho bảng "Lịch sử duyệt kỳ thi"
 const STATUS_BADGE = {
@@ -62,6 +63,8 @@ export const ExamReviewTab = () => {
   const [approveId, setApproveId] = useState(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  useScrollLock(isRejectModalOpen || isApproveModalOpen);
 
   // Phân trang cho bảng "Lịch sử duyệt kỳ thi" — danh sách này không giới
   // hạn từ server nên có thể rất dài theo thời gian, chỉ hiện 10 dòng/trang.

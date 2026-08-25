@@ -29,6 +29,7 @@ import { CandidateDashboard } from './pages/candidate/CandidateDashboard';
 import { fetchActiveExam } from './services/exam-review.service';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AlertCircle } from 'lucide-react';
+import { setLenisInstance } from './lib/lenis-instance';
 
 // Khoảng thời gian tự động làm mới kỳ thi đang active trên trang chủ (ms).
 // Giúp Hero Section tự cập nhật khi Người duyệt đề vừa "Đăng chính thức" mà không cần F5.
@@ -324,10 +325,12 @@ function App() {
       autoRaf: true,
     });
     lenisRef.current = lenis;
+    setLenisInstance(lenis); // MỚI — đăng ký vào registry để các modal ở mọi cấp cây component đều dùng được
     document.documentElement.classList.add('lenis');
 
     return () => {
       lenis.destroy();
+      setLenisInstance(null); // MỚI — dọn registry khi App unmount
       document.documentElement.classList.remove('lenis');
       lenisRef.current = null;
     };

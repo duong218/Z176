@@ -6,6 +6,7 @@ import { fetchUsers, fetchRoles, createUser, updateUserRole, toggleUserLock, res
 import { fetchDepartments, createDepartment } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 // Danh sách cột có thể hiển thị trong bảng tài khoản. `alwaysOn` = cột lõi
 // không cho ẩn (Username, Phân quyền, Trạng thái, Hành động). Các cột còn
@@ -149,6 +150,8 @@ export const AccountTab = ({ currentUser }) => {
   const [importConfirming, setImportConfirming] = useState(false); // đang ghi thật (bước confirm)
   const [importResult, setImportResult] = useState(null); // { total, created, updated, reused, failed, results }
   const fileInputRef = useRef(null);
+
+  useScrollLock(isCreateOpen || isCreateDeptOpen || isEditRoleOpen || tempPasswordModal.isOpen || Boolean(importPreview));
 
   // useCallback: giữ nguyên tham chiếu hàm giữa các lần render (chỉ đổi khi
   // showToast đổi) — để useEffect bên dưới có thể khai báo loadData vào

@@ -3,6 +3,7 @@ import { Plus, Loader2, X, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { fetchTopics, createTopic, updateTopic, deleteTopic } from '../../services/examiner.service';
 import { useConfirm } from '../ConfirmDialog';
 import { useToast } from '../ToastContext';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export const TopicTab = ({ onViewQuestions } = {}) => {
   const confirmAction = useConfirm();
@@ -17,6 +18,8 @@ export const TopicTab = ({ onViewQuestions } = {}) => {
   const [editingTopic, setEditingTopic] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+
+  useScrollLock(isOpen); // MỚI — khoá cuộn trang nền khi modal thêm/sửa chủ đề đang mở
 
   const loadTopics = async () => {
     setLoading(true);

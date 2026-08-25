@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-`client/` là ứng dụng Single Page Application (SPA) xây dựng bằng React 19, Vite và Tailwind CSS v4. Sử dụng Lenis cho smooth scroll, Lucide React cho hệ thống icon, Motion cho animation vi tương tác, Recharts cho biểu đồ thống kê báo cáo. Thư mục `dist/` là đầu ra build production (không chỉnh sửa trực tiếp). Dữ liệu mock chỉ phục vụ môi trường phát triển (dev only).
+`client/` là ứng dụng Single Page Application (SPA) xây dựng bằng React 19, Vite và Tailwind CSS v4. Sử dụng Lenis cho smooth scroll, Lucide React cho hệ thống icon, Motion cho animation vi tương tác, Recharts cho biểu đồ thống kê báo cáo. Thư mục `dist/` là đầu ra build production (không chỉnh sửa trực tiếp).
 
 ```text
 client/
@@ -23,48 +23,50 @@ client/
 │       ├── Mau_Import_Cau_Hoi_Z176.xlsx    # Mẫu Excel chuẩn import câu hỏi ngân hàng đề
 │       └── Mau_Import_Nhan_Vien_Z176.xlsx  # Mẫu Excel chuẩn import danh sách nhân viên
 ├── src/
-│   ├── App.jsx                             # Component gốc: AppShell (ToastProvider + ConfirmProvider) → App (Auth, Routing, Polling)
+│   ├── App.jsx                             # Component gốc: AppShell (ToastProvider + ConfirmProvider) → App (Auth, Routing, Polling, khởi tạo Lenis smooth scroll)
 │   ├── data.js                             # Dữ liệu tĩnh Z176: thông tin doanh nghiệp, quy chế thi, hướng dẫn thi, dữ liệu mẫu
 │   ├── index.css                           # CSS gốc, import Tailwind CSS v4 (@theme tokens, custom scrollbar, animations)
 │   ├── main.jsx                            # Entry point React: render AppShell bọc trong StrictMode + ErrorBoundary
 │   ├── assets/
 │   │   └── images/
 │   │       └── military_banner_bg_*.jpg    # Ảnh nền banner phong cách quân đội Z176
-│   ├── mock-data/
-│   │   └── admin.mock.js                   # Dữ liệu mock cho dashboard quản trị (phục vụ dev/test giao diện)
+│   ├── hooks/
+│   │   └── useScrollLock.js                # Hook khóa cuộn: gọi lenis.stop() + body overflow hidden khi modal/drawer mở, tự phục hồi khi đóng
+│   ├── lib/
+│   │   └── lenis-instance.js               # Singleton module-level lưu trữ instance Lenis active (setLenisInstance / getLenisInstance)
 │   ├── components/
 │   │   ├── Banner.jsx                      # Banner hiển thị tên đơn vị, tiêu đề cuộc thi, badge doanh nghiệp
-│   │   ├── ChangePasswordModal.jsx         # Modal đổi mật khẩu bắt buộc lần đầu đăng nhập (mustChangePassword)
-│   │   ├── ConfirmDialog.jsx               # Dialog xác nhận bất đồng bộ thay thế window.confirm(), hook useConfirm()
+│   │   ├── ChangePasswordModal.jsx         # Modal đổi mật khẩu bắt buộc lần đầu đăng nhập (mustChangePassword), useScrollLock
+│   │   ├── ConfirmDialog.jsx               # Dialog xác nhận bất đồng bộ thay thế window.confirm(), hook useConfirm(), useScrollLock
 │   │   ├── ContactSection.jsx              # Section thông tin liên hệ kỹ thuật + thông tin công ty Z176
 │   │   ├── CTAButton.jsx                   # Nút gọi hành động chính trên trang chủ (Vào thi, Tra cứu kết quả)
 │   │   ├── ErrorBoundary.jsx               # Bọc bắt lỗi render component React, hiển thị fallback UI an toàn
-│   │   ├── ExamModal.jsx                   # Modal phòng thi toàn màn hình: câu hỏi, đếm giờ, autosave, heartbeat 15s, tự nộp khi vắng mặt
+│   │   ├── ExamModal.jsx                   # Modal phòng thi toàn màn hình: câu hỏi, đếm giờ, autosave, heartbeat 15s, tự nộp khi vắng mặt, cảnh báo rời thi 10s, useScrollLock
 │   │   ├── Footer.jsx                      # Footer trang chủ: thông tin bản quyền, liên hệ, chính sách
-│   │   ├── Header.jsx                      # Header navigation: logo tùy chỉnh, menu điều hướng, user info, đăng xuất, NotificationBell
-│   │   ├── LoginModal.jsx                  # Modal đăng nhập: form username/password, validation, gọi auth service
-│   │   ├── LogoSelectorModal.jsx           # Modal tùy chỉnh/chọn logo đơn vị hiển thị (dành cho Admin)
+│   │   ├── Header.jsx                      # Header navigation: logo tùy chỉnh, menu điều hướng, user info, đăng xuất, NotificationBell, mobile drawer, useScrollLock(drawerOpen)
+│   │   ├── LoginModal.jsx                  # Modal đăng nhập: form username/password, validation, gọi auth service, useScrollLock
+│   │   ├── LogoSelectorModal.jsx           # Modal tùy chỉnh/chọn logo đơn vị hiển thị (dành cho Admin), useScrollLock
 │   │   ├── NotificationBell.jsx            # Chuông thông báo: badge đếm chưa đọc (poll 30s), dropdown phân loại sự kiện, đọc tất cả
 │   │   ├── QuickGuideSection.jsx           # Section hướng dẫn 4 bước thi trắc nghiệm trên trang chủ
 │   │   ├── RegulationsSection.jsx          # Section quy chế thi trắc nghiệm chuyên môn Z176
 │   │   ├── ResultsLookupSection.jsx        # Section tra cứu kết quả thi công khai theo Mã nhân viên / Phòng ban
-│   │   ├── SessionRevokedModal.jsx         # Modal chặn thao tác khi phiên đăng nhập bị thu hồi (đăng nhập từ nơi khác)
+│   │   ├── SessionRevokedModal.jsx         # Modal chặn thao tác khi phiên đăng nhập bị thu hồi (đăng nhập từ nơi khác), useScrollLock
 │   │   ├── TimeAndCountdown.jsx            # Hiển thị đồng hồ thời gian thực và đếm ngược kỳ thi active
 │   │   ├── Toast.jsx                       # Toast notification thông báo kết quả thao tác (success/error/info/warning)
 │   │   ├── ToastContext.jsx                # React Context + Provider quản lý hàng đợi Toast toàn app, hook useToast()
 │   │   └── UnitLogoDisplay.jsx             # Component hiển thị logo đơn vị (ưu tiên logo custom từ localStorage, fallback logo.svg)
 │   │
 │   ├── components/admin/
-│   │   ├── AccountTab.jsx                  # Tab quản lý tài khoản: CRUD user, tạo inline phòng ban, import Excel 2 bước, xuất Excel credentials, phân role, khóa/mở, reset password
+│   │   ├── AccountTab.jsx                  # Tab quản lý tài khoản: CRUD user, tạo inline phòng ban, import Excel 2 bước, xuất Excel credentials, phân role, khóa/mở, reset password, useScrollLock
 │   │   ├── AuditLogTab.jsx                 # Tab nhật ký hệ thống: phân trang, lọc theo action/user/resource/thời gian, chi tiết metadata
 │   │   ├── BackupTab.jsx                   # Tab sao lưu & phục hồi: danh sách backup Drive, tạo backup, restore file .gz với progress % và phrase xác nhận
 │   │   └── OverviewTab.jsx                 # Tab tổng quan admin: thống kê tài khoản theo role, kỳ thi active, số lượng câu hỏi
 │   │
 │   ├── components/examiner/
-│   │   ├── DepartmentTab.jsx               # Tab quản lý phòng ban: CRUD phòng ban, mã code, slug, tìm kiếm, ngừng sử dụng/khôi phục
-│   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo dự thảo, cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt
+│   │   ├── DepartmentTab.jsx               # Tab quản lý phòng ban: CRUD phòng ban, mã code, slug, tìm kiếm, ngừng sử dụng/khôi phục, useScrollLock
+│   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo dự thảo, cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt, useScrollLock
 │   │   ├── OverviewTab.jsx                 # Tab tổng quan examiner: thống kê ngân hàng câu hỏi, chủ đề, trạng thái đề xuất
-│   │   ├── QuestionBankTab.jsx             # Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm đơn/nhiều đáp án, upload ảnh Cloudinary, import Excel 2 bước, xóa hàng loạt
+│   │   ├── QuestionBankTab.jsx             # Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm đơn/nhiều đáp án, upload ảnh Cloudinary, import Excel 2 bước, xóa hàng loạt, useScrollLock
 │   │   ├── StudyDocumentTab.jsx            # Tab tài liệu ôn tập: upload file PDF/Word/Excel lên Cloudinary, phân quyền phòng ban, xem/tải/xóa
 │   │   └── TopicTab.jsx                    # Tab chủ đề thi: CRUD chủ đề, tự động khôi phục nếu tạo trùng tên chủ đề đã xóa mềm
 │   │
@@ -72,7 +74,7 @@ client/
 │   │   ├── DepartmentReportTab.jsx         # Tab báo cáo phòng ban: thống kê số thí sinh, số lượt thi, tỷ lệ đạt/không đạt theo từng đơn vị
 │   │   ├── DetailedResultsTab.jsx          # Tab kết quả chi tiết: danh sách bảng điểm thí sinh, bộ lọc nâng cao, xuất Excel, cấp thêm lượt thi
 │   │   ├── ExamReportTab.jsx               # Tab báo cáo kỳ thi: thống kê tổng hợp kết quả theo từng kỳ thi, xuất báo cáo Excel
-│   │   ├── ExamReviewTab.jsx               # Tab duyệt đề thi: xem chi tiết cấu hình đề, duyệt (approve), từ chối (reject kèm lý do), phát hành (publish), lưu trữ (archive)
+│   │   ├── ExamReviewTab.jsx               # Tab duyệt đề thi: xem chi tiết cấu hình đề, duyệt (approve), từ chối (reject kèm lý do), phát hành (publish), lưu trữ (archive), useScrollLock
 │   │   └── OverviewTab.jsx                 # Tab tổng quan leader: biểu đồ và chỉ số hiệu suất thi toàn đơn vị
 │   │
 │   ├── pages/
@@ -103,6 +105,7 @@ Dự án sử dụng chiến lược quản lý trạng thái phân tán, chủ 
 - **Global UI State**: Sử dụng Context API.
   - `ToastContext`: Cung cấp hàm `showToast(msg, type)` / `addToast()` để hiển thị thông báo ở mọi nơi mà không cần truyền props.
   - `ConfirmDialog (ConfirmContext)`: Quản lý hiển thị dialog xác nhận bất đồng bộ qua hook `useConfirm()`.
+- **Scroll Lock**: Module-level singleton (`lib/lenis-instance.js`) + hook (`hooks/useScrollLock.js`) quản lý trạng thái khóa cuộn khi modal/drawer mở. Tự động gọi `lenis.stop()` + `document.body.style.overflow = 'hidden'` khi `isLocked = true`, phục hồi khi `isLocked = false`. Được tích hợp vào tất cả modal và drawer trong hệ thống.
 - **Local State**: Các form, danh sách, modal quản lý trạng thái độc lập bằng `useState`, `useReducer`, `useRef`.
 
 ## Tích hợp API và Gọi dữ liệu (API Integration & Data Fetching)
@@ -127,5 +130,5 @@ Dự án sử dụng chiến lược quản lý trạng thái phân tán, chủ 
 - **Thiết kế Responsive**: Mobile-first cho toàn bộ layout. Tab/Dashboard sử dụng Flexbox/CSS Grid.
 - **Animations**:
   - Sử dụng thư viện `Motion` (Framer Motion) hoặc Tailwind classes (`animate-spin`, `transition-all`) cho vi tương tác (micro-interactions).
-  - Tối ưu cuộn trang: Sử dụng thư viện `Lenis` tạo hiệu ứng cuộn mượt (Smooth Scrolling) trên trang chủ.
+  - Tối ưu cuộn trang: Sử dụng thư viện `Lenis` tạo hiệu ứng cuộn mượt (Smooth Scrolling) trên trang chủ, quản lý instance qua singleton (`lenis-instance.js`) và hook `useScrollLock` khóa cuộn khi overlay mở.
 - **Icons**: Sử dụng bộ `lucide-react`, đồng nhất SVG format cho toàn bộ hệ thống (dễ dàng tùy chỉnh `size` và `strokeWidth`).

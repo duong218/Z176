@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Home, FileText, Award, CheckSquare, PhoneCall, User, Menu, X, LogOut, Shield, LayoutDashboard, KeyRound } from 'lucide-react';
 import { UnitLogoDisplay } from './UnitLogoDisplay';
 import { NotificationBell } from './NotificationBell';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 const ROLE_LABELS = {
   admin: 'Quản trị viên',
@@ -32,6 +33,8 @@ export const Header = ({
   onSelectDashboardTab,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useScrollLock(drawerOpen);
 
   const menuItems = variant === 'dashboard' ? [] : [
     // "Trang chủ" chỉ hiện khi CHƯA đăng nhập — khi đã đăng nhập, logo Z176

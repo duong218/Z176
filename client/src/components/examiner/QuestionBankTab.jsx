@@ -3,6 +3,7 @@ import { Search, Plus, Edit2, Trash2, Loader2, X, Upload, Download, ChevronLeft,
 import { fetchQuestions, fetchTopics, fetchDepartments, createQuestion, updateQuestion, deleteQuestion, previewImportQuestions, confirmImportQuestionsExcel, bulkDeleteQuestions, uploadQuestionImage } from '../../services/examiner.service';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export const QuestionBankTab = ({ initialFilter } = {}) => {
   const { showToast } = useToast();
@@ -35,6 +36,8 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
   // Import Excel (bulk) state — 2 bước: preview (xem trước, chưa ghi DB) rồi
   // confirm (ghi thật) — xem handleImportFile / handleConfirmImport bên dưới.
   const [showImportGuide, setShowImportGuide] = useState(false);
+
+  useScrollLock(isFormOpen || isImportOpen || showImportGuide);
   const [importLoading, setImportLoading] = useState(false); // đang upload + phân tích file (bước preview)
   const [importPreview, setImportPreview] = useState(null); // { token, totalRows, readyCount, duplicateCount, errorCount, missingDepartments, duplicates, ready, errors }
   const [importConfirming, setImportConfirming] = useState(false); // đang ghi thật (bước confirm)

@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { X, User, Lock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { loginUser } from '../services/auth.service';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 
