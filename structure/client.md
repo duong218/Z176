@@ -67,7 +67,7 @@ client/
 │   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo dự thảo, cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt, useScrollLock
 │   │   ├── OverviewTab.jsx                 # Tab tổng quan examiner: thống kê ngân hàng câu hỏi, chủ đề, trạng thái đề xuất
 │   │   ├── QuestionBankTab.jsx             # Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm đơn/nhiều đáp án, upload ảnh Cloudinary, import Excel 2 bước, xóa hàng loạt, useScrollLock
-│   │   ├── StudyDocumentTab.jsx            # Tab tài liệu ôn tập: upload file PDF/Word/Excel lên Cloudinary, phân quyền phòng ban, xem/tải/xóa
+│   │   ├── StudyDocumentTab.jsx            # Tab tài liệu ôn tập: upload file PDF/Word/Excel lên server nội bộ, phân quyền phòng ban, xem/tải/xóa
 │   │   └── TopicTab.jsx                    # Tab chủ đề thi: CRUD chủ đề, tự động khôi phục nếu tạo trùng tên chủ đề đã xóa mềm
 │   │
 │   ├── components/leader/

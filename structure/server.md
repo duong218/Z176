@@ -55,7 +55,7 @@ server/
     │   ├── result.model.js                         # Schema kết quả thi: userId, examId, attemptId, score, passed, correctCount, totalCount
     │   ├── role.model.js                           # Schema vai trò người dùng: code (admin/examiner/leader/candidate), name
     │   ├── schedule.model.js                       # Schema lịch thi: examId, startDate, endDate
-    │   ├── study-document.model.js                 # Schema tài liệu ôn tập: title, topicId, scope, departmentId, fileUrl, publicId, originalName, mimeType, uploadedBy
+    │   ├── study-document.model.js                 # Schema tài liệu ôn tập: title, topicId, scope, departmentId, filePath, originalFileName, mimeType, uploadedBy
     │   ├── topic.model.js                          # Schema chủ đề thi: name, description, isActive
     │   └── user.model.js                           # Schema tài khoản người dùng: username, password (hash), roleId, isActive, lockedAt, lockUntil, mustChangePassword, tokenVersion
     ├── routes/
@@ -95,7 +95,7 @@ server/
     │   ├── report.service.js                       # Logic báo cáo: tổng quan thống kê, báo cáo phòng ban, báo cáo kỳ thi, bảng điểm chi tiết, xuất Excel chuẩn bằng ExcelJS, tra cứu công khai
     │   ├── role.service.js                         # Logic vai trò: truy vấn danh mục Role từ database
     │   ├── seed.service.js                         # Logic seed: tạo 4 role (admin/examiner/leader/candidate) và tài khoản Admin mặc định khi hệ thống khởi động
-    │   ├── study-document.service.js               # Logic tài liệu ôn tập: upload Cloudinary (resource_type: raw), phân quyền xem theo phòng ban, stream tải/xem tài liệu
+    │   ├── study-document.service.js               # Logic tài liệu ôn tập: lưu trữ trực tiếp trên đĩa server nội bộ (uploadDir), phân quyền xem theo phòng ban, stream tải/xem tài liệu an toàn
     │   ├── topic.service.js                        # Logic chủ đề: CRUD, xóa mềm (cascade ẩn câu hỏi thuộc chủ đề), tự động khôi phục khi tạo trùng tên
     │   └── user.service.js                         # Logic người dùng: CRUD, import Excel 2 bước (preview phân loại -> confirm ghi DB), xuất Excel tài khoản kèm mật khẩu tạm ngẫu nhiên, khóa/mở (cập nhật lockedAt), reset mật khẩu
     └── utils/
@@ -136,21 +136,21 @@ server/
 
 ### 3. Quy trình Trộn đề và Phát hành Kỳ thi (`exam-code-generation.service.js`)
 - Khi Leader bấm "Đăng chính thức" (`publish`):
-  1. Hệ thống duyệt qua tất cả phòng ban có nhân viên tham gia kỳ thi.
-  2. Tính toán phương án lấy câu hỏi: Lấy số câu Chung (`Common`) và số câu Riêng (`DepartmentSpecific`) theo cấu hình đề xuất.
-  3. Cơ chế bù đắp thông minh: Nếu một phòng ban không đủ số câu riêng, hệ thống sẽ tự động bù số câu thiếu từ ngân hàng câu hỏi chung của chủ đề đó.
-  4. Trộn ngẫu nhiên câu hỏi (thuật toán Fisher–Yates) và tạo bản ghi `ExamCode`.
-  5. Tự động gán thí sinh của từng phòng ban vào mã đề tương ứng trong `ExamCandidate`.
+  1. Hệ thống duyệt qua tất cả phòng ban có nhân viên active tham gia kỳ thi.
+  2. Tính toán phương án lấy câu hỏi: Lấy số câu Chung (`Common`) và số câu Riêng (`DepartmentSpecific`) theo cấu hình đề xuất (áp dụng 1 lần duy nhất cho toàn phòng ban).
+  3. Cơ chế bù đắp thông minh (Smart Fallback): Nếu một phòng ban không đủ số câu riêng, hệ thống tự động bù số câu thiếu từ ngân hàng câu hỏi chung của chủ đề đó.
+  4. Rút ngẫu nhiên câu hỏi độc lập (thuật toán Fisher–Yates) và tạo bản ghi `ExamCode` riêng biệt cho **từng cá nhân nhân viên** (`D3F9A1-PB-NV-RandomHex`), tránh nhìn bài chéo.
+  5. Tự động gán từng thí sinh vào mã đề tương ứng của người đó trong `ExamCandidate` (idempotent theo từng nhân viên).
   6. Gửi thông báo hệ thống tự động tới toàn bộ thí sinh.
 
 ### 4. Quy trình Phòng thi và Giám sát phiên thi (`exam-attempt.service.js`)
-- **Khởi tạo / Tiếp tục (`start`)**: Sinh snapshot thứ tự câu hỏi riêng biệt cho thí sinh, ẩn hoàn toàn cờ `isCorrect` của đáp án trước khi trả về client.
-- **Tự động lưu câu trả lời (`answer`)**: Lưu tức thì phương án thí sinh đã chọn vào bảng `AttemptQuestion` theo thời gian thực (autosave).
-- **Heartbeat & Tự động nộp bài (`heartbeat`)**: Client gửi tín hiệu heartbeat mỗi 15 giây. Nếu thí sinh tắt trình duyệt hoặc gián đoạn kết nối quá 1 phút (`INACTIVITY_TIMEOUT_MS`), hệ thống sẽ tự động đóng phiên và chấm điểm.
+- **Khởi tạo / Tiếp tục (`start`)**: Sinh snapshot thứ tự câu hỏi và thứ tự phương án trả lời xáo riêng biệt cho từng lượt thi của thí sinh (`AttemptQuestion`), ẩn hoàn toàn cờ `isCorrect` của đáp án trước khi trả về client.
+- **Tự động lưu câu trả lời (`answer`)**: Lưu tức thì phương án thí sinh đã chọn vào bảng `CandidateAnswer` theo thời gian thực (autosave).
+- **Heartbeat & Tự động nộp bài (`heartbeat`)**: Client gửi tín hiệu heartbeat mỗi 15 giây. Nếu thí sinh tắt trình duyệt hoặc gián đoạn kết nối quá 1 phút (`INACTIVITY_TIMEOUT_MS`), hệ thống sẽ tự động đóng phiên và chấm điểm dựa trên các đáp án đã autosave.
 - **Chấm điểm tự động (`submit`)**:
   - Đối với câu hỏi chọn 1 đáp án (`single`): Thí sinh chọn đúng đáp án duy nhất -> Tính điểm.
   - Đối với câu hỏi chọn nhiều đáp án (`multiple`): Thí sinh phải chọn đúng và đủ tất cả các đáp án đúng, không chọn thừa đáp án sai -> Tính điểm.
-  - Tính điểm thang 10, so sánh với `passingScore` của kỳ thi để xác định kết quả `passed`.
+  - Tính điểm thang 100 (`Math.round((correctCount / totalQuestions) * 100)`), so sánh với `passThresholdPercent` (mặc định 70%) của kỳ thi để xác định kết quả `passed`.
 
 ---
 
@@ -252,8 +252,8 @@ server/
 |---|---|---|---|
 | `GET` | `/api/study-documents/candidate` | Candidate | Lấy danh sách tài liệu ôn tập thí sinh được phép xem (theo phòng ban trực thuộc). |
 | `GET` | `/api/study-documents` | Admin, Examiner, Leader | Danh sách tất cả tài liệu ôn tập trong hệ thống. |
-| `POST` | `/api/study-documents` | Admin, Examiner | Tải tài liệu ôn tập mới lên Cloudinary (PDF, Word, Excel). |
-| `DELETE` | `/api/study-documents/:id` | Admin, Examiner | Xóa tài liệu ôn tập (gỡ file trên Cloudinary và xóa trong CSDL). |
+| `POST` | `/api/study-documents` | Admin, Examiner | Tải tài liệu ôn tập mới lên đĩa server nội bộ (PDF, Word, Excel, tối đa 20MB). |
+| `DELETE` | `/api/study-documents/:id` | Admin, Examiner | Xóa tài liệu ôn tập (gỡ file trên đĩa server nội bộ và xóa trong CSDL). |
 | `GET` | `/api/study-documents/:id/file` | Authenticated | Xem trực tiếp (`mode=inline`) hoặc tải về (`mode=download`) tệp tài liệu. |
 
 ### 12. `/api/audit-logs` — Nhật ký Hệ thống
