@@ -32,9 +32,17 @@ function computeFingerprint(questionIds) {
   return crypto.createHash('sha256').update(sorted.join(',')).digest('hex');
 }
 
-function buildExamCode(exam, department) {
-  const codeSuffix = (department.code || department.name).replace(/\s+/g, '').toUpperCase().slice(0, 10);
-  return `${exam._id.toString().slice(-6).toUpperCase()}-${codeSuffix}`;
+// ĐỔI — mỗi thí sinh giờ có bộ câu RIÊNG (random độc lập, không dùng chung cả
+// phòng ban nữa — xem generateExamCodesAndAssignCandidates bên dưới), nên mã
+// đề cũng phải là CỦA RIÊNG từng người để không đụng unique index {examId,
+// code}. Ưu tiên employeeCode (dễ đọc/đối chiếu khi có khiếu nại), luôn cộng
+// thêm hậu tố ngẫu nhiên ngắn để tuyệt đối không trùng dù 2 nhân viên hiếm
+// khi nào đó có employeeCode giống nhau hoặc đều trống.
+function buildExamCode(exam, department, employee) {
+  const deptSuffix = (department.code || department.name).replace(/\s+/g, '').toUpperCase().slice(0, 8);
+  const empSuffix = (employee.employeeCode || 'NV').replace(/\s+/g, '').toUpperCase().slice(0, 8);
+  const randomSuffix = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `${exam._id.toString().slice(-6).toUpperCase()}-${deptSuffix}-${empSuffix}-${randomSuffix}`;
 }
 
 /**
@@ -89,15 +97,23 @@ async function validateQuestionAvailability(exam, department) {
   };
 }
 
-/** Tạo ExamCode + ExamCodeQuestion cho 1 phòng ban từ 2 pool đã kiểm tra đủ, theo đúng plan đã tính (có thể đã bù thêm từ pool chung nếu thiếu câu riêng). */
-async function createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions, plan) {
+/**
+ * ĐỔI — Tạo ExamCode + ExamCodeQuestion RIÊNG cho 1 NHÂN VIÊN cụ thể (không
+ * còn dùng chung cho cả phòng ban). Mỗi lần gọi tự pickRandom() độc lập từ 2
+ * pool (chung + riêng phòng ban) truyền vào — nên dù nhiều nhân viên cùng
+ * phòng ban gọi hàm này, mỗi người vẫn ra 1 bộ câu khác nhau (ngẫu nhiên),
+ * đúng tinh thần "mỗi người 1 đề riêng" thay vì "cả phòng ban chung 1 đề".
+ * plan.commonPickCount / plan.deptPickCount giữ nguyên ý nghĩa như cũ —
+ * chỉ số LƯỢNG câu cần lấy từ mỗi pool, không đổi.
+ */
+async function createExamCodeForEmployee(exam, department, employee, commonQuestions, deptQuestions, plan) {
   const commonPick = pickRandom(commonQuestions, plan.commonPickCount);
   const deptPick = pickRandom(deptQuestions, plan.deptPickCount);
   const allQuestions = shuffle([...commonPick, ...deptPick]);
 
   const examCode = await ExamCode.create({
     examId: exam._id,
-    code: buildExamCode(exam, department),
+    code: buildExamCode(exam, department, employee),
     departmentId: department._id,
     questionSetFingerprint: computeFingerprint(allQuestions.map((q) => q._id)),
   });
@@ -113,29 +129,22 @@ async function createExamCodeForDepartment(exam, department, commonQuestions, de
 }
 
 /**
- * Đảm bảo có ExamCode cho (exam, department) — trả về mã đề đã có sẵn nếu
- * tồn tại, hoặc tạo mới nếu chưa. Dùng cho trường hợp gán đề cho 1 nhân viên
- * đơn lẻ (vd nhân viên mới tạo sau khi kỳ thi đã publish, hoặc phòng ban lúc
- * publish chưa có ai nên chưa được sinh mã đề), VÀ cho publish (xem
- * generateExamCodesAndAssignCandidates bên dưới — nay idempotent theo TỪNG
- * phòng ban thay vì theo cả kỳ thi).
+ * ĐỔI — Luôn TẠO MỚI mã đề riêng cho nhân viên này (không còn "tìm mã đề đã
+ * có của phòng ban rồi dùng chung" như bản cũ — vì giờ không còn khái niệm
+ * "mã đề chung của phòng ban" nữa). Có retry 1 lần nếu hi hữu trùng `code`
+ * (lỗi 11000) — buildExamCode() đã có hậu tố ngẫu nhiên nên xác suất trùng
+ * cực thấp, nhưng vẫn phòng hờ để không làm gãy cả luồng publish/gán nhân
+ * viên chỉ vì 1 lần trùng ngẫu nhiên hiếm gặp.
  */
-async function ensureExamCodeForDepartment(exam, department, precomputedPool) {
-  const existing = await ExamCode.findOne({ examId: exam._id, departmentId: department._id });
-  if (existing) return existing;
-
+async function ensureExamCodeForEmployee(exam, department, employee, precomputedPool) {
   const { commonQuestions, deptQuestions, plan } =
     precomputedPool ?? (await validateQuestionAvailability(exam, department));
 
   try {
-    return await createExamCodeForDepartment(exam, department, commonQuestions, deptQuestions, plan);
+    return await createExamCodeForEmployee(exam, department, employee, commonQuestions, deptQuestions, plan);
   } catch (err) {
-    // Trường hợp đụng độ hiếm gặp: 2 request tạo nhân viên cùng phòng ban chạy
-    // song song, cả 2 cùng thấy "chưa có mã đề" rồi cùng tạo -> vi phạm unique
-    // index {examId, code}. Khi đó lấy lại mã đề mà request kia vừa tạo thành công.
     if (err?.code === 11000) {
-      const raceExisting = await ExamCode.findOne({ examId: exam._id, departmentId: department._id });
-      if (raceExisting) return raceExisting;
+      return createExamCodeForEmployee(exam, department, employee, commonQuestions, deptQuestions, plan);
     }
     throw err;
   }
@@ -147,22 +156,25 @@ async function ensureExamCodeForDepartment(exam, department, precomputedPool) {
  * Publish. Kiểm tra đủ câu hỏi cho TẤT CẢ phòng ban trước khi tạo bất kỳ mã
  * đề nào — thiếu ở bất kỳ đâu sẽ chặn hẳn (không publish dở dang).
  *
- * IDEMPOTENT THEO TỪNG PHÒNG BAN + TỪNG NHÂN VIÊN (không phải theo "cả kỳ
- * thi đã có mã đề hay chưa" như bản cũ). Lý do: nếu lần publish trước bị lỗi
- * giữa chừng (vd ExamCode đã tạo xong cho vài phòng ban, nhưng
- * ExamCandidate.insertMany bị lỗi một phần), publishExam() sẽ throw và
- * exam.status KHÔNG được set thành 'published' — Leader thấy publish thất
- * bại và có thể bấm publish lại. Với bản cũ, early-return theo
- * "ExamCode.countDocuments > 0" sẽ khiến lần gọi lại bỏ qua HOÀN TOÀN, kể cả
- * những nhân viên chưa từng được gán ExamCandidate ở lần trước — họ sẽ vĩnh
- * viễn không có đề để thi mà không ai biết. Bản này thay vào đó: với mỗi
- * phòng ban, dùng lại ExamCode đã có (nếu có) hoặc tạo mới; với mỗi nhân
- * viên, chỉ gán nếu họ CHƯA có ExamCandidate cho kỳ thi này — nên gọi lại
- * bao nhiêu lần cũng chỉ bổ sung đúng phần còn thiếu, không tạo trùng,
- * không bỏ sót ai.
+ * ĐỔI — Mỗi NHÂN VIÊN giờ có 1 bộ câu RIÊNG (random độc lập từ pool chung +
+ * riêng của phòng ban mình), KHÔNG còn dùng chung 1 mã đề cho cả phòng ban
+ * như bản cũ — tránh việc cả phòng ban thấy y hệt nhau (dễ nhìn/đọc bài
+ * chéo), đổi lại chấp nhận đánh đổi: độ khó giữa các thí sinh có thể không
+ * đều tuyệt đối vì random thuần, không cân theo độ khó câu hỏi.
+ *
+ * Việc validate pool đủ câu vẫn tính 1 LẦN theo PHÒNG BAN (không nhân theo số
+ * nhân viên) — vì mỗi nhân viên chỉ RÚT ngẫu nhiên từ pool dùng chung, không
+ * chia bài loại trừ lẫn nhau, nên pool chỉ cần đủ đúng plan.commonPickCount /
+ * plan.deptPickCount là đủ cho MỌI nhân viên trong phòng ban, bất kể đông
+ * hay ít người.
+ *
+ * IDEMPOTENT THEO TỪNG NHÂN VIÊN: nếu lần publish trước bị lỗi giữa chừng,
+ * gọi lại hàm này chỉ tạo bổ sung đúng phần còn thiếu (nhân viên chưa có
+ * ExamCandidate), không tạo trùng, không bỏ sót ai — nhờ check
+ * alreadyAssignedIds bên dưới trước khi random+tạo mã đề cho từng người.
  */
 export async function generateExamCodesAndAssignCandidates(exam) {
-  const employees = await Employee.find({ isActive: true }).select('_id departmentId');
+  const employees = await Employee.find({ isActive: true }).select('_id employeeCode departmentId');
   const employeesByDept = new Map();
   for (const emp of employees) {
     const key = emp.departmentId.toString();
@@ -179,56 +191,44 @@ export async function generateExamCodesAndAssignCandidates(exam) {
     _id: { $in: [...employeesByDept.keys()] },
   });
 
-  // Validate hết trước (fail-fast), giữ nguyên pool + plan đã tính để tạo ở bước sau.
-  // Chỉ cần validate cho phòng ban CHƯA có ExamCode — phòng ban đã có mã đề từ
-  // lần publish trước (dù có thể lỗi ở bước gán candidate) thì không cần tính
-  // lại pool, dùng thẳng ExamCode cũ để đảm bảo toàn bộ nhân viên trong cùng
-  // phòng ban luôn nhận đúng 1 mã đề duy nhất, không bị sinh lệch pool giữa
-  // các lần gọi.
-  const existingCodes = await ExamCode.find({
-    examId: exam._id,
-    departmentId: { $in: departments.map((d) => d._id) },
-  });
-  const existingCodeByDept = new Map(existingCodes.map((c) => [c.departmentId.toString(), c]));
-
+  // Validate đủ câu hỏi cho TỪNG PHÒNG BAN trước (fail-fast) — 1 lần duy nhất
+  // mỗi phòng ban, dùng lại cho mọi nhân viên của phòng ban đó (xem giải
+  // thích ở JSDoc phía trên).
   const pools = new Map();
   for (const dept of departments) {
-    if (existingCodeByDept.has(dept._id.toString())) continue; // đã có mã đề, không cần tính pool lại
     const { commonQuestions, deptQuestions, plan } = await validateQuestionAvailability(exam, dept);
     pools.set(dept._id.toString(), { commonQuestions, deptQuestions, plan });
   }
 
   for (const dept of departments) {
     const deptKey = dept._id.toString();
-
-    const examCode = existingCodeByDept.has(deptKey)
-      ? existingCodeByDept.get(deptKey)
-      : await createExamCodeForDepartment(
-          exam,
-          dept,
-          pools.get(deptKey).commonQuestions,
-          pools.get(deptKey).deptQuestions,
-          pools.get(deptKey).plan,
-        );
-
     const deptEmployees = employeesByDept.get(deptKey) || [];
     if (deptEmployees.length === 0) continue;
 
-    // Chỉ gán những nhân viên CHƯA có ExamCandidate cho kỳ thi này — an toàn
-    // khi generateExamCodesAndAssignCandidates được gọi lại nhiều lần do lần
-    // publish trước bị lỗi giữa chừng.
+    // Chỉ tạo đề + gán cho những nhân viên CHƯA có ExamCandidate cho kỳ thi
+    // này — an toàn khi hàm này được gọi lại nhiều lần do lần publish trước
+    // bị lỗi giữa chừng.
     const existingCandidates = await ExamCandidate.find({
       examId: exam._id,
       employeeId: { $in: deptEmployees.map((e) => e._id) },
     }).select('employeeId');
     const alreadyAssignedIds = new Set(existingCandidates.map((c) => c.employeeId.toString()));
 
-    const candidateDocs = deptEmployees
-      .filter((emp) => !alreadyAssignedIds.has(emp._id.toString()))
-      .map((emp) => ({ examId: exam._id, employeeId: emp._id, examCodeId: examCode._id }));
+    const pendingEmployees = deptEmployees.filter((emp) => !alreadyAssignedIds.has(emp._id.toString()));
+    if (pendingEmployees.length === 0) continue;
 
-    if (candidateDocs.length > 0) {
-      await ExamCandidate.insertMany(candidateDocs, { ordered: false });
+    const pool = pools.get(deptKey);
+
+    // Tạo tuần tự từng nhân viên (không insertMany hàng loạt như bản cũ) vì
+    // mỗi người giờ cần 1 ExamCode RIÊNG (random riêng) trước khi có thể tạo
+    // ExamCandidate trỏ tới đúng examCodeId của người đó.
+    for (const employee of pendingEmployees) {
+      const examCode = await ensureExamCodeForEmployee(exam, dept, employee, pool);
+      await ExamCandidate.create({
+        examId: exam._id,
+        employeeId: employee._id,
+        examCodeId: examCode._id,
+      });
     }
   }
 }
@@ -253,7 +253,7 @@ export async function assignEmployeeToActiveExamIfAny(employee) {
     department = await Department.findById(employee.departmentId);
     if (!department || !department.isActive) return null;
 
-    const examCode = await ensureExamCodeForDepartment(exam, department);
+    const examCode = await ensureExamCodeForEmployee(exam, department, employee);
 
     return await ExamCandidate.create({
       examId: exam._id,
