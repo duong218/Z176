@@ -1,9 +1,108 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
-import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 import { useScrollLock } from '../../hooks/useScrollLock';
+
+// MỚI — Dropdown chọn chủ đề tự dựng, thay cho thẻ <select> gốc của trình
+// duyệt. Danh sách xổ xuống của <select> native do OS/trình duyệt tự vẽ,
+// không bị ràng buộc bởi kích thước modal cha nên có thể tràn ra ngoài viền
+// modal/màn hình (đặc biệt trên mobile). Component này tự đo khoảng trống
+// còn lại trong viewport để quyết định mở xuống hay lật lên trên, và luôn
+// giới hạn chiều rộng/chiều cao trong phạm vi màn hình.
+function TopicSelect({ value, options, onChange, placeholder = '-- Chọn chủ đề --' }) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState({ placement: 'bottom', maxHeight: 240 });
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !wrapperRef.current) return undefined;
+
+    const PREFERRED_MAX_HEIGHT = 240;
+    const VIEWPORT_MARGIN = 12;
+
+    const recalcPosition = () => {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom - VIEWPORT_MARGIN;
+      const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+      if (spaceBelow >= 120 || spaceBelow >= spaceAbove) {
+        setMenuStyle({ placement: 'bottom', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceBelow)) });
+      } else {
+        setMenuStyle({ placement: 'top', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceAbove)) });
+      }
+    };
+
+    recalcPosition();
+    window.addEventListener('resize', recalcPosition);
+    window.addEventListener('scroll', recalcPosition, true);
+    return () => {
+      window.removeEventListener('resize', recalcPosition);
+      window.removeEventListener('scroll', recalcPosition, true);
+    };
+  }, [open]);
+
+  const selectedOption = options.find((o) => o._id === value);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full p-2.5 pr-10 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none bg-white text-left relative"
+        style={{ color: value ? '#0F172A' : '#64748B' }}
+      >
+        {selectedOption ? selectedOption.name : placeholder}
+        <ChevronDown
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none transition-transform"
+          style={{ transform: open ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}
+        />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute z-20 w-full overflow-y-auto bg-white rounded-lg border border-slate-200 shadow-lg py-1 ${
+            menuStyle.placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+          style={{ maxHeight: `${menuStyle.maxHeight}px` }}
+          data-lenis-prevent
+        >
+          <button
+            type="button"
+            onClick={() => { onChange(''); setOpen(false); }}
+            className="w-full text-left px-3.5 min-h-[44px] flex items-center text-base"
+            style={!value ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 } : { color: '#0F172A' }}
+          >
+            {placeholder}
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt._id}
+              type="button"
+              onClick={() => { onChange(opt._id); setOpen(false); }}
+              className="w-full text-left px-3.5 min-h-[44px] flex items-center text-base"
+              style={value === opt._id ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 } : { color: '#0F172A' }}
+            >
+              {opt.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // MỚI — Danh sách đề xuất kỳ thi hiện tải hết 1 lần (không phân trang phía
 // server, xem fetchMyExamProposals). Về sau số lượng đề xuất tăng dần theo
@@ -102,6 +201,10 @@ export const ExamProposalTab = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!formData.topicId) {
+      showToast('Vui lòng chọn chủ đề liên kết cho kỳ thi.', 'warning');
+      return;
+    }
     if (hasBlockingError) {
       showToast('Cấu hình số câu hỏi chưa hợp lệ so với ngân hàng câu hỏi hiện có của chủ đề này. Vui lòng kiểm tra lại phần cảnh báo trong form.', 'warning');
       return;
@@ -352,9 +455,9 @@ export const ExamProposalTab = () => {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh] my-auto" data-lenis-prevent>
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h2 className="text-lg sm:text-xl font-bold text-slate-800">Tạo đề xuất kỳ thi mới</h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -364,7 +467,7 @@ export const ExamProposalTab = () => {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain" data-lenis-prevent>
+            <div className="p-4 sm:p-6 overflow-y-auto" data-lenis-prevent>
               <form id="createExamForm" onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên kỳ thi</label>
@@ -374,13 +477,11 @@ export const ExamProposalTab = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Chủ đề liên kết</label>
-                  <select required className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none bg-white"
-                    value={formData.topicId} onChange={e => setFormData({ ...formData, topicId: e.target.value })}>
-                    <option value="">-- Chọn chủ đề --</option>
-                    {topics.map(t => (
-                      <option key={t._id} value={t._id}>{t.name}</option>
-                    ))}
-                  </select>
+                  <TopicSelect
+                    value={formData.topicId}
+                    options={topics}
+                    onChange={(topicId) => setFormData({ ...formData, topicId })}
+                  />
                 </div>
 
                 {formData.topicId && (

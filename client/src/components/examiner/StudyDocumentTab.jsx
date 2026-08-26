@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   BookOpen,
   UploadCloud,
@@ -9,6 +9,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 import { fetchTopics, fetchDepartments } from '../../services/examiner.service';
 import {
@@ -25,6 +26,97 @@ const SCOPE_DEPARTMENT = 'DepartmentSpecific';
 
 const ACCEPTED_EXTENSIONS = '.pdf,.doc,.docx,.xls,.xlsx';
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+// MỚI — Dropdown tự dựng, thay cho <select> native. Danh sách xổ xuống của
+// <select> do OS/trình duyệt tự vẽ, không bị ràng buộc bởi layout trang cha
+// nên hay bị tràn ra ngoài khung chứa/màn hình trên mobile (đặc biệt khi ô
+// chọn nằm gần đầu trang, danh sách dài sẽ tràn xuống dưới, lệch khỏi khung
+// card). Component này tự đo khoảng trống viewport để quyết định mở xuống
+// hay lật lên trên, luôn giới hạn width/height trong màn hình.
+function Select({ value, options, onChange, placeholder = '-- Chọn --', triggerClassName = '' }) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState({ placement: 'bottom', maxHeight: 240 });
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !wrapperRef.current) return undefined;
+
+    const PREFERRED_MAX_HEIGHT = 240;
+    const VIEWPORT_MARGIN = 12;
+
+    const recalcPosition = () => {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom - VIEWPORT_MARGIN;
+      const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+      if (spaceBelow >= 120 || spaceBelow >= spaceAbove) {
+        setMenuStyle({ placement: 'bottom', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceBelow)) });
+      } else {
+        setMenuStyle({ placement: 'top', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceAbove)) });
+      }
+    };
+
+    recalcPosition();
+    window.addEventListener('resize', recalcPosition);
+    window.addEventListener('scroll', recalcPosition, true);
+    return () => {
+      window.removeEventListener('resize', recalcPosition);
+      window.removeEventListener('scroll', recalcPosition, true);
+    };
+  }, [open]);
+
+  const selectedOption = options.find((o) => o.value === value);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`text-left relative ${triggerClassName}`}
+        style={{ color: value ? undefined : '#64748B' }}
+      >
+        <span className="block truncate pr-6">{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
+          style={{ transform: open ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}
+        />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute z-20 w-full overflow-y-auto bg-white rounded-lg border border-slate-200 shadow-lg py-1 ${
+            menuStyle.placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+          style={{ maxHeight: `${menuStyle.maxHeight}px` }}
+          data-lenis-prevent
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className="w-full text-left px-3.5 min-h-[44px] flex items-center text-base"
+              style={value === opt.value ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 } : { color: '#0F172A' }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const formatDateTime = (value) => {
   if (!value) return '—';
@@ -215,18 +307,13 @@ export const StudyDocumentTab = () => {
               <label className="block text-base font-semibold text-[#0F172A] mb-1.5">
                 Chủ đề <span className="text-[#E53E3E]">*</span>
               </label>
-              <select
+              <Select
                 value={form.topicId}
-                onChange={(e) => setForm((f) => ({ ...f, topicId: e.target.value }))}
-                className="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
-              >
-                <option value="">— Chọn chủ đề —</option>
-                {topics.map((t) => (
-                  <option key={t._id} value={t._id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm((f) => ({ ...f, topicId: val }))}
+                placeholder="— Chọn chủ đề —"
+                options={topics.map((t) => ({ value: t._id, label: t.name }))}
+                triggerClassName="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
+              />
             </div>
 
             <div>
@@ -246,14 +333,15 @@ export const StudyDocumentTab = () => {
               <label className="block text-base font-semibold text-[#0F172A] mb-1.5">
                 Phạm vi
               </label>
-              <select
+              <Select
                 value={form.scope}
-                onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value, departmentId: '' }))}
-                className="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
-              >
-                <option value={SCOPE_COMMON}>Chung (mọi thí sinh)</option>
-                <option value={SCOPE_DEPARTMENT}>Riêng theo phòng ban</option>
-              </select>
+                onChange={(val) => setForm((f) => ({ ...f, scope: val, departmentId: '' }))}
+                options={[
+                  { value: SCOPE_COMMON, label: 'Chung (mọi thí sinh)' },
+                  { value: SCOPE_DEPARTMENT, label: 'Riêng theo phòng ban' },
+                ]}
+                triggerClassName="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
+              />
             </div>
 
             {form.scope === SCOPE_DEPARTMENT && (
@@ -261,18 +349,13 @@ export const StudyDocumentTab = () => {
                 <label className="block text-base font-semibold text-[#0F172A] mb-1.5">
                   Phòng ban <span className="text-[#E53E3E]">*</span>
                 </label>
-                <select
+                <Select
                   value={form.departmentId}
-                  onChange={(e) => setForm((f) => ({ ...f, departmentId: e.target.value }))}
-                  className="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
-                >
-                  <option value="">— Chọn phòng ban —</option>
-                  {departments.map((d) => (
-                    <option key={d._id} value={d._id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm((f) => ({ ...f, departmentId: val }))}
+                  placeholder="— Chọn phòng ban —"
+                  options={departments.map((d) => ({ value: d._id, label: d.name }))}
+                  triggerClassName="w-full min-h-[44px] px-3 py-2 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]/40 focus:border-[#008BC5]"
+                />
               </div>
             )}
           </div>

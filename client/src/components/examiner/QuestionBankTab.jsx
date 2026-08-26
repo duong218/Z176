@@ -5,6 +5,100 @@ import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 import { useScrollLock } from '../../hooks/useScrollLock';
 
+// MỚI — Dropdown tự dựng dùng chung, thay cho toàn bộ thẻ <select> native
+// trong file này. Danh sách xổ xuống của <select> do OS/trình duyệt tự vẽ,
+// không bị ràng buộc bởi layout của trang/modal cha nên hay bị tràn ra
+// ngoài khung chứa hoặc lệch khỏi màn hình trên mobile. Component này tự đo
+// khoảng trống còn lại trong viewport để quyết định mở xuống hay lật lên
+// trên, và luôn giới hạn width/height trong phạm vi màn hình.
+// options: [{ value, label }]; triggerClassName để giữ nguyên style/kích
+// thước riêng của từng chỗ dùng (khác nhau giữa ô lọc và ô trong form).
+function Select({ value, options, onChange, placeholder = '-- Chọn --', disabled = false, triggerClassName = '' }) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState({ placement: 'bottom', maxHeight: 240 });
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !wrapperRef.current) return undefined;
+
+    const PREFERRED_MAX_HEIGHT = 240;
+    const VIEWPORT_MARGIN = 12;
+
+    const recalcPosition = () => {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom - VIEWPORT_MARGIN;
+      const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+      if (spaceBelow >= 120 || spaceBelow >= spaceAbove) {
+        setMenuStyle({ placement: 'bottom', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceBelow)) });
+      } else {
+        setMenuStyle({ placement: 'top', maxHeight: Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, spaceAbove)) });
+      }
+    };
+
+    recalcPosition();
+    window.addEventListener('resize', recalcPosition);
+    window.addEventListener('scroll', recalcPosition, true);
+    return () => {
+      window.removeEventListener('resize', recalcPosition);
+      window.removeEventListener('scroll', recalcPosition, true);
+    };
+  }, [open]);
+
+  const selectedOption = options.find((o) => o.value === value);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={`text-left relative ${triggerClassName} ${disabled ? 'disabled:bg-slate-50 disabled:text-slate-400 cursor-not-allowed' : ''}`}
+        style={{ color: disabled ? '#94A3B8' : value ? undefined : '#64748B' }}
+      >
+        <span className="block truncate pr-6">{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform"
+          style={{ transform: open ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}
+        />
+      </button>
+
+      {open && !disabled && (
+        <div
+          className={`absolute z-20 w-full overflow-y-auto bg-white rounded-lg border border-slate-200 shadow-lg py-1 ${
+            menuStyle.placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+          style={{ maxHeight: `${menuStyle.maxHeight}px` }}
+          data-lenis-prevent
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className="w-full text-left px-3.5 min-h-[40px] flex items-center text-sm"
+              style={value === opt.value ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 } : { color: '#0F172A' }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const QuestionBankTab = ({ initialFilter } = {}) => {
   const { showToast } = useToast();
   const confirmAction = useConfirm();
@@ -554,55 +648,58 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
         {/* Bộ lọc — 2 cột trên mobile để mỗi ô chọn còn đủ rộng, có thể cuộn
             ngang danh sách khi mở dropdown; enlarge padding cho dễ chạm. */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
-          <select
+          <Select
             value={selectedTopic}
-            onChange={(e) => setSelectedTopic(e.target.value)}
-            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
-          >
-            <option value="">-- Tất cả chủ đề --</option>
-            {topics.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
-          </select>
+            onChange={setSelectedTopic}
+            placeholder="-- Tất cả chủ đề --"
+            options={topics.map(t => ({ value: t._id, label: t.name }))}
+            triggerClassName="w-full px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+          />
 
-          <select
+          <Select
             value={selectedScope}
-            onChange={(e) => setSelectedScope(e.target.value)}
-            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
-          >
-            <option value="">-- Phạm vi --</option>
-            <option value="Common">Chung</option>
-            <option value="DepartmentSpecific">Riêng bộ phận</option>
-          </select>
+            onChange={setSelectedScope}
+            placeholder="-- Phạm vi --"
+            options={[
+              { value: 'Common', label: 'Chung' },
+              { value: 'DepartmentSpecific', label: 'Riêng bộ phận' },
+            ]}
+            triggerClassName="w-full px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+          />
 
-          <select
+          <Select
             value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
+            onChange={setSelectedDept}
             disabled={selectedScope !== 'DepartmentSpecific'}
-            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm disabled:bg-slate-50 disabled:text-slate-400"
-          >
-            <option value="">-- Bộ phận --</option>
-            {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
-          </select>
+            placeholder="-- Bộ phận --"
+            options={departments.map(d => ({ value: d._id, label: d.name }))}
+            triggerClassName="w-full px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+          />
 
-          <select
+          <Select
             value={selectedDifficulty}
-            onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
-          >
-            <option value="">-- Độ khó --</option>
-            <option value="easy">Dễ</option>
-            <option value="medium">Trung bình</option>
-            <option value="hard">Khó</option>
-          </select>
+            onChange={setSelectedDifficulty}
+            placeholder="-- Độ khó --"
+            options={[
+              { value: 'easy', label: 'Dễ' },
+              { value: 'medium', label: 'Trung bình' },
+              { value: 'hard', label: 'Khó' },
+            ]}
+            triggerClassName="w-full px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+          />
 
-          <select
-            value={selectedAnswerType}
-            onChange={(e) => setSelectedAnswerType(e.target.value)}
-            className="col-span-2 md:col-span-1 px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
-          >
-            <option value="">-- Hình thức đáp án --</option>
-            <option value="single">Một đáp án (Single)</option>
-            <option value="multiple">Nhiều đáp án (Multiple)</option>
-          </select>
+          <div className="col-span-2 md:col-span-1">
+            <Select
+              value={selectedAnswerType}
+              onChange={setSelectedAnswerType}
+              placeholder="-- Hình thức đáp án --"
+              options={[
+                { value: 'single', label: 'Một đáp án (Single)' },
+                { value: 'multiple', label: 'Nhiều đáp án (Multiple)' },
+              ]}
+              triggerClassName="w-full px-3 py-2.5 min-h-[42px] border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white text-sm"
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap justify-between items-center pt-2 gap-3 border-t border-slate-100">
@@ -772,20 +869,20 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* QUESTION FORM MODAL */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl sm:my-8 max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-slate-100 flex flex-col">
             <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">
                 {editingQuestion ? 'Chỉnh sửa câu hỏi' : 'Thêm câu hỏi mới'}
               </h3>
               <button
                 onClick={() => setIsFormOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto" data-lenis-prevent>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Nội dung câu hỏi</label>
                 <textarea
@@ -801,85 +898,85 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Loại nội dung</label>
-                  <select
+                  <Select
                     value={questionKind}
-                    onChange={(e) => setQuestionKind(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
-                  >
-                    <option value="theory">Lý thuyết</option>
-                    <option value="practice">Bài tập thực hành</option>
-                  </select>
+                    onChange={setQuestionKind}
+                    options={[
+                      { value: 'theory', label: 'Lý thuyết' },
+                      { value: 'practice', label: 'Bài tập thực hành' },
+                    ]}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Độ khó</label>
-                  <select
+                  <Select
                     value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
-                  >
-                    <option value="easy">Dễ</option>
-                    <option value="medium">Trung bình</option>
-                    <option value="hard">Khó</option>
-                  </select>
+                    onChange={setDifficulty}
+                    options={[
+                      { value: 'easy', label: 'Dễ' },
+                      { value: 'medium', label: 'Trung bình' },
+                      { value: 'hard', label: 'Khó' },
+                    ]}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Hình thức đáp án</label>
-                  <select
+                  <Select
                     value={answerType}
-                    onChange={(e) => {
-                      setAnswerType(e.target.value);
+                    onChange={(val) => {
+                      setAnswerType(val);
                       // Reset correct checks if switching to single
-                      if (e.target.value === 'single') {
+                      if (val === 'single') {
                         setAnswers(prev => prev.map((ans, idx) => ({ ...ans, isCorrect: idx === 0 })));
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
-                  >
-                    <option value="single">Một đáp án đúng (Single Choice)</option>
-                    <option value="multiple">Nhiều đáp án đúng (Multiple Choice)</option>
-                  </select>
+                    options={[
+                      { value: 'single', label: 'Một đáp án đúng (Single Choice)' },
+                      { value: 'multiple', label: 'Nhiều đáp án đúng (Multiple Choice)' },
+                    ]}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Chủ đề liên kết</label>
-                  <select
-                    required
+                  <Select
                     value={topicId}
-                    onChange={(e) => setTopicId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
-                  >
-                    <option value="">-- Chọn chủ đề --</option>
-                    {topics.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
-                  </select>
+                    onChange={setTopicId}
+                    placeholder="-- Chọn chủ đề --"
+                    options={topics.map(t => ({ value: t._id, label: t.name }))}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Phạm vi câu hỏi</label>
-                  <select
+                  <Select
                     value={scope}
-                    onChange={(e) => setScope(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
-                  >
-                    <option value="Common">Chung (Toàn nhà máy)</option>
-                    <option value="DepartmentSpecific">Riêng bộ phận</option>
-                  </select>
+                    onChange={setScope}
+                    options={[
+                      { value: 'Common', label: 'Chung (Toàn nhà máy)' },
+                      { value: 'DepartmentSpecific', label: 'Riêng bộ phận' },
+                    ]}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Bộ phận liên kết</label>
-                  <select
-                    required={scope === 'DepartmentSpecific'}
+                  <Select
                     disabled={scope !== 'DepartmentSpecific'}
                     value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    <option value="">-- Chọn bộ phận --</option>
-                    {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
-                  </select>
+                    onChange={setDepartmentId}
+                    placeholder="-- Chọn bộ phận --"
+                    options={departments.map(d => ({ value: d._id, label: d.name }))}
+                    triggerClassName="w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5] bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  />
                 </div>
               </div>
 
@@ -987,18 +1084,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* IMPORT EXCEL MODAL */}
       {isImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto border border-slate-100" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 sticky top-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Nhập câu hỏi từ file Excel</h3>
               <button
                 onClick={() => setIsImportOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+            <div className="p-4 sm:p-5 space-y-4">
               <a
                 href="/templates/Mau_Import_Cau_Hoi_Z176.xlsx"
                 download
@@ -1125,9 +1222,9 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* IMPORT EXCEL — XEM TRƯỚC & XÁC NHẬN (bước 2/2) */}
       {importPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh] my-auto" data-lenis-prevent>
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Xem trước import — chưa ghi vào hệ thống
               </h3>
@@ -1140,7 +1237,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               </button>
             </div>
 
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+            <div className="p-5 space-y-4 overflow-y-auto" data-lenis-prevent>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div className="bg-slate-50 rounded-lg p-3">
                   <div className="text-xl font-bold text-[#0F172A]">{importPreview.totalRows}</div>
