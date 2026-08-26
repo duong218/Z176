@@ -19,7 +19,9 @@ Một kỳ thi chuyên môn tại Nhà máy Z176 (ví dụ *"Kiểm tra An toàn
 - **Phần câu hỏi Chung (`Common`)**: Áp dụng cho toàn bộ cán bộ công nhân viên trong đơn vị (kiến thức pháp luật, nội quy chung, an toàn vệ sinh lao động cơ bản).
 - **Phần câu hỏi Riêng (`DepartmentSpecific`)**: Chỉ riêng phòng ban đó mới có (ví dụ câu hỏi nghiệp vụ Xưởng Cơ khí khác Xưởng Vũ khí/Khí tài, Phòng Kỹ thuật khác Phòng Kế hoạch).
 
-Vì vậy, hệ thống không dùng một bộ đề duy nhất cho toàn công ty, mà tự động sinh ra **nhiều mã đề thi — mỗi phòng ban một mã đề riêng biệt** — rồi tự động gán toàn bộ nhân viên vào đúng mã đề của phòng ban trực thuộc.
+Vì vậy, hệ thống tự động sinh ra **mã đề thi ngẫu nhiên độc lập cho từng nhân viên/thí sinh**:
+- Mỗi thí sinh được rút ngẫu nhiên một tập câu hỏi riêng từ kho câu hỏi Chung và kho câu hỏi Riêng của phòng ban mình.
+- Mỗi thí sinh sở hữu một mã đề riêng biệt (`ExamCode`), ví dụ `D3F9A1-KYTHUAT-NV012-A8F1`, đảm bảo các thí sinh cùng phòng ban ngồi cạnh nhau vẫn có bộ câu hỏi khác nhau, chống gian lận và nhìn bài triệt để.
 
 Toàn bộ quy trình diễn ra **hoàn toàn tự động**: Người duyệt đề (Leader) chỉ cần bấm một nút *"Đăng chính thức"* (`publish`), hệ thống sẽ tự tính toán, kiểm tra số lượng câu hỏi, trộn ngẫu nhiên và phân bổ đề thi cho từng thí sinh mà không cần can thiệp thủ công.
 
@@ -60,55 +62,57 @@ Exam (approved)
   ├─ Bước 2: Kiểm tra ngân hàng câu hỏi của TẤT CẢ phòng ban (validateQuestionAvailability)
   │          - Đếm pool câu hỏi Chung (Common) thuộc chủ đề
   │          - Đếm pool câu hỏi Riêng (DepartmentSpecific) của từng phòng ban
-  │          - Áp dụng cơ chế BÙ THÊM từ câu Chung nếu câu Riêng không đủ
+  │          - Áp dụng cơ chế BÙ THÊM từ câu Chung nếu câu Riêng không đủ (Smart Fallback)
+  │          - Tính toán kế hoạch trích xuất (plan: commonPickCount, deptPickCount)
   │          - Nếu TỔNG (Chung + Riêng) vẫn thiếu -> Ném lỗi chi tiết từng phòng ban và CHẶN LẠI
   │
-  ├─ Bước 3: Tạo mã đề cho từng phòng ban
-  │          - Lấy ngẫu nhiên số câu Chung và số câu Riêng theo plan đã tính
+  ├─ Bước 3: Tạo mã đề ngẫu nhiên RIÊNG CHO TỪNG NHÂN VIÊN (ensureExamCodeForEmployee)
+  │          - Với từng nhân viên: Lấy ngẫu nhiên câu Chung và câu Riêng từ pool theo plan
   │          - Trộn ngẫu nhiên (Fisher–Yates shuffle) gộp chung 2 tập câu hỏi
-  │          - Tạo ExamCode (ví dụ: A1B2C3-KYTHUAT) kèm fingerprint SHA-256
-  │          - Tạo ExamCodeQuestion lưu danh sách câu hỏi cho mã đề
+  │          - Tạo ExamCode riêng (ví dụ: D3F9A1-KYTHUAT-NV001-B3E2) kèm fingerprint SHA-256
+  │          - Tạo ExamCodeQuestion lưu danh sách câu hỏi cho mã đề của nhân viên đó
   │
-  └─ Bước 4: Tạo ExamCandidate gán toàn bộ nhân viên trong phòng ban vào ExamCode tương ứng
+  └─ Bước 4: Tạo ExamCandidate liên kết nhân viên vào đúng ExamCode vừa sinh
 ```
 
-### Bước 1 — Xác định các phòng ban cần sinh đề
+### Bước 1 — Xác định các phòng ban & nhân viên cần sinh đề
 - Hệ thống truy vấn toàn bộ nhân viên `Employee` đang hoạt động (`isActive: true`).
 - Nhóm danh sách nhân viên theo `departmentId`.
 - Chỉ các phòng ban **đang có ít nhất 1 nhân viên hoạt động** mới được đưa vào danh sách sinh đề. Những phòng ban không có nhân sự sẽ được bỏ qua nhằm tối ưu tài nguyên lưu trữ.
-- Nếu toàn hệ thống không có bất kỳ nhân viên nào đang hoạt động, quy trình sẽ ném lỗi `NO_CANDIDATES_AVAILABLE`.
+- Nếu toàn hệ thống không có bất kỳ nhân viên nào đang hoạt động, quy trình sẽ ném lỗi `NO_ACTIVE_EMPLOYEES`.
 
 ### Bước 2 — Kiểm tra câu hỏi & Cơ chế Bù đắp thông minh (`validateQuestionAvailability`)
 Người ra đề quy định 2 thông số trong cấu hình kỳ thi:
 - `commonQuestionCount`: Số lượng câu hỏi chung cần lấy.
 - `departmentQuestionCount`: Số lượng câu hỏi riêng cần lấy.
 
-Với mỗi phòng ban tham gia, hệ thống thực hiện kiểm tra 2 kho câu hỏi:
+Với mỗi phòng ban tham gia, hệ thống thực hiện kiểm tra 2 kho câu hỏi (tính toán 1 lần duy nhất cho toàn bộ nhân viên trong phòng ban đó):
 1. **Pool câu Chung**: `Question` thuộc đúng `topicId`, `scope = 'Common'`, `isActive = true`.
 2. **Pool câu Riêng**: `Question` thuộc đúng `topicId`, `scope = 'DepartmentSpecific'`, đúng `departmentId`, `isActive = true`.
 
 **Thuật toán Bù đắp câu hỏi (Smart Fallback Mechanism):**
-- Nếu kho câu riêng của phòng ban có đủ `departmentQuestionCount`: Lấy đúng số câu riêng yêu cầu và số câu chung yêu cầu.
+- Nếu kho câu riêng của phòng ban có đủ `departmentQuestionCount`: `deptPickCount = departmentQuestionCount`, `commonPickCount = commonQuestionCount`.
 - Nếu kho câu riêng **bị thiếu** (ví dụ cần 5 câu riêng nhưng phòng ban chỉ có 3 câu):
-  - Hệ thống lấy tất cả 3 câu riêng hiện có.
-  - Số câu còn thiếu (2 câu) sẽ được **tự động bù thêm từ pool câu hỏi Chung** (số câu chung cần lấy = `commonQuestionCount + 2`).
+  - Hệ thống lấy tất cả 3 câu riêng hiện có (`deptPickCount = 3`).
+  - Số câu còn thiếu (`shortfall = 2`) sẽ được **tự động bù thêm từ pool câu hỏi Chung** (`commonPickCount = commonQuestionCount + 2`).
 - **Điều kiện ném lỗi chặn phát hành:** Chỉ khi tổng số câu Chung + câu Riêng của phòng ban nhỏ hơn tổng số câu của cả đề thi (`commonQuestionCount + departmentQuestionCount`), hệ thống mới báo lỗi và trả về chi tiết tên phòng ban kèm số lượng câu bị thiếu.
 
-### Bước 3 — Trộn ngẫu nhiên và Khởi tạo Mã đề (`ExamCode`)
-Với số lượng câu hỏi đã tính toán từ plan ở Bước 2:
-1. Trích xuất ngẫu nhiên (Fisher–Yates shuffle) đủ số câu từ pool Chung và pool Riêng.
-2. Trộn chung toàn bộ danh sách câu hỏi đã chọn thành một danh sách duy nhất.
-3. Sinh chuỗi mã đề hiển thị: `buildExamCode(exam, department)` theo định dạng:
-   `{6 ký tự cuối ExamId}-{Mã/Tên phòng ban viết hoa không dấu, tối đa 10 ký tự}` (Ví dụ: `D3F9A1-XUONG1`).
+### Bước 3 — Rút ngẫu nhiên độc lập và Khởi tạo Mã đề riêng cho từng nhân viên (`createExamCodeForEmployee`)
+Với mỗi nhân viên chưa được gán đề trong phòng ban:
+1. Trích xuất ngẫu nhiên (Fisher–Yates shuffle) `plan.commonPickCount` câu từ pool Chung và `plan.deptPickCount` câu từ pool Riêng của phòng ban.
+2. Trộn ngẫu nhiên chung toàn bộ danh sách câu hỏi đã chọn thành một danh sách duy nhất.
+3. Sinh chuỗi mã đề hiển thị độc lập: `buildExamCode(exam, department, employee)` theo định dạng:
+   `{6 ký tự cuối ExamId}-{Mã PB}-{Mã NV/NV}-{RandomHex}` (Ví dụ: `D3F9A1-XUONG1-NV012-A8F1`).
 4. Lưu bản ghi `ExamCode` vào cơ sở dữ liệu.
-5. Tạo các bản ghi `ExamCodeQuestion` lưu danh sách `questionId` kèm chỉ số thứ tự mặc định `orderIndex`.
+5. Tạo các bản ghi `ExamCodeQuestion` lưu danh sách `questionId` kèm chỉ số thứ tự `orderIndex`.
 6. Tính toán mã băm `fingerprint` (SHA-256) từ danh sách ID câu hỏi đã sắp xếp để nhận diện bộ câu hỏi.
 
 > [!NOTE]
-> `ExamCode` và `ExamCodeQuestion` đại diện cho bộ câu hỏi chung cố định của một phòng ban. Khi từng cá nhân thí sinh bước vào phòng thi, hệ thống sẽ thực hiện một bước xáo thứ tự câu hỏi và đáp án độc lập khác (`AttemptQuestion`) trong `exam-attempt.service.js`.
+> - `ExamCode` và `ExamCodeQuestion` đại diện cho bộ câu hỏi độc lập được rút ngẫu nhiên cho **từng cá nhân nhân viên**.
+> - Khi thí sinh bước vào phòng thi, hệ thống tiếp tục thực hiện thêm một bước xáo ngẫu nhiên thứ tự câu hỏi và thứ tự các phương án trả lời (`AttemptQuestion`) trong `exam-attempt.service.js` để tạo snapshot cố định cho riêng lượt làm bài đó.
 
 ### Bước 4 — Gán Thí sinh vào Mã đề (`ExamCandidate`)
-- Với mỗi nhân viên thuộc phòng ban, hệ thống tạo bản ghi `ExamCandidate` liên kết `examId`, `employeeId`, `examCodeId`.
+- Với mỗi nhân viên, hệ thống tạo bản ghi `ExamCandidate` liên kết `examId`, `employeeId`, và `examCodeId` vừa tạo riêng cho người đó.
 - Mặc định khởi tạo `attemptsUsed = 0` và `extraAttemptsGranted = 0`.
 
 ---
@@ -116,8 +120,8 @@ Với số lượng câu hỏi đã tính toán từ plan ở Bước 2:
 ## Tính Bất biến và Cơ chế Chống lỗi (Idempotency & Resilience)
 
 Hệ thống được thiết kế để chịu lỗi mạng hoặc sự cố gián đoạn giữa chừng:
-- **Tái sử dụng Mã đề đã tạo**: Nếu quá trình phát hành bị ngắt quãng và Leader bấm phát hành lại, hệ thống kiểm tra `ExamCode` đã tồn tại cho phòng ban đó chưa. Nếu đã có, hệ thống sử dụng lại nguyên vẹn mã đề cũ, không sinh lại đề mới làm sai lệch bộ câu hỏi.
-- **Không bỏ sót và không trùng Thí sinh**: Hệ thống chỉ tạo `ExamCandidate` cho những nhân viên chưa có bản ghi trong kỳ thi đó. Những nhân viên đã được gán trước đó sẽ được giữ nguyên.
+- **Idempotent theo từng nhân viên**: Nếu quá trình phát hành bị ngắt quãng và Leader bấm phát hành lại, hệ thống kiểm tra `ExamCandidate` nào đã tồn tại thì bỏ qua, chỉ sinh mã đề và tạo `ExamCandidate` cho những nhân viên còn thiếu (`pendingEmployees`).
+- Không sinh trùng lặp mã đề và không làm sai lệch những thí sinh đã được gán trước đó.
 
 ---
 
@@ -126,12 +130,11 @@ Hệ thống được thiết kế để chịu lỗi mạng hoặc sự cố gi
 Khi Quản trị viên tạo tài khoản nhân viên mới (tạo đơn lẻ hoặc import Excel) trong thời gian một kỳ thi đang ở trạng thái `published` (đang mở thi):
 
 1. Hệ thống tìm kiếm kỳ thi đang `published` tương ứng.
-2. Kiểm tra xem phòng ban của nhân viên mới đã có `ExamCode` của kỳ thi đó hay chưa:
-   - **Đã có mã đề**: Sử dụng lại `ExamCode` có sẵn của phòng ban để gán cho nhân viên mới vào `ExamCandidate`.
-   - **Chưa có mã đề** (do lúc publish phòng ban này chưa có nhân viên nào): Hệ thống tự động kích hoạt logic sinh `ExamCode` mới riêng cho phòng ban này và gán nhân viên vào.
-3. **Cơ chế Nuốt lỗi An toàn & Thông báo (`notifyExamAssignmentFailed`)**: Nếu việc gán đề cho nhân viên mới thất bại (ví dụ ngân hàng câu hỏi của phòng ban mới không đủ), lỗi sẽ **không ném ra ngoài để chặn việc tạo tài khoản nhân viên**. Thay vào đó:
+2. Kiểm tra xem nhân viên đã có `ExamCandidate` trong kỳ thi chưa (nếu có thì trả về ngay).
+3. Hệ thống gọi `ensureExamCodeForEmployee` để tự động kiểm tra kho câu hỏi của phòng ban, rút ngẫu nhiên bộ câu hỏi và sinh một `ExamCode` mới riêng cho nhân viên này, sau đó tạo `ExamCandidate`.
+4. **Cơ chế Nuốt lỗi An toàn & Thông báo (`notifyExamAssignmentFailed`)**: Nếu việc gán đề cho nhân viên mới thất bại (ví dụ ngân hàng câu hỏi của phòng ban mới không đủ), lỗi sẽ **không ném ra ngoài để chặn việc tạo tài khoản nhân viên**. Thay vào đó:
    - Ghi cảnh báo ra log hệ thống.
    - Tự động gửi thông báo hệ thống (`Notification`) tới **tất cả Admin đang active** và **Examiner đã tạo kỳ thi** để kịp thời bổ sung câu hỏi cho phòng ban đó.
-4. **Xử lý Xung đột Đồng thời (Concurrency Lock - Error 11000)**: Khi có 2 request tạo nhân viên cùng phòng ban chạy đồng thời, cả 2 có thể cùng phát hiện "chưa có mã đề" và cùng tạo `ExamCode`. Khi đó MongoDB sẽ trả về lỗi trùng lặp mã duy nhất `E11000`. Hệ thống chủ động bắt mã lỗi này, tự động chuyển sang đọc lại mã đề vừa được tạo bởi request kia và hoàn tất gán thí sinh mà không gặp bất kỳ lỗi nào.
+5. **Xử lý Xung đột Đồng thời (Concurrency Retry - Error 11000)**: Trong trường hợp hi hữu trùng mã đề `code` ngẫu nhiên khi insert vào MongoDB (`E11000`), hệ thống tự động retry sinh lại mã đề mới an toàn.
 
 

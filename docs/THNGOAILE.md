@@ -6,22 +6,22 @@ Tài liệu này tổng hợp các tình huống ngoại lệ (edge cases) mà h
 
 ## PHẦN A — TÌNH HUỐNG NGOẠI LỆ ĐÃ KHẮC PHỤC
 
-### A1. Xung đột đồng thời khi tạo nhân viên cùng phòng ban (Race Condition E11000)
+### A1. Trùng lặp ngẫu nhiên mã đề khi tạo ExamCode (Retry E11000)
 
-**Tình huống:** Quản trị viên import Excel chứa nhiều nhân viên cùng phòng ban lúc kỳ thi đang `published`. Cả 2 request tạo nhân viên chạy đồng thời, cùng phát hiện phòng ban chưa có `ExamCode` và cùng cố tạo mã đề mới — vi phạm ràng buộc duy nhất (unique index) `{examId, code}` trên MongoDB, ném lỗi `E11000`.
+**Tình huống:** Hàm `buildExamCode` sinh mã đề có hậu tố ngẫu nhiên (ví dụ `D3F9A1-XUONG1-NV001-A8F1`). Trong trường hợp hi hữu trùng mã duy nhất `{examId, code}` trên MongoDB (ném lỗi `E11000`).
 
-**Cách khắc phục:** Hàm `ensureExamCodeForDepartment` trong `exam-code-generation.service.js` chủ động bắt mã lỗi `11000`, hiểu đây là xung đột đồng thời (không phải lỗi thật), tự động đọc lại mã đề vừa được tạo bởi request kia và tiếp tục gán thí sinh bình thường.
+**Cách khắc phục:** Hàm `ensureExamCodeForEmployee` trong `exam-code-generation.service.js` chủ động bắt mã lỗi `11000`, tự động retry sinh lại mã đề mới với hậu tố ngẫu nhiên khác và tiếp tục lưu DB an toàn.
 
 ---
 
-### A2. Publish kỳ thi bị gián đoạn giữa chừng (Idempotent Recovery)
+### A2. Publish kỳ thi bị gián đoạn giữa chừng (Idempotent Recovery theo từng nhân viên)
 
-**Tình huống:** Quá trình publish kỳ thi đã tạo xong `ExamCode` cho 3/5 phòng ban thì gặp lỗi mạng hoặc DB timeout. Leader bấm "Đăng chính thức" lại lần nữa.
+**Tình huống:** Quá trình publish kỳ thi đã tạo xong `ExamCode` và `ExamCandidate` cho một số nhân viên thì gặp lỗi mạng hoặc DB timeout. Leader bấm "Đăng chính thức" lại lần nữa.
 
-**Cách khắc phục:** Hàm `generateExamCodesAndAssignCandidates` được thiết kế idempotent theo **từng phòng ban và từng nhân viên**:
-- Phòng ban nào đã có `ExamCode` từ lần chạy trước → tái sử dụng nguyên vẹn, không sinh đề mới.
-- Nhân viên nào đã có `ExamCandidate` → bỏ qua, chỉ gán những nhân viên chưa có.
-- Trạng thái kỳ thi chỉ chuyển sang `published` **sau khi** sinh đề thành công cho tất cả phòng ban → không bao giờ publish dở dang.
+**Cách khắc phục:** Hàm `generateExamCodesAndAssignCandidates` được thiết kế idempotent theo **từng nhân viên**:
+- Quét danh sách nhân viên đã có `ExamCandidate` cho kỳ thi này (`alreadyAssignedIds`) → bỏ qua, không tạo lại.
+- Chỉ tạo `ExamCode` và `ExamCandidate` cho những nhân viên còn thiếu (`pendingEmployees`).
+- Trạng thái kỳ thi chỉ chuyển sang `published` **sau khi** sinh đề và gán thành công cho tất cả nhân viên của mọi phòng ban → không bao giờ publish dở dang.
 
 ---
 

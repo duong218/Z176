@@ -210,12 +210,12 @@ Khi Leader bấm nút **"Đăng chính thức (Phát hành)"**, hệ thống kí
     *   Quét toàn bộ nhân viên đang hoạt động của tất cả phòng ban.
     *   Kiểm tra số lượng câu hỏi chung và câu hỏi riêng của từng phòng ban xem có đủ số lượng theo cấu hình kỳ thi hay không.
     *   *Cơ chế bù đắp thông minh (Smart Fallback)*: Nếu câu hỏi riêng của phòng ban bị thiếu, hệ thống tự động bù thêm từ kho câu hỏi chung. Nếu tổng số câu (Chung + Riêng) vẫn không đủ, hệ thống lập tức chặn lại và báo rõ phòng ban nào đang thiếu bao nhiêu câu.
-2.  **Sinh mã đề thi phân tán (`ExamCode` & `ExamCodeQuestion`)**:
-    *   Sử dụng thuật toán Fisher–Yates xáo ngẫu nhiên để trích xuất tập câu hỏi cho từng phòng ban.
-    *   Tạo mã đề riêng cho từng phòng ban (ví dụ `D3F9A1-XUONG1`).
+2.  **Sinh mã đề thi cá nhân hóa cho từng thí sinh (`ExamCode` & `ExamCodeQuestion`)**:
+    *   Với từng nhân viên thuộc phòng ban, hệ thống rút ngẫu nhiên (Fisher–Yates shuffle) số câu hỏi chung và riêng theo kế hoạch (plan) để tạo thành một bộ câu hỏi riêng biệt.
+    *   Tạo mã đề riêng cho từng cá nhân thí sinh (ví dụ `D3F9A1-XUONG1-NV001-A8F1`).
     *   Tạo chuỗi băm `fingerprint` (SHA-256) kiểm tra tính duy nhất.
 3.  **Tự động phân bổ thí sinh (`ExamCandidate`)**:
-    *   Gán toàn bộ nhân viên trực thuộc phòng ban vào mã đề tương ứng của phòng ban đó.
+    *   Gán từng nhân viên vào mã đề độc lập vừa được tạo riêng cho họ.
 4.  **Cập nhật trạng thái & Gửi thông báo diện rộng**:
     *   Kỳ thi chuyển sang trạng thái `published` (`publishedAt = new Date()`).
     *   Gửi In-app Notification thông báo kỳ thi mới tới **toàn bộ người dùng đang active**, ngoại trừ tài khoản Admin và chính Leader bấm nút phát hành.

@@ -114,8 +114,8 @@ Xảy ra khi thí sinh bấm *"Nộp bài"*, hết giờ làm bài, hoặc do h�
    - **Câu hỏi 1 đáp án (`single`)**: Thí sinh chọn đúng duy nhất 1 đáp án đúng -> Đúng (1 điểm).
    - **Câu hỏi nhiều đáp án (`multiple`)**: Thí sinh phải chọn đúng và đủ tất cả các đáp án đúng, không chọn thừa bất kỳ đáp án sai nào -> Đúng (1 điểm).
 5. **Tính toán Kết quả**:
-   - $\text{Điểm số} = \left(\frac{\text{Số câu đúng}}{\text{Tổng số câu}}\right) \times 10$ (làm tròn 2 chữ số thập phân).
-   - $\text{Kết quả Đạt} = \text{Điểm số} \ge \text{passingScore}$ của kỳ thi.
+   - $\text{Điểm số} = \text{round}\left(\frac{\text{Số câu đúng}}{\text{Tổng số câu}} \times 100\right)$ (thang điểm 100).
+   - $\text{Kết quả Đạt} = \text{Điểm số} \ge \text{passThresholdPercent}$ (mặc định 70%).
 6. Lưu kết quả vào bảng `Result`, cập nhật trạng thái `ExamAttempt` thành `submitted`, ghi nhận `submittedAt`.
 
 ---
