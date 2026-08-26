@@ -705,6 +705,14 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                 </div>
               </div>
 
+              {examData?.exam?.code && (
+                <div className="flex items-center justify-end">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#008BC5]/10 text-[#008BC5] font-bold font-mono text-xs border border-[#008BC5]/30">
+                    Mã đề: {examData.exam.code}
+                  </span>
+                </div>
+              )}
+
               {/* Progress bar - thuần hiển thị, tính từ answeredCount/questions.length đã có sẵn */}
               <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                 <div

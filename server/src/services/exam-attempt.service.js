@@ -2,6 +2,7 @@ import {
   Employee,
   Exam,
   ExamCandidate,
+  ExamCode,
   ExamCodeQuestion,
   Question,
   Answer,
@@ -223,6 +224,10 @@ export const examAttemptService = {
       await inProgress.save();
     }
 
+    // Mã đề cố định đã gán cho thí sinh (không đổi trong suốt kỳ thi, dùng
+    // ExamCandidate.examCodeId — độc lập với việc đang thi dở hay chưa bắt đầu).
+    const examCode = await ExamCode.findById(examCandidate.examCodeId).select('code');
+
     const finishedCount = attempts.filter((a) => a.status !== ATTEMPT_STATUS.IN_PROGRESS).length;
     const canTake = Boolean(inProgress) || finishedCount < maxAttempts;
 
@@ -274,6 +279,7 @@ export const examAttemptService = {
       exam: {
         id: exam._id,
         title: exam.title,
+        code: examCode?.code ?? null,
         durationMinutes: exam.durationMinutes,
         passThresholdPercent: exam.passThresholdPercent,
         totalQuestions: exam.totalQuestions,
