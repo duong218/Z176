@@ -3,6 +3,9 @@ import { X, User, Lock, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ShieldC
 import { loginUser } from '../services/auth.service';
 import { useScrollLock } from '../hooks/useScrollLock';
 
+// Đặt file logo tại: client/public/logo/logo.svg
+const LOGO_SRC = '/logo/logo.svg';
+
 // Đặt ảnh của bạn tại: client/public/images/login-cover.jpg
 // (khuyến nghị ảnh dọc, chủ thể ở giữa khung, >= 1200x1600px).
 // Mobile: ảnh nằm ngang phía trên form (dải ngắn, không chiếm quá nhiều màn hình).
@@ -113,10 +116,16 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             {/* Thanh tiêu đề nổi trên ảnh — chỉ hiện ở mobile */}
             <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 bg-gradient-to-b from-black/70 via-black/25 to-transparent p-3 sm:hidden">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#008BC5] font-bold text-white shadow-z176">
-                  <User className="h-5 w-5" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1 shadow-z176">
+                  <img src={LOGO_SRC} alt="" aria-hidden="true" className="h-full w-full object-contain" />
                 </div>
-                <span className="text-sm font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]">
+                <span
+                  className="text-sm font-bold text-white"
+                  style={{
+                    textShadow:
+                      '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 2px 4px rgba(0,0,0,0.6)',
+                  }}
+                >
                   Đăng nhập hệ thống Z176
                 </span>
               </div>
@@ -141,8 +150,8 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             }`}
           >
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[#008BC5] font-bold text-white">
-                <User className="h-5 w-5 sm:h-6 sm:w-6" />
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-white p-1 sm:p-1.5">
+                <img src={LOGO_SRC} alt="" aria-hidden="true" className="h-full w-full object-contain" />
               </div>
               <h3 className="text-base sm:text-xl font-bold text-white">
                 Đăng nhập hệ thống Z176
