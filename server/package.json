@@ -7,7 +7,7 @@
     "node": ">=22.0.0 <25.0.0"
   },
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "node --watch-path=src src/index.js",
     "start": "node src/index.js",
     "seed": "node src/scripts/seed-cli.js",
     "backup": "node src/scripts/backup-cli.js",

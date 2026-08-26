@@ -27,6 +27,19 @@ const DEFAULT_ROLES = [
 ];
 
 export async function seedRolesIfEmpty() {
+  // MỚI — kiểm tra đã seed đủ role chưa TRƯỚC khi upsert, thay vì luôn bắn
+  // 4 lệnh updateOne mỗi lần server khởi động. Trong dev, node --watch
+  // restart lại toàn bộ process (kể cả connectDatabase + runStartupSeed)
+  // mỗi lần lưu file — nếu 4 role đã tồn tại sẵn từ lâu (trường hợp phổ
+  // biến nhất), việc bắn lại 4 write không cần thiết chỉ làm mỗi lần
+  // restart chậm thêm mà không đổi gì trong DB. Chỉ khi thiếu ít nhất 1
+  // role (lần đầu chạy, hoặc DEFAULT_ROLES vừa thêm role mới) mới cần
+  // upsert đầy đủ như cũ.
+  const existingCount = await Role.countDocuments({
+    code: { $in: DEFAULT_ROLES.map((r) => r.code) },
+  });
+  if (existingCount === DEFAULT_ROLES.length) return;
+
   for (const role of DEFAULT_ROLES) {
     await Role.updateOne({ code: role.code }, { $setOnInsert: role }, { upsert: true });
   }
