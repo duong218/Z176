@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component {
               Tải lại trang
             </button>
             {process.env.NODE_ENV !== 'production' && this.state.error && (
-              <div className="mt-6 text-left bg-slate-100 p-4 rounded-lg overflow-auto max-h-48 text-xs text-red-500 font-mono">
+              <div className="mt-6 text-left bg-slate-100 p-4 rounded-lg overflow-auto max-h-48 text-xs text-red-500 font-mono" data-lenis-prevent>
                 {this.state.error.toString()}
               </div>
             )}

@@ -739,15 +739,15 @@ export const AccountTab = ({ currentUser }) => {
 
       {/* CREATE USER MODAL */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Thêm tài khoản mới</h3>
-              <button onClick={() => { setIsCreateOpen(false); resetCreateForm(); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setIsCreateOpen(false); resetCreateForm(); }} className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-5 space-y-4">
+            <form onSubmit={handleCreateUser} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Tên đăng nhập (Username)</label>
                 <input
@@ -825,18 +825,18 @@ export const AccountTab = ({ currentUser }) => {
                 </div>
               )}
 
-              <div className="pt-2 flex gap-3">
+              <div className="pt-2 flex gap-3 pb-1">
                 <button
                   type="button"
                   onClick={() => { setIsCreateOpen(false); resetCreateForm(); }}
-                  className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Lưu
@@ -847,24 +847,21 @@ export const AccountTab = ({ currentUser }) => {
         </div>
       )}
 
-      {/* MỚI — MODAL CON: TẠO PHÒNG BAN MỚI (mở từ dropdown Phòng ban trong
-          form Thêm tài khoản). z-index cao hơn modal Thêm tài khoản (z-50)
-          vì modal này nằm chồng lên trên nó, giống cách ConfirmDialog dùng
-          z-[110] để chồng lên các modal thường. */}
+      {/* MỚI — MODAL CON: TẠO PHÒNG BAN MỚI */}
       {isCreateDeptOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-[10px] shadow-xl w-full max-w-sm overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Tạo phòng ban mới</h3>
               <button
                 type="button"
                 onClick={() => { setIsCreateDeptOpen(false); setNewDeptName(''); setNewDeptCode(''); setDeptFormError(''); }}
-                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateDepartmentInline} className="p-5 space-y-4">
+            <form onSubmit={handleCreateDepartmentInline} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               {deptFormError && (
                 <div className="p-3.5 bg-[#FEECEC] border border-[#E53E3E]/30 text-[#0F172A] rounded-lg flex items-center gap-2.5 text-sm">
                   <AlertCircle className="w-5 h-5 shrink-0" />
@@ -893,18 +890,18 @@ export const AccountTab = ({ currentUser }) => {
                   className="w-full px-3.5 py-2.5 min-h-[44px] text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008BC5]"
                 />
               </div>
-              <div className="pt-2 flex gap-3">
+              <div className="pt-2 flex gap-3 pb-1">
                 <button
                   type="button"
                   onClick={() => { setIsCreateDeptOpen(false); setNewDeptName(''); setNewDeptCode(''); setDeptFormError(''); }}
-                  className="flex-1 py-2.5 min-h-[44px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={deptActionLoading}
-                  className="flex-1 py-2.5 min-h-[44px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {deptActionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Lưu
@@ -917,15 +914,15 @@ export const AccountTab = ({ currentUser }) => {
 
       {/* EDIT ROLE MODAL */}
       {isEditRoleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Sửa phân quyền</h3>
-              <button onClick={() => { setIsEditRoleOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setIsEditRoleOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleUpdateRole} className="p-5 space-y-4">
+            <form onSubmit={handleUpdateRole} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
                 <label className="block text-sm font-semibold text-slate-500">Tài khoản</label>
                 <p className="text-base font-bold text-[#0F172A] mt-0.5">{editingUser?.username}</p>
@@ -943,18 +940,18 @@ export const AccountTab = ({ currentUser }) => {
                   ))}
                 </select>
               </div>
-              <div className="pt-2 flex gap-3">
+              <div className="pt-2 flex gap-3 pb-1">
                 <button
                   type="button"
                   onClick={() => { setIsEditRoleOpen(false); setEditingUser(null); }}
-                  className="flex-1 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 disabled:opacity-75"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Cập nhật
@@ -967,9 +964,9 @@ export const AccountTab = ({ currentUser }) => {
 
       {/* TEMPORARY PASSWORD DISPLAY MODAL */}
       {tempPasswordModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200" data-lenis-prevent>
+            <div className="p-4 sm:p-6 text-center space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div className="w-16 h-16 bg-[#22C55E]/10 rounded-full flex items-center justify-center mx-auto text-[#22C55E]">
                 <Eye className="w-8 h-8" />
               </div>
@@ -1007,7 +1004,7 @@ export const AccountTab = ({ currentUser }) => {
                   username: tempPasswordModal.username,
                   password: tempPasswordModal.password,
                 })}
-                className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 min-h-[46px] bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center justify-center gap-2"
               >
                 <Upload className="w-4 h-4 rotate-180" /> Tải file tài khoản (username + mật khẩu)
               </button>
@@ -1015,7 +1012,7 @@ export const AccountTab = ({ currentUser }) => {
               <button
                 type="button"
                 onClick={() => setTempPasswordModal({ isOpen: false, title: '', username: '', password: '' })}
-                className="w-full py-3 bg-[#0F172A] text-white rounded-lg font-semibold hover:bg-slate-800 transition-colors shadow-md"
+                className="w-full py-3 min-h-[46px] bg-[#0F172A] text-white rounded-lg font-semibold hover:bg-slate-800 active:bg-slate-800 transition-colors shadow-md"
               >
                 Đóng
               </button>
@@ -1026,22 +1023,22 @@ export const AccountTab = ({ currentUser }) => {
 
       {/* IMPORT EXCEL — XEM TRƯỚC & XÁC NHẬN MODAL (bước 1/2) */}
       {importPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh] my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Xem trước import — chưa ghi vào hệ thống
               </h3>
               <button
                 onClick={() => setImportPreview(null)}
                 disabled={importConfirming}
-                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center">
                 <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-xl font-bold text-[#22C55E]">{importPreview.toCreate}</div>
@@ -1087,7 +1084,7 @@ export const AccountTab = ({ currentUser }) => {
                 </div>
               )}
 
-              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-72 overflow-y-auto" data-lenis-prevent>
                 {importPreview.rows.map((r) => (
                   <div key={r.rowIndex} className="p-3 text-sm flex items-start gap-2">
                     <span className="text-slate-400 w-14 shrink-0">Dòng {r.rowIndex}</span>
@@ -1149,17 +1146,17 @@ export const AccountTab = ({ currentUser }) => {
 
       {/* IMPORT EXCEL — KẾT QUẢ MODAL (bước 2/2, sau khi đã ghi thật) */}
       {importResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Kết quả import
               </h3>
-              <button onClick={() => setImportResult(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setImportResult(null)} className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div className="bg-[#F0FDF4] rounded-lg p-3">
                   <div className="text-2xl font-bold text-[#22C55E]">{importResult.created}</div>
@@ -1180,7 +1177,7 @@ export const AccountTab = ({ currentUser }) => {
               </div>
 
               {importResult.failed > 0 && (
-                <div className="bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg p-3 text-xs text-[#92400E] max-h-32 overflow-y-auto space-y-1">
+                <div className="bg-[#FFFBEB] border border-[#F6AD37]/40 rounded-lg p-3 text-xs text-[#92400E] max-h-32 overflow-y-auto space-y-1" data-lenis-prevent>
                   <p className="flex items-center gap-1 font-semibold"><AlertTriangle className="w-3.5 h-3.5" /> Các dòng lỗi:</p>
                   {importResult.results.filter(r => r.status === 'error').map(r => (
                     <p key={r.row}>Dòng {r.row}: {r.message}</p>

@@ -124,7 +124,7 @@ export const LogoSelectorModal = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1" data-lenis-prevent>
           {errorMsg && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-[#E53E3E] font-medium text-sm">
               {errorMsg}

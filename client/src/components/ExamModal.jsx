@@ -503,8 +503,11 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-[10px] shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[92vh] relative">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      data-lenis-prevent
+    >
+      <div className="bg-white w-full max-w-2xl rounded-[10px] shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[92dvh] relative">
         {/* Overlay cảnh báo rời màn hình thi — chỉ hiện khi đang testing và
             phát hiện tab/app bị chuyển. Che toàn bộ modal, không cho tương
             tác gì khác cho tới khi quay lại hoặc hết giờ. */}
@@ -573,9 +576,14 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
           </div>
         )}
 
-        {/* STEP: CONFIRMATION SCREEN */}
+        {/* STEP: CONFIRMATION SCREEN
+            Nút hành động chính được đặt ngay sau khối thông tin nhân viên,
+            TRƯỚC danh sách nội quy — vì danh sách nội quy có thể dài, đẩy
+            nút xuống dưới màn hình trên các máy màn hình thấp (vd iPhone),
+            khiến người dùng phải cuộn hết nội quy mới thấy nút để bấm vào
+            thi. Đưa nút lên trước giúp thấy và bấm ngay không cần cuộn. */}
         {step === 'confirm' && (
-          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1" data-lenis-prevent>
             <div className="bg-slate-50 border border-slate-200 rounded-[10px] p-4 space-y-2">
               <h4 className="font-bold text-base text-[#0F172A]">Xác nhận thông tin cán bộ / công nhân thi:</h4>
 
@@ -610,6 +618,35 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
               )}
             </div>
 
+            {submitError && (
+              <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
+            {!currentUser ? (
+              <button
+                onClick={onOpenLogin}
+                className="w-full min-h-[52px] bg-[#008BC5] text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
+              >
+                <span>ĐĂNG NHẬP ĐỂ VÀO THI</span>
+              </button>
+            ) : !examData?.canTake ? (
+              <div className="text-center text-sm text-slate-500 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                Bạn đã sử dụng hết lượt thi chính thức. Nếu cần thi lại, vui lòng liên hệ Người duyệt đề.
+              </div>
+            ) : (
+              <button
+                onClick={handleStartExam}
+                disabled={!employee}
+                className="w-full min-h-[52px] bg-[#008BC5] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
+              >
+                <CheckCircle2 className="w-6 h-6" />
+                <span>{examData?.attempt ? 'TIẾP TỤC BÀI THI ĐANG DỞ' : 'XÁC NHẬN & BẮT ĐẦU BÀI THI'}</span>
+              </button>
+            )}
+
             {currentUser && examData && (
               <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-[10px] p-4 text-sm text-[#334155]">
                 <h5 className="font-bold text-base text-[#0F172A]">{examData.exam.title}</h5>
@@ -627,44 +664,13 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                   <li>Mỗi thí sinh có {examData.maxAttempts} lượt thi chính thức. Muốn thi lại cần được Người duyệt đề cấp phép riêng.</li>
                   {examData.attempt && (
                     <li className="text-[#008BC5] font-semibold">
-                      Bạn đang có 1 lượt thi dở dang — bấm bên dưới để tiếp tục đúng lượt đó (không tính thêm lượt mới,
+                      Bạn đang có 1 lượt thi dở dang — bấm bên trên để tiếp tục đúng lượt đó (không tính thêm lượt mới,
                       các câu đã chọn trước đó sẽ được khôi phục kể cả khi đổi thiết bị).
                     </li>
                   )}
                 </ul>
               </div>
             )}
-
-            {submitError && (
-              <div className="p-3 bg-[#FEECEC] border border-[#E53E3E]/30 rounded-lg text-[#0F172A] text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            <div className="pt-2">
-              {!currentUser ? (
-                <button
-                  onClick={onOpenLogin}
-                  className="w-full min-h-[52px] bg-[#008BC5] text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
-                >
-                  <span>ĐĂNG NHẬP ĐỂ VÀO THI</span>
-                </button>
-              ) : !examData?.canTake ? (
-                <div className="text-center text-sm text-slate-500 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  Bạn đã sử dụng hết lượt thi chính thức. Nếu cần thi lại, vui lòng liên hệ Người duyệt đề.
-                </div>
-              ) : (
-                <button
-                  onClick={handleStartExam}
-                  disabled={!employee}
-                  className="w-full min-h-[52px] bg-[#008BC5] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-full hover:bg-[#007ba1] transition-colors flex items-center justify-center gap-2 shadow-z176 min-touch-target"
-                >
-                  <CheckCircle2 className="w-6 h-6" />
-                  <span>{examData?.attempt ? 'TIẾP TỤC BÀI THI ĐANG DỞ' : 'XÁC NHẬN & BẮT ĐẦU BÀI THI'}</span>
-                </button>
-              )}
-            </div>
           </div>
         )}
 
@@ -725,7 +731,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
             {showQuestionGrid ? (
               /* Màn hình danh sách câu hỏi — chiếm toàn bộ vùng nội dung, thoải mái
                  cuộn/chọn khi đề có 30-50 câu, thay vì khung nhỏ chèn phía trên. */
-              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4" data-lenis-prevent>
                 <div>
                   <h4 className="font-bold text-base text-[#0F172A]">Danh sách câu hỏi</h4>
                   <p className="text-sm text-[#334155] mt-0.5">
@@ -779,6 +785,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
                     bản (mức răn đe, không chặn được screenshot/chụp lại). */}
                 <div
                   className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 select-none"
+                  data-lenis-prevent
                   onCopy={handleBlockCopy}
                   style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
                 >
@@ -942,7 +949,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
 
         {/* STEP: RESULT SCREEN */}
         {step === 'result' && resultData && (
-          <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-center">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-center" data-lenis-prevent>
             <div
               className="w-16 h-16 rounded-full mx-auto flex items-center justify-center shadow-z176"
               style={{ backgroundColor: resultData.passed ? '#22C55E' : '#E53E3E' }}

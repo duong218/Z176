@@ -772,20 +772,20 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* QUESTION FORM MODAL */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl sm:my-8 max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-slate-100 flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
             <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">
                 {editingQuestion ? 'Chỉnh sửa câu hỏi' : 'Thêm câu hỏi mới'}
               </h3>
               <button
                 onClick={() => setIsFormOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+            <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Nội dung câu hỏi</label>
                 <textarea
@@ -987,18 +987,18 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* IMPORT EXCEL MODAL */}
       {isImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto border border-slate-100">
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 sticky top-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A]">Nhập câu hỏi từ file Excel</h3>
               <button
                 onClick={() => setIsImportOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 sm:p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <a
                 href="/templates/Mau_Import_Cau_Hoi_Z176.xlsx"
                 download
@@ -1125,9 +1125,9 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
 
       {/* IMPORT EXCEL — XEM TRƯỚC & XÁC NHẬN (bước 2/2) */}
       {importPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh] my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-[#0F172A] flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-[#008BC5]" /> Xem trước import — chưa ghi vào hệ thống
               </h3>
@@ -1140,7 +1140,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div className="bg-slate-50 rounded-lg p-3">
                   <div className="text-xl font-bold text-[#0F172A]">{importPreview.totalRows}</div>
@@ -1240,7 +1240,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
                   <p className="text-xs text-slate-500">
                     Các câu hỏi dưới đây <b>trùng nội dung</b> với câu đã có trong ngân hàng (cùng chủ đề/phạm vi/bộ phận). Mặc định sẽ <b>bỏ qua, giữ câu cũ</b> — tick vào dòng nào bạn muốn vẫn thêm câu mới song song.
                   </p>
-                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto" data-lenis-prevent>
                     {importPreview.duplicates.map((d) => (
                       <label key={d.row} className="p-2.5 text-sm flex items-start gap-2 cursor-pointer hover:bg-slate-50">
                         <input
@@ -1263,7 +1263,7 @@ export const QuestionBankTab = ({ initialFilter } = {}) => {
               {importPreview.errors?.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs text-slate-500">Các dòng dưới đây có lỗi khác, sẽ <b>luôn bị bỏ qua</b>:</p>
-                  <div className="border border-red-200 rounded-lg divide-y divide-red-100 max-h-40 overflow-y-auto">
+                  <div className="border border-red-200 rounded-lg divide-y divide-red-100 max-h-40 overflow-y-auto" data-lenis-prevent>
                     {importPreview.errors.map((e) => (
                       <div key={e.row} className="p-2.5 text-sm flex items-start gap-2">
                         <span className="text-slate-400 w-14 shrink-0">Dòng {e.row}</span>

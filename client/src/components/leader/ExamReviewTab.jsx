@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   fetchPendingExams,
   fetchApprovedExams,
@@ -8,7 +8,7 @@ import {
   publishExam,
   archiveExam,
 } from '../../services/exam-review.service';
-import { CheckCircle, XCircle, Clock, Globe, Calendar, History, Archive } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Globe, History, Archive } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 import { useScrollLock } from '../../hooks/useScrollLock';
@@ -71,7 +71,7 @@ export const ExamReviewTab = () => {
   const HISTORY_PAGE_SIZE = 10;
   const [historyPage, setHistoryPage] = useState(1);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [pending, approved, history] = await Promise.all([
@@ -88,11 +88,11 @@ export const ExamReviewTab = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   // Dùng chung cho handleApprove/handleReject/handleArchive bên dưới — khi
   // action bị chặn vì kỳ thi không còn ở trạng thái mong đợi nữa (thường do
@@ -540,26 +540,52 @@ export const ExamReviewTab = () => {
 
       {/* Approve Modal */}
       {isApproveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden" style={{ boxShadow: '0px 1px 3px rgba(15,23,42,0.08)' }}>
-            <div className="p-4 border-b border-[#E2E8F0] bg-[#F6F8FA] flex justify-between items-center">
-              <h2 className="font-bold text-[#0F172A] text-base flex items-center gap-2"><Calendar className="w-5 h-5 text-[#22C55E]" /> Cài đặt thời gian</h2>
-              <button onClick={() => setIsApproveModalOpen(false)} className="text-[#64748B] hover:text-[#334155] min-touch-target flex items-center justify-center"><XCircle className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-lg text-[#0F172A]">Phê duyệt đề xuất kỳ thi</h3>
+              <button
+                onClick={() => setIsApproveModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             </div>
-            <form onSubmit={handleApprove} className="p-4 space-y-4">
+            <form onSubmit={handleApprove} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
-                <label className="block text-sm font-semibold text-[#334155] mb-1">Ngày bắt đầu</label>
-                <input type="datetime-local" required className="w-full h-12 px-3 border border-[#E2E8F0] rounded-[10px] text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
-                  value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian bắt đầu</label>
+                <input
+                  required
+                  type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
+                />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[#334155] mb-1">Ngày kết thúc</label>
-                <input type="datetime-local" required className="w-full h-12 px-3 border border-[#E2E8F0] rounded-[10px] text-base text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#008BC5]"
-                  value={endDate} onChange={e => setEndDate(e.target.value)} />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian kết thúc</label>
+                <input
+                  required
+                  type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
+                />
               </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setIsApproveModalOpen(false)} className="px-4 h-12 bg-[#F6F8FA] text-[#334155] rounded-[10px] text-base font-semibold min-touch-target">Hủy</button>
-                <button type="submit" className="px-4 h-12 bg-[#22C55E] hover:bg-[#16A34A] text-white rounded-[10px] text-base font-semibold min-touch-target">Phê duyệt</button>
+              <div className="pt-2 flex gap-3 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setIsApproveModalOpen(false)}
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 min-h-[46px] bg-[#008BC5] text-white rounded-lg font-semibold hover:bg-[#007ba1] active:bg-[#007ba1] transition-colors"
+                >
+                  Xác nhận duyệt
+                </button>
               </div>
             </form>
           </div>
@@ -568,28 +594,48 @@ export const ExamReviewTab = () => {
 
       {/* Reject Modal */}
       {isRejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden" style={{ boxShadow: '0px 1px 3px rgba(15,23,42,0.08)' }}>
-            <div className="p-4 border-b border-[#E2E8F0] bg-[#F6F8FA] flex justify-between items-center">
-              <h2 className="font-bold text-[#0F172A] text-base flex items-center gap-2"><XCircle className="w-5 h-5 text-[#E53E3E]" /> Từ chối đề xuất</h2>
-              <button onClick={() => setIsRejectModalOpen(false)} className="text-[#64748B] hover:text-[#334155] min-touch-target flex items-center justify-center"><XCircle className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-hidden border border-slate-100 flex flex-col my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-lg text-[#0F172A]">Từ chối đề xuất kỳ thi</h3>
+              <button
+                onClick={() => setIsRejectModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             </div>
-            <form onSubmit={handleReject} className="p-4 space-y-4">
+            <form onSubmit={handleReject} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
               <div>
-                <label className="block text-sm font-semibold text-[#334155] mb-1">Lý do từ chối</label>
-                <textarea required className="w-full p-3 border border-[#E2E8F0] rounded-[10px] text-base text-[#0F172A] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#0693E3] focus:border-[#E53E3E]"
-                  placeholder="Nhập lý do để Người ra đề chỉnh sửa..."
-                  value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Lý do từ chối</label>
+                <textarea
+                  required
+                  rows="3"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Nhập lý do từ chối để Người ra đề chỉnh sửa lại..."
+                  className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
+                />
               </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setIsRejectModalOpen(false)} className="px-4 h-12 bg-[#F6F8FA] text-[#334155] rounded-[10px] text-base font-semibold min-touch-target">Hủy</button>
-                <button type="submit" className="px-4 h-12 bg-[#E53E3E] hover:bg-[#C53030] text-white rounded-[10px] text-base font-semibold min-touch-target">Từ chối</button>
+              <div className="pt-2 flex gap-3 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="flex-1 py-3 min-h-[46px] border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 min-h-[46px] bg-[#E53E3E] text-white rounded-lg font-semibold hover:bg-red-700 active:bg-red-700 transition-colors"
+                >
+                  Từ chối
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 };

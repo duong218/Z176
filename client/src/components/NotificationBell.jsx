@@ -173,7 +173,7 @@ export const NotificationBell = ({ currentUser }) => {
           </div>
 
           {/* List */}
-          <div className="max-h-[70vh] sm:max-h-96 overflow-y-auto">
+          <div className="max-h-[70vh] sm:max-h-96 overflow-y-auto" data-lenis-prevent>
             {loading ? (
               <div className="p-8 text-center text-[#64748B] text-base">Đang tải...</div>
             ) : notifications.length === 0 ? (

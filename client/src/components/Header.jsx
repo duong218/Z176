@@ -252,7 +252,7 @@ export const Header = ({
             )}
 
             {/* Menu Items strictly in order */}
-            <div className="p-4 flex-1 overflow-y-auto space-y-2">
+            <div className="p-4 flex-1 overflow-y-auto space-y-2" data-lenis-prevent>
               {menuItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (

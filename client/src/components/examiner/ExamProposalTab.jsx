@@ -352,9 +352,9 @@ export const ExamProposalTab = () => {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100 flex flex-col max-h-[90dvh] my-auto" data-lenis-prevent>
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
               <h2 className="text-lg sm:text-xl font-bold text-slate-800">Tạo đề xuất kỳ thi mới</h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -364,7 +364,7 @@ export const ExamProposalTab = () => {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6 overflow-y-auto">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain" data-lenis-prevent>
               <form id="createExamForm" onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên kỳ thi</label>

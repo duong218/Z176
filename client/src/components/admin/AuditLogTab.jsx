@@ -164,11 +164,11 @@ function FilterSelect({ label, value, options, onChange, placeholder }) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white rounded-[10px] border border-[#E2E8F0] py-1" style={{ boxShadow: '0px 1px 3px rgba(15,23,42,0.08)' }}>
+        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white rounded-[10px] border border-[#E2E8F0] py-1 shadow-lg" data-lenis-prevent>
           <button
             type="button"
             onClick={() => { onChange(''); setOpen(false); }}
-            className="w-full text-left px-4 min-h-[44px] flex items-center text-base"
+            className="w-full text-left px-3.5 py-2.5 min-h-[44px] flex items-center text-sm sm:text-base transition-colors hover:bg-slate-50"
             style={
               !value
                 ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 }
@@ -182,7 +182,7 @@ function FilterSelect({ label, value, options, onChange, placeholder }) {
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false); }}
-              className="w-full text-left px-4 min-h-[44px] flex items-center text-base"
+              className="w-full text-left px-3.5 py-2.5 min-h-[44px] flex items-center text-sm sm:text-base transition-colors hover:bg-slate-50"
               style={
                 value === opt.value
                   ? { backgroundColor: '#EAF6FF', color: '#008BC5', fontWeight: 600 }
