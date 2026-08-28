@@ -38,7 +38,7 @@ export const ContactSection = () => {
           <div className="bg-white p-4 rounded-[10px] border border-slate-200 shadow-z176 space-y-2">
             <div className="flex items-center gap-2 text-[#008BC5] font-bold text-base">
               <Building2 className="w-5 h-5" />
-              <span>Ban Tổ Chức (Phòng TC-LĐ)</span>
+              <span>Ban Tổ Chức (Phòng ban Tổ chức - Lao động)</span>
             </div>
             <p className="text-sm text-[#334155]">Hỗ trợ xác minh Mã nhân viên, cấp lại lượt thi do lý do bất khả kháng.</p>
             <a
