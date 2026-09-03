@@ -64,7 +64,7 @@ client/
 │   │
 │   ├── components/examiner/
 │   │   ├── DepartmentTab.jsx               # Tab quản lý phòng ban: CRUD phòng ban, mã code, slug, tìm kiếm, ngừng sử dụng/khôi phục, useScrollLock
-│   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo dự thảo, cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt, useScrollLock
+│   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo mới / chỉnh sửa dự thảo (draft/rejected), cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt, useScrollLock
 │   │   ├── OverviewTab.jsx                 # Tab tổng quan examiner: thống kê ngân hàng câu hỏi, chủ đề, trạng thái đề xuất
 │   │   ├── QuestionBankTab.jsx             # Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm đơn/nhiều đáp án, upload ảnh Cloudinary, import Excel 2 bước, xóa hàng loạt, useScrollLock
 │   │   ├── StudyDocumentTab.jsx            # Tab tài liệu ôn tập: upload file PDF/Word/Excel lên server nội bộ, phân quyền phòng ban, xem/tải/xóa
@@ -90,7 +90,7 @@ client/
 │       ├── admin.service.js                # Service quản trị: fetchOverviewStats, CRUD user, import/export Excel nhân viên, backup/restore API
 │       ├── exam-attempt.service.js         # Service làm bài thi: fetchMyExam, startExamAttempt, submitExamAttempt, answerExamQuestion (autosave), sendExamHeartbeat
 │       ├── exam-review.service.js          # Service workflow kỳ thi: fetchPendingExams, fetchApprovedExams, fetchExamHistory, approveExam, rejectExam, publishExam, archiveExam, fetchActiveExam, grantExtraAttempt
-│       ├── examiner.service.js             # Service người ra đề: CRUD câu hỏi, upload ảnh câu hỏi, preview/confirm import câu hỏi, xóa hàng loạt, CRUD chủ đề, CRUD phòng ban
+│       ├── examiner.service.js             # Service người ra đề: CRUD câu hỏi, upload ảnh câu hỏi, preview/confirm import câu hỏi, xóa hàng loạt, CRUD chủ đề, CRUD phòng ban, tạo/chỉnh sửa đề xuất kỳ thi
 │       ├── notification.service.js         # Service thông báo: fetchNotifications, fetchUnreadCount, markNotificationRead, markAllNotificationsRead
 │       ├── report.service.js               # Service báo cáo: fetchOverviewReport, fetchDepartmentReport, fetchExamReport, fetchDetailedResults, exportReport, lookupPublicResult, fetchMyResults
 │       └── study-document.service.js       # Service tài liệu: fetchStudyDocuments, fetchCandidateDocuments, createStudyDocument, deleteStudyDocument, getStudyDocumentFileBlob

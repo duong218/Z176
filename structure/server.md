@@ -22,7 +22,7 @@ server/
     │   ├── auth.controller.js                      # Xử lý request xác thực: đăng nhập, refresh token, đăng xuất, lấy hồ sơ cá nhân (/me), đổi mật khẩu
     │   ├── backup.controller.js                    # Xử lý request sao lưu: danh sách bản lưu trên Drive, tạo sao lưu mới, tải về máy, khôi phục từ file .gz
     │   ├── department.controller.js                # Xử lý request CRUD phòng ban, mã đơn vị, ngừng sử dụng (xóa mềm) và khôi phục
-    │   ├── exam.controller.js                      # Xử lý request kỳ thi: tạo dự thảo, nộp duyệt, phê duyệt, từ chối, phát hành, lưu trữ, lấy kỳ thi active
+    │   ├── exam.controller.js                      # Xử lý request kỳ thi: tạo dự thảo, chỉnh sửa đề xuất, nộp duyệt, phê duyệt, từ chối, phát hành, lưu trữ, lấy kỳ thi active
     │   ├── exam-attempt.controller.js              # Xử lý request lượt thi: lấy đề thi, bắt đầu/resume, nộp bài, autosave đáp án, heartbeat 15s, cấp thêm lượt
     │   ├── notification.controller.js              # Xử lý request thông báo: danh sách, đếm chưa đọc, đánh dấu đã đọc / đọc tất cả
     │   ├── question.controller.js                  # Xử lý request ngân hàng câu hỏi: CRUD, import Excel 2 bước, upload ảnh Cloudinary, thống kê theo chủ đề, xóa hàng loạt
@@ -64,7 +64,7 @@ server/
     │   ├── backup.routes.js                        # Tuyến API sao lưu & phục hồi dữ liệu: danh sách, tạo backup, download, restore (Admin)
     │   ├── audit.routes.js                         # Tuyến API tra cứu audit log (Admin)
     │   ├── department.routes.js                    # Tuyến API CRUD phòng ban (Admin, Examiner)
-    │   ├── exam.routes.js                          # Tuyến API kỳ thi: /active (Public), CRUD và workflow phê duyệt (Examiner, Leader)
+    │   ├── exam.routes.js                          # Tuyến API kỳ thi: /active (Public), CRUD (tạo/sửa đề xuất) và workflow phê duyệt (Examiner, Leader)
     │   ├── exam-attempt.routes.js                  # Tuyến API làm bài thi thí sinh (Candidate) và cấp thêm lượt thi (Leader)
     │   ├── notification.routes.js                  # Tuyến API thông báo (Tất cả người dùng đã đăng nhập)
     │   ├── question.routes.js                      # Tuyến API ngân hàng câu hỏi: CRUD, import Excel, upload ảnh, thống kê, xóa hàng loạt (Admin, Examiner)
@@ -87,7 +87,7 @@ server/
     │   ├── backup.scheduler.js                     # Cron scheduler: Tự động sao lưu dữ liệu lúc 03:00 hàng ngày (Asia/Ho_Chi_Minh)
     │   ├── upload-cleanup.scheduler.js             # Cron scheduler: Tự động dọn dẹp tệp tin tạm quá 6 giờ trong thư mục upload (chạy mỗi giờ)
     │   ├── department.service.js                   # Logic phòng ban: CRUD, xóa mềm, tự động khôi phục khi tạo trùng, slugify chuẩn hóa tiếng Việt, đếm nhân viên
-    │   ├── exam.service.js                         # Logic kỳ thi: tạo dự thảo, đệ trình duyệt, approve/reject kèm lý do, publish, archive, truy vấn kỳ thi active
+    │   ├── exam.service.js                         # Logic kỳ thi: tạo dự thảo, chỉnh sửa đề xuất (draft/rejected → draft), đệ trình duyệt, approve/reject kèm lý do, publish, archive, truy vấn kỳ thi active
     │   ├── exam-attempt.service.js                 # Logic làm bài thi: sinh snapshot câu hỏi xáo trộn, start/resume, autosave, heartbeat giữ phiên, tự nộp khi vắng mặt >1 phút, chấm điểm tự động, cấp thêm lượt thi
     │   ├── exam-code-generation.service.js         # Logic sinh mã đề thi: thuật toán phân bổ câu hỏi chung/riêng theo phòng ban, xáo Fisher-Yates, sinh mã đề và gán thí sinh tự động
     │   ├── notification.service.js                 # Logic thông báo: tạo thông báo tự động theo sự kiện kỳ thi (nộp duyệt, phê duyệt, từ chối, phát hành), đánh dấu đã đọc
@@ -223,6 +223,7 @@ server/
 | `GET` | `/api/exams/active` | Public | Lấy thông tin kỳ thi đang mở thi công khai trên trang chủ. |
 | `GET` | `/api/exams` | Admin, Leader, Examiner | Lấy danh sách kỳ thi theo quyền (Examiner xem đề của mình, Leader/Admin xem tất cả). |
 | `POST` | `/api/exams` | Examiner | Tạo dự thảo đề xuất kỳ thi mới (`draft`). |
+| `PATCH` | `/api/exams/:id` | Examiner | Chỉnh sửa đề xuất kỳ thi (áp dụng cho `draft`/`rejected`, tự động quay về `draft` và xóa lý do từ chối cũ). |
 | `POST` | `/api/exams/:id/submit` | Examiner | Đệ trình dự thảo kỳ thi lên Leader phê duyệt (`pending_review`). |
 | `POST` | `/api/exams/:id/approve` | Leader | Phê duyệt dự thảo kỳ thi (`approved`). |
 | `POST` | `/api/exams/:id/reject` | Leader | Từ chối dự thảo kỳ thi kèm lý do cụ thể (`rejected`). |
@@ -302,7 +303,7 @@ server/
 |---|---|
 | **Public** | Xem kỳ thi, tra cứu kết quả công khai (theo phòng ban, theo mã nhân viên), health check. |
 | **Candidate** (Thí sinh) | Xem kỳ thi, tài liệu ôn tập (theo phòng ban), vào thi (start/autosave/heartbeat/submit), xem lịch sử kết quả, thông báo cá nhân. |
-| **Examiner** (Người ra đề) | CRUD câu hỏi/chủ đề/phòng ban, import Excel câu hỏi 2 bước, upload ảnh câu hỏi, tạo + đệ trình đề xuất kỳ thi, quản lý tài liệu ôn tập, thông báo. |
+| **Examiner** (Người ra đề) | CRUD câu hỏi/chủ đề/phòng ban, import Excel câu hỏi 2 bước, upload ảnh câu hỏi, tạo + chỉnh sửa + đệ trình đề xuất kỳ thi, quản lý tài liệu ôn tập, thông báo. |
 | **Leader** (Người duyệt đề) | Xem tất cả đề xuất, duyệt/từ chối/phát hành/lưu trữ kỳ thi, xem báo cáo tổng hợp, xuất Excel, cấp thêm lượt thi, thông báo. |
 | **Admin** (Quản trị viên) | Toàn quyền quản lý user (CRUD, import/export Excel, phân role, khóa/mở, reset password), audit log, sao lưu & phục hồi dữ liệu (Backup/Restore), quản lý câu hỏi/chủ đề/phòng ban, xem báo cáo, thông báo. |
 
