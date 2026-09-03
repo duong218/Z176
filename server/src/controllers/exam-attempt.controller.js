@@ -1,3 +1,8 @@
+/**
+ * Controller Quản lý Lượt thi & Quá trình làm bài thi của Thí sinh (Exam Attempt & Test Taking).
+ * Hỗ trợ lấy đề thi, bắt đầu làm bài, lưu tạm câu trả lời (Autosave), Heartbeat giữ phiên và nộp bài tính điểm.
+ */
+
 import { examAttemptService } from '../services/exam-attempt.service.js';
 import { writeAudit } from '../services/audit.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
@@ -7,12 +12,10 @@ function clientIp(req) {
 }
 
 export const examAttemptController = {
+  // Thí sinh lấy thông tin kỳ thi được phân công (tự động phát hiện nộp bài nếu rời tab > 1 phút)
   getMyExam: asyncHandler(async (req, res) => {
     const data = await examAttemptService.getMyExam(req.auth.userId);
 
-    // getMyExam có thể tự phát hiện + tự nộp bài do rời quá 1 phút ngay trong
-    // lần gọi này (data.autoSubmitted khác null). Ghi audit riêng cho sự kiện
-    // đó để có dấu vết, tách biệt với audit "OK" thông thường của getMyExam.
     if (data.autoSubmitted) {
       await writeAudit({
         actorUserId: req.auth.userId,
@@ -27,6 +30,7 @@ export const examAttemptController = {
     res.json({ success: true, message: 'OK', data });
   }),
 
+  // Bắt đầu làm bài thi chính thức hoặc tiếp tục lượt thi đang dang dở (Resume)
   start: asyncHandler(async (req, res) => {
     const data = await examAttemptService.startAttempt(req.auth.userId);
 
@@ -42,6 +46,7 @@ export const examAttemptController = {
     res.status(201).json({ success: true, message: 'OK', data });
   }),
 
+  // Thí sinh chủ động bấm Nộp bài thi -> Chấm điểm tự động và lưu kết quả
   submit: asyncHandler(async (req, res) => {
     const { answers } = req.body ?? {};
     const data = await examAttemptService.submitAttempt(req.auth.userId, req.params.id, answers);
@@ -58,8 +63,7 @@ export const examAttemptController = {
     res.json({ success: true, message: 'Nộp bài thành công', data });
   }),
 
-  // Autosave 1 câu trả lời. Gọi mỗi lần thí sinh chọn/đổi đáp án. Không audit
-  // (tần suất quá cao, sẽ làm phình audit log vô ích).
+  // Lưu tạm đáp án cho từng câu hỏi (Autosave khi thí sinh tích chọn đáp án)
   answer: asyncHandler(async (req, res) => {
     const { questionId, selectedAnswerIds } = req.body ?? {};
     const data = await examAttemptService.recordAnswer(
@@ -71,9 +75,7 @@ export const examAttemptController = {
     res.json({ success: true, message: 'OK', data });
   }),
 
-  // Heartbeat giữ phiên sống, client gọi định kỳ khi tab đang hiển thị. Nếu
-  // phát hiện đã idle quá hạn thì service tự nộp bài ngay trong lệnh gọi này —
-  // ghi audit riêng cho trường hợp đó, tương tự getMyExam.
+  // Heartbeat duy trì kết nối phiên làm bài (phát hiện gian lận và tự nộp bài nếu thí sinh rời tab quá lâu)
   heartbeat: asyncHandler(async (req, res) => {
     const data = await examAttemptService.heartbeat(req.auth.userId, req.params.id);
 
@@ -91,7 +93,7 @@ export const examAttemptController = {
     res.json({ success: true, message: 'OK', data });
   }),
 
-  // MỚI — Leader cấp thêm 1 lượt thi chính thức cho 1 thí sinh (theo examCandidateId).
+  // Ban Giám khảo / Leader cấp thêm lượt thi cho thí sinh gặp sự cố bất khả kháng
   grantExtraAttempt: asyncHandler(async (req, res) => {
     const data = await examAttemptService.grantExtraAttempt(req.params.examCandidateId, req.auth.userId);
 
@@ -108,4 +110,4 @@ export const examAttemptController = {
 
     res.json({ success: true, message: 'Đã cấp thêm lượt thi cho thí sinh', data });
   }),
-};
+};

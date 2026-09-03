@@ -1,6 +1,11 @@
+/**
+ * Middleware kiểm tra trạng thái đổi mật khẩu bắt buộc.
+ * Bắt buộc người dùng (đặc biệt là tài khoản khởi tạo mặc định) phải đổi mật khẩu trước khi thao tác nghiệp vụ khác.
+ */
+
 import { ApiError } from '../utils/api-error.js';
 
-/** Chặn thao tác nghiệp vụ khi admin seed bắt buộc đổi mật khẩu lần đầu. */
+// Chặn truy cập nghiệp vụ nếu tài khoản có cờ mustChangePassword = true
 export function requirePasswordChanged(req, _res, next) {
   if (req.auth?.mustChangePassword) {
     next(
@@ -14,3 +19,4 @@ export function requirePasswordChanged(req, _res, next) {
   }
   next();
 }
+

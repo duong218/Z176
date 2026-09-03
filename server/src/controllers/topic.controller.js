@@ -1,14 +1,21 @@
+/**
+ * Controller Quản lý Chủ đề / Chuyên môn Câu hỏi (Topic Management).
+ * Hỗ trợ tạo mới, cập nhật, khôi phục chủ đề cũ và chặn gỡ bỏ chủ đề khi đang gắn liền với kỳ thi đang kích hoạt.
+ */
+
 import * as topicService from '../services/topic.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
 import { ApiError } from '../utils/api-error.js';
 import { writeAudit } from '../services/audit.service.js';
 
+// Lấy danh sách các chuyên môn / chủ đề
 export const list = asyncHandler(async (req, res) => {
   const activeOnly = req.query.activeOnly !== 'false';
   const data = await topicService.listTopics({ activeOnly });
   res.json({ success: true, message: 'OK', code: 'TOPIC_LIST_OK', data });
 });
 
+// Tạo chủ đề mới hoặc tự động khôi phục chủ đề cũ đã từng bị vô hiệu hóa
 export const create = asyncHandler(async (req, res) => {
   const { name, description } = req.body ?? {};
   const data = await topicService.createTopic({ name, description });
@@ -35,6 +42,7 @@ export const create = asyncHandler(async (req, res) => {
   });
 });
 
+// Cập nhật thông tin chủ đề
 export const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, description, isActive } = req.body ?? {};
@@ -56,6 +64,7 @@ export const update = asyncHandler(async (req, res) => {
   });
 });
 
+// Ngừng sử dụng chủ đề (kiểm tra và chặn nếu chủ đề đang được dùng trong kỳ thi đã công bố)
 export const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -63,10 +72,6 @@ export const remove = asyncHandler(async (req, res) => {
   try {
     data = await topicService.deactivateTopic(id);
   } catch (err) {
-    // Bị chặn vì đang có kỳ thi published dùng chủ đề này — vẫn ghi log cho
-    // admin biết có người thử ngừng sử dụng chủ đề trong lúc kỳ thi đang
-    // diễn ra (dù bị chặn, không thực hiện), rồi ném lỗi ra ngoài bình
-    // thường để asyncHandler trả về đúng response lỗi cho client.
     if (err instanceof ApiError && err.code === 'TOPIC_HAS_ACTIVE_EXAM') {
       await writeAudit({
         actorUserId: req.auth.userId,
@@ -94,4 +99,4 @@ export const remove = asyncHandler(async (req, res) => {
     code: 'TOPIC_DEACTIVATED',
     data,
   });
-});
+});

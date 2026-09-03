@@ -1,3 +1,8 @@
+/**
+ * Controller Quản lý Tài liệu Ôn tập & Học tập (Study Document Management).
+ * Hỗ trợ tải lên file tài liệu (PDF/Word/Excel), phân quyền truy cập theo đơn vị/phòng ban và stream file an toàn.
+ */
+
 import fs from 'fs';
 import path from 'path';
 import * as studyDocumentService from '../services/study-document.service.js';
@@ -5,20 +10,21 @@ import { asyncHandler } from '../utils/async-handler.js';
 import { ApiError } from '../utils/api-error.js';
 import { writeAudit } from '../services/audit.service.js';
 
-// admin / examiner / leader — danh sách quản lý (không lọc theo phòng ban)
+// Danh sách tài liệu cho Quản trị viên / Giám khảo / Leader (không lọc phòng ban)
 export const list = asyncHandler(async (req, res) => {
   const { topicId } = req.query;
   const data = await studyDocumentService.listDocumentsForStaff({ topicId });
   res.json({ success: true, message: 'OK', code: 'STUDY_DOCUMENT_LIST_OK', data });
 });
 
-// candidate — topicId optional: có -> lọc theo kỳ thi active, không có -> tất cả
+// Danh sách tài liệu cho Thí sinh (chỉ xem được tài liệu chung hoặc tài liệu thuộc phòng ban của mình)
 export const listForCandidate = asyncHandler(async (req, res) => {
   const { topicId } = req.query;
   const data = await studyDocumentService.listDocumentsForCandidate(req.auth.userId, { topicId });
   res.json({ success: true, message: 'OK', code: 'STUDY_DOCUMENT_LIST_OK', data });
 });
 
+// Tải lên tài liệu ôn tập mới (PDF, Docx, Xlsx)
 export const create = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new ApiError(400, 'Vui lòng chọn file tài liệu', 'DOCUMENT_FILE_REQUIRED');
@@ -46,6 +52,7 @@ export const create = asyncHandler(async (req, res) => {
   });
 });
 
+// Gỡ bỏ (vô hiệu hóa) tài liệu ôn tập
 export const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const data = await studyDocumentService.deactivateDocument(id, req.auth);
@@ -62,9 +69,7 @@ export const remove = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Đã gỡ tài liệu', code: 'STUDY_DOCUMENT_DEACTIVATED', data });
 });
 
-// Stream file ra — mode=inline (xem PDF ngay trong trình duyệt) hoặc
-// mode=download (tải về, mặc định). Không dùng static route để bắt buộc
-// đi qua authenticate + kiểm tra quyền phòng ban trước khi trả file.
+// Truyền phát file an toàn: chế độ xem trước (inline) hoặc tải về (attachment) sau khi kiểm tra quyền
 export const download = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const mode = req.query.mode === 'inline' ? 'inline' : 'attachment';
@@ -80,4 +85,4 @@ export const download = asyncHandler(async (req, res) => {
   );
 
   fs.createReadStream(path.resolve(doc.filePath)).pipe(res);
-});
+});

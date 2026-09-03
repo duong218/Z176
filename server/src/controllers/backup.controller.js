@@ -1,16 +1,18 @@
+/**
+ * Controller Quản lý Sao lưu & Khôi phục Cơ sở Dữ liệu (Database Backup & Restore).
+ * Tích hợp lưu trữ trực tiếp lên Google Drive, tải file sao lưu .gz và khôi phục CSDL an toàn.
+ */
+
 import { backupService } from '../services/backup.service.js';
 import { auditService } from '../services/audit.service.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
-// POST /api/backups - backup thủ công (admin bấm nút), dump -> upload Drive -> xoay vòng giữ tối đa 5 bản
+// Tạo bản sao lưu CSDL thủ công (Admin), nén gz -> tải lên Google Drive -> tự động xoay vòng giữ 5 bản gần nhất
 export const createBackup = asyncHandler(async (req, res) => {
   const driveFile = await backupService.createBackupToDrive({ prefix: 'z176-manual' });
   const { kept, deleted } = await backupService.rotateDriveBackups();
 
-  // Lưu ý: driveFile.id là ID file trên Google Drive (chuỗi tự do), KHÔNG phải
-  // Mongoose ObjectId, nên không gán vào resourceId (schema AuditLog validate
-  // resourceId là ObjectId) — chỉ đặt trong metadata để tránh lỗi validation.
   await auditService.writeAudit({
     actorUserId: req.auth.userId,
     action: 'BACKUP_MANUAL_CREATE',
@@ -26,7 +28,7 @@ export const createBackup = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/backups - danh sách các bản backup đang lưu trên Google Drive (tối đa 5 bản, mới nhất trước)
+// Lấy danh sách các bản sao lưu đang lưu trữ trên Google Drive
 export const listBackups = asyncHandler(async (req, res) => {
   const files = await backupService.listDriveBackups();
   res.json({
@@ -36,7 +38,7 @@ export const listBackups = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/backups/:fileId/download - tải về 1 bản backup cụ thể từ Drive
+// Tải xuống file nén .gz của một bản sao lưu cụ thể từ Google Drive
 export const downloadBackup = asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   const { fileName } = req.query;
@@ -46,7 +48,6 @@ export const downloadBackup = asyncHandler(async (req, res) => {
 
   await backupService.streamDriveFileToResponse(fileId, res);
 
-  // fileId là Drive file id (string), không phải ObjectId -> để trong metadata
   await auditService.writeAudit({
     actorUserId: req.auth.userId,
     action: 'BACKUP_DOWNLOAD',
@@ -56,13 +57,12 @@ export const downloadBackup = asyncHandler(async (req, res) => {
   });
 });
 
-// POST /api/backups/restore - upload file .gz và khôi phục DB (bắt buộc xác nhận rõ ràng)
+// Khôi phục CSDL từ file .gz tải lên (bắt buộc xác nhận chuỗi 'RESTORE' để tránh ghi đè nhầm)
 export const restoreBackup = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new ApiError(400, 'Vui lòng chọn file backup (.gz) để khôi phục.', 'NO_FILE');
   }
 
-  // Bắt buộc client gửi confirm=RESTORE để tránh khôi phục nhầm (thao tác xoá toàn bộ dữ liệu hiện tại)
   if (req.body?.confirm !== 'RESTORE') {
     await backupService.cleanupLocalFile(req.file.path);
     throw new ApiError(
@@ -87,4 +87,4 @@ export const restoreBackup = asyncHandler(async (req, res) => {
   });
 
   res.json({ success: true, message: 'Khôi phục dữ liệu thành công.' });
-});
+});

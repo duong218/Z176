@@ -1,13 +1,21 @@
+/**
+ * Controller Quản trị Người dùng & Nhân sự (User & Employee Management).
+ * Cung cấp các thao tác CRUD người dùng, phân quyền, khóa/mở khóa, reset mật khẩu,
+ * xuất danh sách tài khoản thí sinh và quy trình 2 bước Import danh sách nhân viên từ file Excel.
+ */
+
 import * as userService from '../services/user.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
 import { ApiError } from '../utils/api-error.js';
 import { writeAudit } from '../services/audit.service.js';
 
+// Lấy danh sách toàn bộ người dùng trong hệ thống
 export const list = asyncHandler(async (req, res) => {
   const data = await userService.listUsers();
   res.json({ success: true, message: 'OK', code: 'USER_LIST_OK', data });
 });
 
+// Tạo tài khoản mới hoặc tự động tái sử dụng tài khoản đã khóa nếu trùng mã nhân viên
 export const create = asyncHandler(async (req, res) => {
   const { username, roleId, fullname, departmentId, employeeCode } = req.body ?? {};
   if (!username || !roleId) {
@@ -19,14 +27,9 @@ export const create = asyncHandler(async (req, res) => {
     username,
     roleId,
     ipAddress: req.ip,
-    // Chỉ có ý nghĩa khi roleId ứng với role 'candidate' — service sẽ tự kiểm tra
-    // và báo lỗi nếu thiếu trong trường hợp đó. Với các role khác, các field này
-    // bị bỏ qua nếu có gửi lên.
     employeeInfo: { fullname, departmentId, employeeCode },
   });
 
-  // Khi reused=true, userService đã tự ghi audit riêng ("Tái sử dụng tài khoản
-  // đã khóa") nên không ghi lại audit CREATE_USER ở đây để tránh trùng lặp log.
   if (!reused) {
     await writeAudit({
       actorUserId: req.auth.userId,
@@ -45,10 +48,11 @@ export const create = asyncHandler(async (req, res) => {
       : 'Tạo tài khoản thành công',
     code: reused ? 'USER_REUSED' : 'USER_CREATED',
     data: { ...user, employee },
-    tempPassword, // Chỉ trả về 1 lần
+    tempPassword, // Chỉ hiển thị mật khẩu khởi tạo 1 lần duy nhất
   });
 });
 
+// Cập nhật vai trò / phân quyền cho người dùng
 export const updateRole = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { roleId } = req.body ?? {};
@@ -75,6 +79,7 @@ export const updateRole = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Cập nhật phân quyền thành công', code: 'ROLE_UPDATED', data });
 });
 
+// Khóa hoặc Mở khóa tài khoản người dùng
 export const toggleLock = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { isActive } = req.body ?? {};
@@ -101,6 +106,7 @@ export const toggleLock = asyncHandler(async (req, res) => {
   res.json({ success: true, message: isActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản', code: 'LOCK_TOGGLED', data });
 });
 
+// Đặt lại mật khẩu tạm thời cho người dùng (bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp)
 export const resetPassword = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -127,8 +133,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
+// Xuất file Excel chứa tài khoản và mật khẩu tạm của thí sinh
 export const exportCandidateCredentials = asyncHandler(async (req, res) => {
-  const { buffer, count } = await userService.exportCandidateCredentialsExcel({
+  const { buffer } = await userService.exportCandidateCredentialsExcel({
     adminId: req.auth.userId,
     ipAddress: req.ip,
   });
@@ -140,16 +147,11 @@ export const exportCandidateCredentials = asyncHandler(async (req, res) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   );
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  // Để client (fetch) đọc được tên file thật thay vì tên mặc định
   res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
   res.send(buffer);
-
-  // Không dùng writeAudit ở đây nữa vì exportCandidateCredentialsExcel() đã tự
-  // ghi audit bên trong service (khác với các action khác trong file này) —
-  // vì hàm cần biết chính xác số lượng tài khoản đã reset (count) tại thời
-  // điểm reset xong, trước khi trả buffer về controller.
 });
 
+// Bước 1 Import Excel: Đọc và phân tích file Excel xem trước các bản ghi (hợp lệ, trùng lặp, lỗi)
 export const previewImportExcel = asyncHandler(async (req, res) => {
   if (!req.file?.path) {
     throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');
@@ -165,6 +167,7 @@ export const previewImportExcel = asyncHandler(async (req, res) => {
   });
 });
 
+// Bước 2 Import Excel: Xác nhận thực hiện lưu các bản ghi đã duyệt vào CSDL
 export const confirmImportExcel = asyncHandler(async (req, res) => {
   const { rows } = req.body ?? {};
   if (!Array.isArray(rows) || !rows.length) {

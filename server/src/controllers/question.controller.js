@@ -1,3 +1,8 @@
+/**
+ * Controller Quản lý Ngân hàng Câu hỏi & Đáp án (Question Bank Management).
+ * Hỗ trợ tạo mới, cập nhật, xóa đơn/hàng loạt, upload ảnh đề thi lên Cloudinary và import câu hỏi từ file Excel.
+ */
+
 import * as questionService from '../services/question.service.js';
 import { writeAudit } from '../services/audit.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
@@ -9,10 +14,12 @@ import {
   QUESTION_SCOPE,
 } from '../models/constants.js';
 
+// Hàm phụ trợ lấy địa chỉ IP của client
 function clientIp(req) {
   return req.ip ?? req.headers['x-forwarded-for']?.toString()?.split(',')[0]?.trim();
 }
 
+// Hàm kiểm tra hợp lệ dữ liệu enum khi tạo mới câu hỏi
 function parseCreateBody(body) {
   const {
     content,
@@ -53,6 +60,7 @@ function parseCreateBody(body) {
   };
 }
 
+// Lấy danh sách câu hỏi kèm phân trang và bộ lọc (theo chủ đề, độ khó, phạm vi, từ khóa)
 export const list = asyncHandler(async (req, res) => {
   const data = await questionService.listQuestions({
     topicId: req.query.topicId,
@@ -69,11 +77,13 @@ export const list = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'OK', code: 'QUESTION_LIST_OK', data });
 });
 
+// Lấy thông tin chi tiết một câu hỏi theo ID
 export const getById = asyncHandler(async (req, res) => {
   const data = await questionService.getQuestionById(req.params.id);
   res.json({ success: true, message: 'OK', code: 'QUESTION_GET_OK', data });
 });
 
+// Tạo mới câu hỏi thủ công kèm danh sách đáp án
 export const create = asyncHandler(async (req, res) => {
   const payload = parseCreateBody(req.body);
   const data = await questionService.createQuestion(payload, req.auth.userId);
@@ -95,6 +105,7 @@ export const create = asyncHandler(async (req, res) => {
   });
 });
 
+// Tải ảnh minh họa cho câu hỏi lên Cloudinary
 export const uploadImage = asyncHandler(async (req, res) => {
   if (!req.file?.buffer) {
     throw new ApiError(400, 'Thiếu file ảnh (field: image)', 'IMAGE_FILE_MISSING');
@@ -108,6 +119,7 @@ export const uploadImage = asyncHandler(async (req, res) => {
   });
 });
 
+// Cập nhật nội dung câu hỏi và các lựa chọn đáp án
 export const update = asyncHandler(async (req, res) => {
   const payload = { ...req.body };
   if (payload.questionKind && !Object.values(QUESTION_KIND).includes(payload.questionKind)) {
@@ -146,6 +158,7 @@ export const update = asyncHandler(async (req, res) => {
   });
 });
 
+// Xóa (vô hiệu hóa) một câu hỏi
 export const remove = asyncHandler(async (req, res) => {
   const data = await questionService.deactivateQuestion(
     req.params.id,
@@ -169,6 +182,7 @@ export const remove = asyncHandler(async (req, res) => {
   });
 });
 
+// Xóa nhiều câu hỏi cùng lúc (bỏ qua những câu đang được dùng trong kỳ thi đang diễn ra)
 export const bulkRemove = asyncHandler(async (req, res) => {
   const { ids, filters } = req.body ?? {};
   const data = await questionService.deactivateManyQuestions({ ids, filters }, req.auth.userId, clientIp(req));
@@ -185,11 +199,6 @@ export const bulkRemove = asyncHandler(async (req, res) => {
     ipAddress: clientIp(req),
   });
 
-  // Có câu hỏi bị giữ lại vì đang dùng cho kỳ thi đang publish -> vẫn trả
-  // 200 (thao tác xóa phần còn lại đã thành công), nhưng đổi message để
-  // người dùng biết rõ không phải TOÀN BỘ số câu đã chọn đều bị xóa, tránh
-  // hiểu nhầm giống bug đã gặp ở Bug 2 (gộp chung mọi trường hợp thành 1 câu
-  // thông báo sai bản chất).
   const message = data.skippedActiveExam
     ? `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi. Giữ lại ${data.skippedActiveExam.skippedCount} câu vì đang được dùng cho kỳ thi "${data.skippedActiveExam.examTitle}" đang diễn ra — vui lòng đợi kỳ thi kết thúc rồi thử lại.`
     : `Đã ngừng sử dụng ${data.deactivatedCount} câu hỏi`;
@@ -202,11 +211,13 @@ export const bulkRemove = asyncHandler(async (req, res) => {
   });
 });
 
+// Thống kê số lượng câu hỏi theo từng mức độ khó trong một chủ đề
 export const getStatsByTopic = asyncHandler(async (req, res) => {
   const data = await questionService.getQuestionStatsByTopic(req.params.topicId);
   res.json({ success: true, message: 'OK', code: 'QUESTION_STATS_OK', data });
 });
 
+// Bước 1 Import câu hỏi từ file Excel: Đọc file và tạo bản xem trước
 export const previewImport = asyncHandler(async (req, res) => {
   if (!req.file?.path) {
     throw new ApiError(400, 'Thiếu file Excel (field: file)', 'IMPORT_FILE_MISSING');
@@ -220,6 +231,7 @@ export const previewImport = asyncHandler(async (req, res) => {
   });
 });
 
+// Bước 2 Import câu hỏi từ file Excel: Lưu danh sách câu hỏi hợp lệ vào CSDL
 export const confirmImport = asyncHandler(async (req, res) => {
   const { token, createDepartments, keepDuplicateRows } = req.body ?? {};
   if (!token) {

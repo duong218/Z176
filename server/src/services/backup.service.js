@@ -1,3 +1,8 @@
+/**
+ * Service Sao lưu & Khôi phục Dữ liệu MongoDB và Tích hợp Google Drive (Backup Service).
+ * Sử dụng công cụ mongodump/mongorestore nén gzip và đồng bộ trực tiếp lên Google Drive qua OAuth2.
+ */
+
 import { spawn } from 'child_process';
 import path from 'path';
 import os from 'os';
@@ -10,10 +15,12 @@ import { ApiError } from '../utils/api-error.js';
 const MAX_BACKUPS_KEPT = 5;
 const TMP_DIR = path.join(os.tmpdir(), 'z176-backups');
 
+// Đảm bảo thư mục lưu file nén tạm tồn tại trên server
 async function ensureTmpDir() {
   await fs.mkdir(TMP_DIR, { recursive: true });
 }
 
+// Kiểm tra đầy đủ thông tin xác thực Google OAuth2 trong biến môi trường
 function assertGoogleConfigured() {
   const { clientId, clientSecret, refreshToken, folderId } = env.googleBackup;
   if (!clientId || !clientSecret || !refreshToken || !folderId) {
@@ -25,13 +32,7 @@ function assertGoogleConfigured() {
   }
 }
 
-/**
- * Tạo Drive client bằng OAuth2 (Gmail cá nhân), KHÔNG dùng Service Account.
- * Lý do: Service Account không có storage quota riêng trên Drive cá nhân
- * ("Service Accounts do not have storage quota"), chỉ dùng được với Shared Drive
- * (Google Workspace). Vì Z176 dùng Gmail cá nhân miễn phí, phải dùng OAuth2
- * với refresh token lấy 1 lần qua scripts/get-google-refresh-token.js.
- */
+// Khởi tạo Google Drive API Client bằng OAuth2 Refresh Token (cho phép ghi vào Drive cá nhân)
 function getDriveClient() {
   assertGoogleConfigured();
   const { clientId, clientSecret, refreshToken } = env.googleBackup;
@@ -42,7 +43,7 @@ function getDriveClient() {
   return google.drive({ version: 'v3', auth: oAuth2Client });
 }
 
-/** Chạy mongodump/mongorestore, reject bằng ApiError nếu lỗi hoặc thiếu binary. */
+// Thực thi lệnh hệ thống ngoài (mongodump / mongorestore)
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -68,17 +69,18 @@ function runCommand(cmd, args) {
   });
 }
 
+// Xóa file tạm cục bộ sau khi hoàn thành thao tác
 async function cleanupLocalFile(filePath) {
   try {
     if (filePath && fssync.existsSync(filePath)) {
       await fs.unlink(filePath);
     }
   } catch {
-    // best-effort, không throw để không che lấp lỗi chính
+    /* best-effort cleanup */
   }
 }
 
-/** mongodump ra file .gz tạm trên đĩa local (chỉ để chuẩn bị upload lên Drive, sẽ xoá ngay sau đó). */
+// Chạy mongodump xuất CSDL ra file .gz nén trong thư mục tạm
 async function dumpToLocalFile(prefix = 'z176-backup') {
   await ensureTmpDir();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -91,7 +93,7 @@ async function dumpToLocalFile(prefix = 'z176-backup') {
   return { filePath, fileName, size: stat.size };
 }
 
-/** Upload file .gz local lên thư mục Drive chỉ định trong env (Drive cá nhân qua OAuth2), trả về metadata file trên Drive. */
+// Tải file nén .gz lên thư mục sao lưu trên Google Drive
 async function uploadToDrive(filePath, fileName) {
   const drive = getDriveClient();
   const res = await drive.files.create({
@@ -108,7 +110,7 @@ async function uploadToDrive(filePath, fileName) {
   return res.data;
 }
 
-/** Toàn bộ luồng: dump DB -> upload Drive -> xoá file tạm local. */
+// Quy trình sao lưu trọn gói: Dump DB -> Upload Drive -> Dọn file tạm
 async function createBackupToDrive({ prefix = 'z176-backup' } = {}) {
   const { filePath, fileName } = await dumpToLocalFile(prefix);
   try {
@@ -119,7 +121,7 @@ async function createBackupToDrive({ prefix = 'z176-backup' } = {}) {
   }
 }
 
-/** Danh sách các bản backup trên Drive, mới nhất trước. */
+// Lấy danh sách các file backup đang lưu trên Google Drive (mới nhất xếp trước)
 async function listDriveBackups() {
   const drive = getDriveClient();
   const res = await drive.files.list({
@@ -131,10 +133,10 @@ async function listDriveBackups() {
   return res.data.files ?? [];
 }
 
-/** Giữ tối đa maxKept bản mới nhất trên Drive, xoá các bản cũ hơn. */
+// Xoay vòng bản sao lưu: Giữ tối đa N bản mới nhất, tự động xóa các bản cũ hơn trên Google Drive
 async function rotateDriveBackups(maxKept = MAX_BACKUPS_KEPT) {
   const drive = getDriveClient();
-  const files = await listDriveBackups(); // đã sort mới nhất trước
+  const files = await listDriveBackups();
   const toDelete = files.slice(maxKept);
 
   for (const file of toDelete) {
@@ -143,7 +145,7 @@ async function rotateDriveBackups(maxKept = MAX_BACKUPS_KEPT) {
   return { kept: files.length - toDelete.length, deleted: toDelete.map((f) => f.name) };
 }
 
-/** Tải 1 file từ Drive về đĩa local tạm (dùng khi cần mongorestore, hoặc trả về client). */
+// Tải file từ Drive về thư mục tạm cục bộ
 async function downloadDriveFileToLocal(fileId, fileName) {
   await ensureTmpDir();
   const drive = getDriveClient();
@@ -159,14 +161,14 @@ async function downloadDriveFileToLocal(fileId, fileName) {
   return filePath;
 }
 
-/** Stream trực tiếp nội dung file Drive ra response (dùng cho endpoint download, không cần lưu local). */
+// Stream trực tiếp dữ liệu file từ Google Drive ra HTTP response cho client tải về
 async function streamDriveFileToResponse(fileId, res) {
   const drive = getDriveClient();
   const driveRes = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
   driveRes.data.pipe(res);
 }
 
-/** mongorestore --drop từ 1 file archive .gz local (VD: file vừa upload từ client). NGUY HIỂM: xoá dữ liệu hiện tại. */
+// Khôi phục dữ liệu CSDL từ file .gz (mongorestore --drop sẽ xóa sạch dữ liệu hiện tại trước khi phục hồi)
 async function restoreFromLocalFile(localFilePath) {
   await runCommand('mongorestore', [`--uri=${env.mongodbUri}`, `--archive=${localFilePath}`, '--gzip', '--drop']);
 }
@@ -180,4 +182,4 @@ export const backupService = {
   restoreFromLocalFile,
   cleanupLocalFile,
   MAX_BACKUPS_KEPT,
-};
+};

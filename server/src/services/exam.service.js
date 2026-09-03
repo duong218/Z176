@@ -1,3 +1,8 @@
+/**
+ * Service Quản lý Kỳ thi (Exam Service).
+ * Xử lý các nghiệp vụ: Đề xuất kỳ thi, Gửi duyệt, Phê duyệt/Từ chối, Xuất bản kỳ thi (Publish) và Lưu trữ (Archive).
+ */
+
 import { Exam, Topic } from '../models/index.js';
 import { EXAM_STATUS } from '../models/constants.js';
 import { ApiError } from '../utils/api-error.js';
@@ -5,6 +10,7 @@ import { generateExamCodesAndAssignCandidates } from './exam-code-generation.ser
 import { notificationService } from './notification.service.js';
 
 export const examService = {
+  // Lấy danh sách kỳ thi theo bộ lọc (trạng thái, người tạo, chủ đề)
   async listExams(filters = {}) {
     const { status, createdBy, topicId } = filters;
     const query = {};
@@ -22,6 +28,7 @@ export const examService = {
     return exams;
   },
 
+  // Examiner tạo bản thảo đề xuất kỳ thi mới (DRAFT)
   async createExamProposal(payload, userId) {
     const { title, topicId, durationMinutes, totalQuestions, commonQuestionCount, departmentQuestionCount, passThresholdPercent } = payload;
 
@@ -43,6 +50,7 @@ export const examService = {
     return exam;
   },
 
+  // Examiner gửi duyệt đề xuất kỳ thi -> Chuyển trạng thái sang PENDING_REVIEW và bắn thông báo tới Leader
   async submitExamForReview(examId, userId) {
     const exam = await Exam.findOne({ _id: examId, createdBy: userId });
     if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
@@ -54,7 +62,6 @@ export const examService = {
     exam.status = EXAM_STATUS.PENDING_REVIEW;
     await exam.save();
 
-    // Báo cho mọi Leader biết có đề mới đang chờ duyệt.
     try {
       await notificationService.notifyExamSubmitted(exam);
     } catch (err) {
@@ -64,6 +71,7 @@ export const examService = {
     return exam;
   },
 
+  // Leader phê duyệt kỳ thi (APPROVED) và ấn định khung thời gian thi
   async approveExam(examId, { startDate, endDate }, leaderId) {
     if (!startDate || !endDate) {
       throw new ApiError(400, 'Vui lòng cung cấp ngày bắt đầu và kết thúc', 'EXAM_DATES_REQUIRED');
@@ -87,9 +95,6 @@ export const examService = {
     exam.approvedAt = new Date();
     await exam.save();
 
-    // Báo cho Examiner đã tạo đề xuất rằng đề của họ đã được duyệt. Không để
-    // lỗi tạo thông báo (vd DB tạm thời lag) làm hỏng luồng duyệt đề chính —
-    // duyệt đề đã ghi nhận thành công ở trên rồi.
     try {
       await notificationService.notifyExamApproved(exam);
     } catch (err) {
@@ -99,6 +104,7 @@ export const examService = {
     return exam;
   },
 
+  // Leader từ chối đề xuất kỳ thi (REJECTED) kèm lý do
   async rejectExam(examId, rejectionReason, leaderId) {
     if (!rejectionReason?.trim()) {
       throw new ApiError(400, 'Vui lòng cung cấp lý do từ chối', 'REASON_REQUIRED');
@@ -112,10 +118,9 @@ export const examService = {
 
     exam.status = EXAM_STATUS.REJECTED;
     exam.rejectionReason = rejectionReason;
-    exam.approvedBy = leaderId; // record who rejected it
+    exam.approvedBy = leaderId;
     await exam.save();
 
-    // Báo cho Examiner đã tạo đề xuất rằng đề của họ bị từ chối (kèm lý do).
     try {
       await notificationService.notifyExamRejected(exam);
     } catch (err) {
@@ -125,6 +130,7 @@ export const examService = {
     return exam;
   },
 
+  // Công bố kỳ thi chính thức (PUBLISHED): Sinh các bộ mã đề thi, gán thí sinh và lưu trữ kỳ thi cũ
   async publishExam(examId, leaderId) {
     const exam = await Exam.findById(examId);
     if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
@@ -132,12 +138,10 @@ export const examService = {
       throw new ApiError(400, 'Chỉ có thể phát hành kỳ thi đã được duyệt', 'EXAM_INVALID_STATUS');
     }
 
-    // Sinh mã đề theo phòng ban + gán thí sinh TRƯỚC khi đổi trạng thái —
-    // nếu ngân hàng câu hỏi không đủ, lỗi sẽ chặn ở đây và kỳ thi vẫn giữ
-    // nguyên trạng thái 'approved', tránh publish dở dang.
+    // Sinh mã đề và gán thí sinh
     await generateExamCodesAndAssignCandidates(exam);
 
-    // Archive any currently published exam
+    // Chuyển kỳ thi đang publish trước đó về trạng thái lưu trữ ARCHIVED
     await Exam.updateMany(
       { status: EXAM_STATUS.PUBLISHED },
       { $set: { status: EXAM_STATUS.ARCHIVED } }
@@ -147,7 +151,6 @@ export const examService = {
     exam.publishedAt = new Date();
     await exam.save();
 
-    // Báo cho MỌI role, TRỪ chính người bấm đăng (leaderId) và role 'admin'.
     try {
       await notificationService.notifyExamPublished(exam, leaderId);
     } catch (err) {
@@ -157,12 +160,7 @@ export const examService = {
     return exam;
   },
 
-  /**
-   * "Bỏ qua" một kỳ thi đã duyệt (approved) đang chờ phát hành: lưu trữ nó
-   * mà không đăng chính thức. Khác với reject (chỉ áp dụng cho kỳ thi đang
-   * pending_review) — đây là kỳ thi ĐÃ được duyệt nhưng Leader quyết định
-   * không phát hành nữa.
-   */
+  // Lưu trữ (ARCHIVE) một kỳ thi đã duyệt mà Leader quyết định không xuất bản nữa
   async archiveExam(examId, leaderId) {
     const exam = await Exam.findById(examId);
     if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
@@ -176,6 +174,7 @@ export const examService = {
     return exam;
   },
 
+  // Lấy kỳ thi đang phát hành chính thức hiện tại
   async getActiveExam() {
     const exam = await Exam.findOne({ status: EXAM_STATUS.PUBLISHED })
       .populate('topicId', 'name')

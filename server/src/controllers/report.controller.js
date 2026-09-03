@@ -1,7 +1,13 @@
+/**
+ * Controller Báo cáo & Thống kê Kết quả Thi (Reporting & Analytics).
+ * Cung cấp số liệu tổng quan, thống kê theo phòng ban/bài thi, tra cứu kết quả công khai và xuất báo cáo Excel.
+ */
+
 import { asyncHandler } from '../utils/async-handler.js';
 import { reportService } from '../services/report.service.js';
 
 export const reportController = {
+  // Lấy các chỉ số thống kê tổng quan (tổng đề thi, số thí sinh, tỷ lệ đạt)
   getOverviewStats: asyncHandler(async (req, res) => {
     const stats = await reportService.getOverviewStats();
     res.json({
@@ -10,6 +16,7 @@ export const reportController = {
     });
   }),
 
+  // Thống kê kết quả thi và tỷ lệ đạt theo từng đơn vị / phòng ban
   getResultsByDepartment: asyncHandler(async (req, res) => {
     const data = await reportService.getResultsByDepartment();
     res.json({
@@ -18,7 +25,7 @@ export const reportController = {
     });
   }),
 
-  // MỚI — Thống kê kết quả thi theo Bài thi (exam/topic).
+  // Thống kê kết quả thi theo từng Bài thi / Chủ đề chuyên môn
   getResultsByExam: asyncHandler(async (req, res) => {
     const data = await reportService.getResultsByExam();
     res.json({
@@ -27,7 +34,7 @@ export const reportController = {
     });
   }),
 
-  // PUBLIC — trang chủ, không đăng nhập. Chỉ tên phòng ban + tỷ lệ đạt.
+  // Thống kê công khai theo phòng ban dành cho trang chủ (không yêu cầu đăng nhập)
   getPublicResultsByDepartment: asyncHandler(async (req, res) => {
     const data = await reportService.getPublicResultsByDepartment();
     res.json({
@@ -36,7 +43,7 @@ export const reportController = {
     });
   }),
 
-  // PUBLIC — tra cứu kết quả cá nhân theo mã NV hoặc họ tên.
+  // Tra cứu kết quả thi công khai theo Mã nhân viên hoặc Họ tên thí sinh
   lookupPublicResult: asyncHandler(async (req, res) => {
     const data = await reportService.lookupPublicResult(req.query.q);
     res.json({
@@ -45,6 +52,7 @@ export const reportController = {
     });
   }),
 
+  // Lấy danh sách kết quả thi chi tiết có hỗ trợ lọc (phòng ban, trạng thái đạt/trượt, khoảng thời gian)
   getDetailedResults: asyncHandler(async (req, res) => {
     const filters = {
       page: req.query.page,
@@ -62,6 +70,7 @@ export const reportController = {
     });
   }),
 
+  // Xuất file Excel báo cáo kết quả thi chi tiết theo danh sách lọc
   exportDetailedResultsExcel: asyncHandler(async (req, res) => {
     const filters = {
       departmentId: req.query.departmentId,
@@ -83,7 +92,7 @@ export const reportController = {
     res.send(buffer);
   }),
 
-  // MỚI — Xuất Excel thống kê + chi tiết kết quả thi theo Bài thi (exam/topic).
+  // Xuất file Excel bảng điểm tổng hợp và chi tiết phân nhóm theo từng bài thi
   exportResultsByExamExcel: asyncHandler(async (req, res) => {
     const buffer = await reportService.exportResultsByExamExcel();
 
@@ -98,7 +107,7 @@ export const reportController = {
     res.send(buffer);
   }),
 
-  // MỚI — Lịch sử kết quả thi của chính thí sinh đang đăng nhập (role 'candidate').
+  // Lấy lịch sử và kết quả tất cả các bài thi của chính thí sinh đang đăng nhập
   getMyResults: asyncHandler(async (req, res) => {
     const data = await reportService.getMyResults(req.auth.userId);
     res.json({

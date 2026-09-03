@@ -1,15 +1,20 @@
+/**
+ * Service Quản lý Tài liệu Ôn tập (Study Document Service).
+ * Xử lý lưu trữ, truy vấn tài liệu theo phạm vi (Chung / Riêng phòng ban) và kiểm soát quyền truy cập file.
+ */
+
 import fs from 'fs';
 import { StudyDocument, Employee, Topic } from '../models/index.js';
 import { DOCUMENT_SCOPE } from '../models/constants.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 
-/** Lấy departmentId của candidate qua hồ sơ Employee liên kết (giống cách audit.service tra cứu). */
+// Lấy ID phòng ban của thí sinh qua hồ sơ Employee
 async function getCandidateDepartmentId(userId) {
   const emp = await Employee.findOne({ userId }).select('departmentId').lean();
   return emp?.departmentId ?? null;
 }
 
-/** Dành cho admin/examiner/leader — xem toàn bộ tài liệu để quản lý, không lọc theo phòng ban. */
+// Lấy danh sách tài liệu dành cho cán bộ quản lý (Admin / Examiner / Leader)
 export async function listDocumentsForStaff({ topicId } = {}) {
   const query = { isActive: true };
   if (topicId) query.topicId = topicId;
@@ -21,12 +26,7 @@ export async function listDocumentsForStaff({ topicId } = {}) {
     .lean();
 }
 
-/**
- * Dành cho candidate — lọc scope giống hệt pattern Question: thấy tài liệu
- * Common + tài liệu DepartmentSpecific đúng phòng ban của mình.
- * topicId truyền vào khi cần lọc theo kỳ thi đang active; bỏ trống để xem
- * toàn bộ tài liệu (mọi topic) mà candidate có quyền xem.
- */
+// Lấy danh sách tài liệu dành cho Thí sinh (Lọc tài liệu chung + tài liệu riêng đúng phòng ban của mình)
 export async function listDocumentsForCandidate(userId, { topicId } = {}) {
   const departmentId = await getCandidateDepartmentId(userId);
   const scopeQuery = departmentId
@@ -47,6 +47,7 @@ export async function listDocumentsForCandidate(userId, { topicId } = {}) {
     .lean();
 }
 
+// Tạo mới tài liệu học tập và lưu thông tin file
 export async function createDocument({ topicId, title, scope, departmentId, file }, uploadedBy) {
   if (!topicId) {
     throw new ApiError(400, 'Vui lòng chọn chủ đề', 'DOCUMENT_TOPIC_REQUIRED');
@@ -76,7 +77,7 @@ export async function createDocument({ topicId, title, scope, departmentId, file
   return doc.toObject();
 }
 
-/** Chỉ người đăng (examiner) hoặc admin được xóa mềm. */
+// Vô hiệu hóa (xóa mềm) tài liệu (chỉ cho phép chính người đăng hoặc Admin)
 export async function deactivateDocument(id, requester) {
   const doc = await StudyDocument.findById(id);
   assertFound(doc, 'Không tìm thấy tài liệu', 'DOCUMENT_NOT_FOUND');
@@ -92,7 +93,7 @@ export async function deactivateDocument(id, requester) {
   return { id: doc._id.toString(), isActive: false };
 }
 
-/** Kiểm tra quyền xem/tải file trước khi controller stream file ra. */
+// Kiểm tra tính hợp lệ và quyền hạn truy cập tài liệu trước khi stream file
 export async function getDocumentForAccess(id, requester) {
   const doc = await StudyDocument.findById(id).lean();
   assertFound(doc, 'Không tìm thấy tài liệu', 'DOCUMENT_NOT_FOUND');
@@ -113,4 +114,4 @@ export async function getDocumentForAccess(id, requester) {
   }
 
   return doc;
-}
+}

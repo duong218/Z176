@@ -1,3 +1,8 @@
+/**
+ * Service Thông báo Hệ thống (Notification Service).
+ * Tự động gửi thông báo theo các sự kiện: Nộp đề xuất thi, Phê duyệt/Từ chối, Công bố kỳ thi và Cảnh báo phát đề lỗi.
+ */
+
 import { Notification, User, Role } from '../models/index.js';
 
 function formatDateTime(date) {
@@ -6,10 +11,12 @@ function formatDateTime(date) {
 }
 
 export const notificationService = {
+  // Tạo 1 thông báo cho một người dùng cụ thể
   async create({ recipientUserId, type, title, message, examId }) {
     return Notification.create({ recipientUserId, type, title, message, examId });
   },
 
+  // Tạo hàng loạt thông báo cho danh sách nhiều người nhận
   async createMany(recipientUserIds, { type, title, message, examId }) {
     if (!recipientUserIds?.length) return [];
     const docs = recipientUserIds.map((recipientUserId) => ({
@@ -22,11 +29,7 @@ export const notificationService = {
     return Notification.insertMany(docs);
   },
 
-  /**
-   * Examiner gửi duyệt đề xuất -> báo cho MỌI user đang active có role
-   * 'leader' (đề mới đang chờ duyệt). Không cần loại trừ ai vì người gửi
-   * (Examiner) không thể đồng thời là Leader.
-   */
+  // Sự kiện: Examiner gửi duyệt đề xuất -> Báo cho tất cả Leader đang hoạt động
   async notifyExamSubmitted(exam) {
     const leaderRole = await Role.findOne({ code: 'leader' }).select('_id').lean();
     if (!leaderRole?._id) return [];
@@ -44,7 +47,7 @@ export const notificationService = {
     });
   },
 
-  /** Leader phê duyệt đề xuất -> báo cho Examiner đã tạo đề xuất (exam.createdBy). */
+  // Sự kiện: Leader phê duyệt đề xuất -> Báo cho Examiner người tạo đề xuất
   async notifyExamApproved(exam) {
     if (!exam?.createdBy) return null;
     return this.create({
@@ -56,7 +59,7 @@ export const notificationService = {
     });
   },
 
-  /** Leader từ chối đề xuất -> báo cho Examiner đã tạo đề xuất (exam.createdBy). */
+  // Sự kiện: Leader từ chối đề xuất -> Báo cho Examiner kèm lý do từ chối
   async notifyExamRejected(exam) {
     if (!exam?.createdBy) return null;
     return this.create({
@@ -68,11 +71,7 @@ export const notificationService = {
     });
   },
 
-  /**
-   * Leader đăng chính thức kỳ thi -> báo cho MỌI user đang active, TRỪ:
-   * - Chính người bấm đăng (publisherId)
-   * - Mọi user có role 'admin'
-   */
+  // Sự kiện: Leader công bố chính thức kỳ thi -> Báo cho tất cả thí sinh và cán bộ liên quan
   async notifyExamPublished(exam, publisherId) {
     const adminRole = await Role.findOne({ code: 'admin' }).select('_id').lean();
 
@@ -92,15 +91,7 @@ export const notificationService = {
     });
   },
 
-  /**
-   * Gán đề thi tự động cho 1 nhân viên mới THẤT BẠI (thường do ngân hàng câu
-   * hỏi không đủ cho phòng ban của họ, kể cả sau khi đã bù từ pool câu
-   * chung — xem validateQuestionAvailability() trong
-   * exam-code-generation.service.js) -> báo cho Examiner đã tạo kỳ thi VÀ
-   * MỌI Admin đang active, để họ chủ động bổ sung câu hỏi cho phòng ban đó.
-   * Không có bước này thì nhân viên sẽ âm thầm không có đề để thi mà không
-   * ai biết, cho tới khi chính họ phàn nàn không thi được.
-   */
+  // Cảnh báo: Ngân hàng đề không đủ câu hỏi để gán cho nhân viên mới -> Báo cho Examiner và Admin
   async notifyExamAssignmentFailed({ exam, employee, department, reason }) {
     const adminRole = await Role.findOne({ code: 'admin' }).select('_id').lean();
     const admins = adminRole?._id
@@ -127,6 +118,7 @@ export const notificationService = {
     });
   },
 
+  // Lấy danh sách thông báo theo người nhận
   async listForUser(userId, { limit = 30 } = {}) {
     return Notification.find({ recipientUserId: userId })
       .sort({ createdAt: -1 })
@@ -135,10 +127,12 @@ export const notificationService = {
       .lean();
   },
 
+  // Đếm số lượng thông báo chưa đọc
   async countUnread(userId) {
     return Notification.countDocuments({ recipientUserId: userId, isRead: false });
   },
 
+  // Đánh dấu 1 thông báo là đã đọc
   async markAsRead(notificationId, userId) {
     return Notification.findOneAndUpdate(
       { _id: notificationId, recipientUserId: userId },
@@ -147,10 +141,11 @@ export const notificationService = {
     ).lean();
   },
 
+  // Đánh dấu tất cả thông báo của người dùng là đã đọc
   async markAllAsRead(userId) {
     await Notification.updateMany(
       { recipientUserId: userId, isRead: false },
       { $set: { isRead: true } },
     );
   },
-};
+};

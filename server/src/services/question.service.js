@@ -1,3 +1,8 @@
+/**
+ * Service Quản lý Ngân hàng Câu hỏi & Import Excel (Question Service).
+ * Xử lý: CRUD câu hỏi & đáp án, Upload/Xóa ảnh Cloudinary với băm SHA-256 chống trùng lặp, Preview & Xác nhận Import Excel thông minh, và Thống kê cơ cấu câu hỏi.
+ */
+
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -29,6 +34,7 @@ cloudinary.config({
 
 const CLOUDINARY_QUESTION_FOLDER = 'z176/questions';
 
+// Stream upload buffer ảnh lên Cloudinary
 function uploadBufferToCloudinary(buffer, publicId) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -39,12 +45,7 @@ function uploadBufferToCloudinary(buffer, publicId) {
   });
 }
 
-/**
- * Upload 1 ảnh câu hỏi lên Cloudinary. public_id = hash SHA-256 nội dung
- * file (không để Cloudinary tự sinh ID) + overwrite:true — 2 câu hỏi dùng
- * chung ảnh giống hệt nhau sẽ tự dùng chung 1 asset, import/upload lại đúng
- * ảnh cũ sẽ ghi đè thay vì tạo bản sao.
- */
+// Upload ảnh câu hỏi lên Cloudinary (Đặt public_id theo mã băm SHA-256 để chống trùng lặp bộ nhớ)
 export async function uploadQuestionImageBuffer(buffer) {
   const hash = crypto.createHash('sha256').update(buffer).digest('hex');
   const publicId = `${CLOUDINARY_QUESTION_FOLDER}/${hash}`;
@@ -52,11 +53,7 @@ export async function uploadQuestionImageBuffer(buffer) {
   return { imageUrl: result.secure_url, imageCloudinaryId: result.public_id };
 }
 
-/**
- * Xoá 1 asset ảnh câu hỏi trên Cloudinary theo public_id. Không throw nếu
- * xoá lỗi (vd asset đã bị xoá tay từ trước) — lỗi Cloudinary không được
- * chặn luồng cập nhật câu hỏi trong DB.
- */
+// Xóa ảnh câu hỏi trên Cloudinary theo public_id
 async function deleteQuestionImage(publicId) {
   if (!publicId) return;
   try {
@@ -66,25 +63,18 @@ async function deleteQuestionImage(publicId) {
   }
 }
 
+// Chuẩn hóa chuỗi tiêu đề cột Excel (chuyển chữ thường, bỏ dấu tiếng Việt và ký tự đặc biệt)
 function normalizeKey(key) {
   return String(key ?? '')
     .trim()
     .toLowerCase()
-    // Chữ "đ" tiếng Việt là 1 ký tự Unicode riêng (không phải "d" + dấu), nên
-    // .normalize('NFD') bên dưới KHÔNG tự tách được nó — phải thay thủ công
-    // trước, nếu không các tiêu đề như "Chủ đề"/"Độ khó"/"Đáp án đúng" sẽ
-    // không khớp được các key ASCII hệ thống đang chờ (chude/dokho/dapandung).
     .replace(/đ/g, 'd')
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/\s+/g, '');
 }
 
-// Dùng riêng cho việc SO KHỚP TRÙNG LẶP nội dung câu hỏi khi import (khác
-// normalizeKey ở trên — cái đó dùng để khớp TÊN CỘT Excel). Ở đây giữ lại
-// khoảng trắng đơn (chỉ gộp nhiều khoảng trắng liên tiếp) để "Câu hỏi A" và
-// "Câu hỏi A " hay "Câu   hỏi A" vẫn coi là trùng, nhưng không đi xa tới mức
-// bỏ hết dấu cách khiến 2 câu khác nghĩa bị nhận nhầm là 1.
+// Chuẩn hóa nội dung văn bản câu hỏi phục vụ kiểm tra trùng lặp dữ liệu import
 function normalizeContentForDedupe(content) {
   return String(content ?? '')
     .trim()
@@ -92,10 +82,7 @@ function normalizeContentForDedupe(content) {
     .replace(/\s+/g, ' ');
 }
 
-// Dựng map "key đã chuẩn hoá -> value" để tra cứu qua resolveEnum() luôn khớp,
-// vì normalizeKey() sẽ được áp dụng CẢ khi đọc giá trị từ Excel LẪN khi build
-// map ở đây (trước đây map khai tay còn dấu/khoảng trắng nên không bao giờ
-// khớp được với kết quả normalizeKey(raw), khiến mọi dòng import đều lỗi).
+// Xây dựng map ánh xạ enum từ nhiều biến thể nhập liệu khác nhau sang giá trị chuẩn
 function buildNormalizedMap(pairs) {
   const out = {};
   for (const [rawKeys, value] of pairs) {
@@ -127,6 +114,7 @@ const SCOPE_MAP = buildNormalizedMap([
   [['departmentspecific', 'department', 'riêng', 'rieng'], QUESTION_SCOPE.DEPARTMENT_SPECIFIC],
 ]);
 
+// Chuẩn hóa tên toàn bộ các thuộc tính (keys) của một dòng Excel
 function mapRowKeys(row) {
   const out = {};
   for (const [k, v] of Object.entries(row)) {
@@ -135,6 +123,7 @@ function mapRowKeys(row) {
   return out;
 }
 
+// Parse danh sách chỉ số đáp án đúng từ chuỗi nhập liệu (hỗ trợ phân tách bằng dấu phẩy, chấm phẩy, xuyệt)
 function parseCorrectIndices(raw) {
   if (raw == null || raw === '') return [];
   const s = String(raw).trim();
@@ -149,6 +138,7 @@ function parseCorrectIndices(raw) {
   return [...new Set(indices)];
 }
 
+// Kiểm tra tính hợp lệ của tập hợp phương án trả lời (Số lượng tối thiểu, số đáp án đúng theo Single / Multiple)
 export function validateAnswerSet(answerType, answers) {
   if (!Array.isArray(answers) || answers.length < 2) {
     throw new ApiError(400, 'Cần ít nhất 2 phương án trả lời', 'QUESTION_ANSWERS_MIN');
@@ -162,6 +152,7 @@ export function validateAnswerSet(answerType, answers) {
   }
 }
 
+// Serialize câu hỏi và danh sách đáp án sang định dạng JSON hoàn chỉnh
 function serializeQuestion(doc, answers) {
   return {
     id: doc._id.toString(),
@@ -186,6 +177,7 @@ function serializeQuestion(doc, answers) {
   };
 }
 
+// Dựng truy vấn lọc câu hỏi theo nhiều tiêu chí
 function buildQuestionQuery(filters = {}) {
   const { topicId, scope, departmentId, questionKind, difficulty, answerType, isActive = true, search } = filters;
   const query = {};
@@ -204,6 +196,7 @@ function buildQuestionQuery(filters = {}) {
   return query;
 }
 
+// Lấy danh sách câu hỏi kèm phân trang và nạp danh sách đáp án
 export async function listQuestions(filters = {}) {
   const { page = 1, limit = 20 } = filters;
   const query = buildQuestionQuery(filters);
@@ -232,6 +225,7 @@ export async function listQuestions(filters = {}) {
   };
 }
 
+// Lấy chi tiết một câu hỏi theo ID
 export async function getQuestionById(id) {
   if (!mongoose.isValidObjectId(id)) {
     throw new ApiError(400, 'ID câu hỏi không hợp lệ', 'QUESTION_ID_INVALID');
@@ -242,6 +236,7 @@ export async function getQuestionById(id) {
   return serializeQuestion(question, answers);
 }
 
+// Ghi đè toàn bộ danh sách đáp án của một câu hỏi
 async function replaceAnswers(questionId, answersInput) {
   await Answer.deleteMany({ questionId });
   const toInsert = answersInput.map((a, index) => ({
@@ -253,6 +248,8 @@ async function replaceAnswers(questionId, answersInput) {
   await Answer.insertMany(toInsert);
 }
 
+
+// Tạo mới một câu hỏi kèm các đáp án lựa chọn
 export async function createQuestion(payload, createdBy) {
   const {
     content,
@@ -293,6 +290,7 @@ export async function createQuestion(payload, createdBy) {
   return getQuestionById(question._id);
 }
 
+// Cập nhật thông tin câu hỏi, đáp án và đồng bộ xóa ảnh cũ trên Cloudinary
 export async function updateQuestion(id, payload, actorUserId, ipAddress) {
   const question = await Question.findById(id);
   assertFound(question, 'Không tìm thấy câu hỏi', 'QUESTION_NOT_FOUND');
@@ -328,10 +326,6 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
     await replaceAnswers(question._id, payload.answers);
   }
 
-  // Chỉ xoá asset Cloudinary CŨ khi client thực sự gửi imageCloudinaryId
-  // MỚI khác với ảnh đang lưu (đổi sang ảnh khác, hoặc gỡ ảnh = gửi null).
-  // Xoá mềm câu hỏi (deactivateQuestion) KHÔNG đụng nhánh này — theo yêu
-  // cầu giữ nguyên ảnh trên Cloudinary phòng khi cần khôi phục dữ liệu.
   if (
     payload.imageCloudinaryId !== undefined &&
     previousCloudinaryId &&
@@ -340,33 +334,17 @@ export async function updateQuestion(id, payload, actorUserId, ipAddress) {
     await deleteQuestionImage(previousCloudinaryId);
   }
 
-  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
-  // đúng chuẩn (action: 'UPDATE_QUESTION', kèm metadata.detail) ngay sau khi
-  // gọi hàm này. Log dạng 'question.update' ở đây bị trùng với log đó (2
-  // dòng log cho cùng 1 lần cập nhật câu hỏi).
-
   return getQuestionById(question._id);
 }
 
-// Trả về Exam đang PUBLISHED (nếu có) đang dùng ÍT NHẤT 1 trong các chủ đề
-// (topicId) truyền vào — dùng chung cho cả xóa đơn lẻ và xóa hàng loạt.
-//
-// LƯU Ý: chặn theo TOPIC của câu hỏi, KHÔNG chặn theo việc câu hỏi cụ thể đó
-// có thực sự nằm trong ExamCodeQuestion (snapshot lúc publish) hay không.
-// Trước đây hệ thống chỉ chặn câu hỏi đã được snapshot vào đề thi, nên 1 chủ
-// đề có 100 câu nhưng đề thi chỉ dùng 63 câu thì 37 câu còn lại vẫn xóa được
-// — điều này khiến hệ thống query lại Question theo topicId với isActive:true
-// (vd lúc sinh ExamCode mới cho nhân viên mới được gán vào phòng ban chưa có
-// ExamCode) bị thiếu số lượng câu so với lúc đề thi được duyệt, dẫn tới lỗi
-// INSUFFICIENT_QUESTIONS bị nuốt lặng lẽ. Để an toàn tuyệt đối, MỌI câu hỏi
-// thuộc 1 chủ đề đang được dùng bởi kỳ thi published — dù có nằm trong đề đã
-// sinh hay không — đều bị CHẶN xóa cho tới khi kỳ thi đó kết thúc.
+// Kiểm tra xem có kỳ thi PUBLISHED nào đang sử dụng các chủ đề này không
 async function findActiveExamUsingTopics(topicIds) {
   const ids = [...new Set(topicIds.filter(Boolean).map((id) => id.toString()))];
   if (ids.length === 0) return null;
   return Exam.findOne({ topicId: { $in: ids }, status: EXAM_STATUS.PUBLISHED });
 }
 
+// Ngừng kích hoạt (xóa mềm) một câu hỏi (chặn nếu thuộc chủ đề có kỳ thi đang mở)
 export async function deactivateQuestion(id, actorUserId, ipAddress) {
   const question = await Question.findById(id);
   assertFound(question, 'Không tìm thấy câu hỏi', 'QUESTION_NOT_FOUND');
@@ -383,24 +361,10 @@ export async function deactivateQuestion(id, actorUserId, ipAddress) {
   question.isActive = false;
   await question.save();
 
-  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
-  // đúng chuẩn (action: 'DELETE_QUESTION', kèm metadata.detail) ngay sau khi
-  // gọi hàm này, cùng lý do như updateQuestion() ở trên — tránh trùng log.
-
   return { id: question._id.toString(), isActive: false };
 }
 
-/**
- * Xóa mềm HÀNG LOẠT — 2 chế độ:
- *  - { ids: [...] }: chỉ xóa đúng các câu hỏi có id trong danh sách (dùng
- *    khi người dùng tick chọn từng câu qua checkbox).
- *  - { filters: {...} }: xóa TẤT CẢ câu hỏi khớp bộ lọc hiện tại trên UI
- *    (dùng khi người dùng bấm "Xóa tất cả theo bộ lọc hiện tại" — tiện dọn
- *    dữ liệu test/trùng lặp mà không cần tick từng ô). Bắt buộc phải có ít
- *    nhất 1 điều kiện lọc CỤ THỂ ngoài isActive, để tránh xóa nhầm toàn bộ
- *    ngân hàng câu hỏi chỉ vì quên chọn bộ lọc.
- * Chỉ tác động tới câu hỏi đang isActive:true (đã xóa mềm rồi thì bỏ qua).
- */
+// Xóa mềm hàng loạt câu hỏi (theo danh sách IDs hoặc theo Bộ lọc hiện tại)
 export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId, ipAddress) {
   let query;
   if (Array.isArray(ids) && ids.length > 0) {
@@ -429,14 +393,6 @@ export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId
     return { deactivatedCount: 0, questionIds: [], skippedActiveExam: null };
   }
 
-  // Xóa hàng loạt có thể gộp câu hỏi từ nhiều chủ đề/phòng ban khác nhau —
-  // nếu CHỈ 1 chủ đề trong số đó đang được kỳ thi published dùng, chặn toàn
-  // bộ thao tác sẽ rất khó chịu cho người xóa hàng loạt (họ không biết chủ
-  // đề nào là "thủ phạm" để bỏ ra khỏi lựa chọn). Thay vào đó: loại TOÀN BỘ
-  // câu hỏi thuộc (các) chủ đề đang bị kỳ thi active dùng ra khỏi danh sách
-  // xóa — bất kể câu đó có thực sự nằm trong đề đã sinh hay không — xóa phần
-  // còn lại, và báo rõ tên kỳ thi + có bao nhiêu câu bị giữ lại để người dùng
-  // tự xử lý.
   const topicIds = [...new Set(matched.map((q) => q.topicId?.toString()).filter(Boolean))];
   const activeExams = await Exam.find({ topicId: { $in: topicIds }, status: EXAM_STATUS.PUBLISHED })
     .select('topicId title')
@@ -452,11 +408,6 @@ export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId
     await Question.updateMany({ _id: { $in: idsToDeactivate } }, { $set: { isActive: false } });
   }
 
-  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
-  // đúng chuẩn (action: 'BULK_DELETE_QUESTIONS', kèm metadata.detail) ngay
-  // sau khi gọi hàm này, cùng lý do như updateQuestion() ở trên — tránh
-  // trùng log.
-
   return {
     deactivatedCount: idsToDeactivate.length,
     questionIds: idsToDeactivate.map((id) => id.toString()),
@@ -467,6 +418,7 @@ export async function deactivateManyQuestions({ ids, filters } = {}, actorUserId
   };
 }
 
+// Ánh xạ giá trị text từ Excel sang hằng số Enum tương ứng
 function resolveEnum(map, raw, fieldLabel) {
   const key = normalizeKey(raw);
   const val = map[key];
@@ -476,6 +428,7 @@ function resolveEnum(map, raw, fieldLabel) {
   return val;
 }
 
+// Xử lý đọc & parse dữ liệu của 1 dòng Excel thành object câu hỏi hoàn chỉnh
 async function buildQuestionFromImportRow(row, rowIndex) {
   const r = mapRowKeys(row);
   const topicName = r.topic ?? r.chude ?? r.chudelon ?? r.topicname;
@@ -508,12 +461,7 @@ async function buildQuestionFromImportRow(row, rowIndex) {
         `Dòng ${rowIndex}: không tìm thấy bộ phận "${deptName}"`,
         'IMPORT_DEPARTMENT_NOT_FOUND',
       );
-      // Đính kèm tên bộ phận gốc (chưa chuẩn hoá) để bước preview gom nhóm
-      // các dòng cùng thiếu 1 bộ phận và hiển thị cho người dùng tạo ngay.
       err.departmentName = String(deptName).trim();
-      // Nếu file Excel có sẵn cột "Mã bộ phận" / "Mô tả bộ phận" thì lấy
-      // luôn để UI tiền điền (và khoá không cho sửa) trong modal preview —
-      // tránh người dùng phải gõ lại dữ liệu đã có sẵn trong file.
       err.departmentCode = String(r.mabophan ?? r.maboph ?? r.deptcode ?? '').trim();
       err.departmentDescription = String(r.motabophan ?? r.mota ?? r.deptdescription ?? '').trim();
       throw err;
@@ -576,6 +524,7 @@ async function buildQuestionFromImportRow(row, rowIndex) {
   };
 }
 
+// Đọc toàn bộ các dòng dữ liệu từ file Excel
 function readImportRows(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new ApiError(400, 'Không đọc được file upload', 'IMPORT_FILE_MISSING');
@@ -585,11 +534,6 @@ function readImportRows(filePath) {
   try {
     workbook = XLSX.readFile(filePath, { cellDates: false });
   } catch (err) {
-    // Thư viện xlsx ném lỗi kỹ thuật khó hiểu (vd "Corrupted zip",
-    // "Unsupported file") khi file không phải Excel thật — thường gặp nhất
-    // là file đổi đuôi tay (.txt -> .xlsx) hoặc file Excel bị hỏng giữa
-    // chừng lúc upload. Bọc lại thành ApiError tiếng Việt rõ ràng để người
-    // ra đề biết cần tải lại đúng file Excel, thay vì thấy lỗi 500 thô.
     throw new ApiError(
       400,
       'File không đúng định dạng Excel hoặc đã bị hỏng. Vui lòng kiểm tra lại file (.xlsx) và tải lên lại.',
@@ -608,10 +552,8 @@ function readImportRows(filePath) {
   return rows;
 }
 
+// Nạp tập hợp các khóa định danh câu hỏi đã tồn tại trong DB để check trùng lặp
 async function loadSeenKeys() {
-  // Tải trước toàn bộ câu hỏi ACTIVE hiện có để so khớp trùng lặp — so theo
-  // (topicId + scope + departmentId + content đã chuẩn hoá). Dùng Set thay vì
-  // query DB từng dòng để tránh N+1 query khi file có hàng trăm dòng.
   const existingQuestions = await Question.find({ isActive: true }, 'content topicId scope departmentId').lean();
   return new Set(
     existingQuestions.map((q) =>
@@ -625,6 +567,7 @@ async function loadSeenKeys() {
   );
 }
 
+// Sinh chuỗi khóa định danh cho câu hỏi
 function buildDedupeKey(payload) {
   return [
     payload.topicId?.toString() ?? '',
@@ -634,10 +577,7 @@ function buildDedupeKey(payload) {
   ].join('|');
 }
 
-// Token dùng để tham chiếu lại đúng file Excel đã upload ở bước preview khi
-// gọi confirm (client không gửi lại file, chỉ gửi token). Token = tên file
-// vật lý multer đã lưu trong uploadDir — chỉ lấy basename để chặn path
-// traversal (vd token = "../../etc/passwd").
+// Xác thực và lấy đường dẫn file tạm theo Token upload
 function resolveImportTokenPath(token) {
   const safe = path.basename(String(token ?? ''));
   if (!safe || safe !== token) {
@@ -646,18 +586,7 @@ function resolveImportTokenPath(token) {
   return path.join(path.resolve(env.uploadDir), safe);
 }
 
-/**
- * BƯỚC 1/2 — Đọc file Excel và PHÂN TÍCH TRƯỚC, KHÔNG ghi gì vào DB (trừ
- * topic — vẫn tự tạo topic mới nếu chưa có, theo đúng hành vi cũ). Trả về:
- *  - missingDepartments: tên bộ phận còn thiếu (gom theo tên, không lặp) để
- *    UI cho người ra đề tạo ngay trong modal preview.
- *  - duplicates: các dòng trùng với câu hỏi đã có sẵn (DB cũ hoặc trùng
- *    ngay trong file) — để người dùng chọn giữ/bỏ từng dòng.
- *  - ready: các dòng sạch, sẵn sàng import ngay.
- *  - errors: lỗi khác (sai định dạng, thiếu đáp án đúng...) — luôn bị bỏ
- *    qua, không thể "cứu" ở bước confirm.
- * File Excel GIỮ NGUYÊN trên đĩa (chưa xoá) để bước confirm đọc lại.
- */
+// Bước 1: Xem trước (Preview) Import Excel: Phân tích các dòng hợp lệ, dòng trùng lặp, thiếu phòng ban và dòng lỗi
 export async function previewImportQuestionsFromExcelFile(filePath) {
   const rows = readImportRows(filePath);
   const seenKeys = await loadSeenKeys();
@@ -665,9 +594,6 @@ export async function previewImportQuestionsFromExcelFile(filePath) {
   const ready = [];
   const duplicates = [];
   const errors = [];
-  // normalizeDeptName -> { name, code, description, rowCount } — rowCount
-  // để UI biết tick tạo bộ phận này sẽ "cứu" thêm được bao nhiêu câu hỏi,
-  // hiển thị đúng số câu sẽ import ngay trong modal preview.
   const missingDepts = new Map();
 
   for (let i = 0; i < rows.length; i += 1) {
@@ -691,8 +617,6 @@ export async function previewImportQuestionsFromExcelFile(filePath) {
           rowCount: 0,
         };
         entry.rowCount += 1;
-        // Chỉ điền nếu chưa có — ưu tiên giá trị từ dòng gặp trước, tránh
-        // dòng sau có ô trống lại xoá mất giá trị dòng trước đã cung cấp.
         if (!entry.code && err.departmentCode) entry.code = err.departmentCode;
         if (!entry.description && err.departmentDescription) entry.description = err.departmentDescription;
         missingDepts.set(key, entry);
@@ -718,16 +642,7 @@ export async function previewImportQuestionsFromExcelFile(filePath) {
   };
 }
 
-/**
- * BƯỚC 2/2 — Xác nhận import thật sau khi người dùng đã xem preview:
- *  - createDepartments: [{ name }] — các bộ phận người dùng chọn tạo ngay
- *    (vd lấy từ missingDepartments của bước preview).
- *  - keepDuplicateRows: [rowIndex, ...] — các dòng TRÙNG mà người dùng vẫn
- *    muốn thêm mới (mặc định: dòng trùng KHÔNG có trong danh sách này sẽ bị
- *    bỏ qua, giữ câu cũ).
- * Đọc lại đúng file đã upload ở bước preview qua `token`, xoá file sau khi
- * xử lý xong (thành công hay có lỗi từng dòng cũng xoá, giống hành vi cũ).
- */
+// Bước 2: Xác nhận (Confirm) Import Excel vào CSDL và tự động tạo phòng ban mới nếu được chọn
 export async function confirmImportQuestions(token, options, createdBy, actorUserId, ipAddress) {
   const { createDepartments = [], keepDuplicateRows = [] } = options ?? {};
   const filePath = resolveImportTokenPath(token);
@@ -739,11 +654,6 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
     );
   }
 
-  // Tạo các bộ phận còn thiếu TRƯỚC KHI ghi bất kỳ câu hỏi nào. Nếu bước
-  // này lỗi (thiếu mã, mã bị trùng...), dừng ngay tại đây — KHÔNG ghi câu
-  // hỏi nào cả — và trả lỗi rõ ràng để người dùng sửa lại mã/mô tả rồi bấm
-  // "Xác nhận nhập" lại luôn trong modal, không cần thoát ra ngoài tạo tay
-  // phòng ban ở tab riêng rồi import lại từ đầu.
   for (const dept of createDepartments) {
     const name = dept?.name?.trim();
     if (!name) continue;
@@ -757,14 +667,9 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
       );
     }
 
-    // upsertDepartmentForImport tự lo hết: đã có + active -> dùng luôn; đã có
-    // nhưng bị xoá mềm -> khôi phục lại với mã/mô tả mới; chưa có -> tạo mới.
-    // Không cần tự check tồn tại ở đây nữa để tránh bỏ sót trường hợp xoá mềm.
     try {
       await upsertDepartmentForImport({ name, code, description: dept?.description });
     } catch (err) {
-      // upsertDepartmentForImport đã tự chuyển lỗi trùng khoá thành ApiError
-      // dễ hiểu — chỉ cần ném tiếp lên.
       throw err;
     }
   }
@@ -784,8 +689,6 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
       const dedupeKey = buildDedupeKey(payload);
 
       if (seenKeys.has(dedupeKey) && !keepSet.has(rowIndex)) {
-        // Trùng và người dùng KHÔNG chọn giữ dòng này -> bỏ qua, không tạo
-        // trùng (mặc định an toàn).
         skippedDuplicates.push({ row: rowIndex, content: payload.content.slice(0, 80) });
         continue;
       }
@@ -802,7 +705,7 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
       });
       await replaceAnswers(question._id, payload.answers);
       created.push(question._id.toString());
-      seenKeys.add(dedupeKey); // đánh dấu luôn để dòng sau trong CÙNG file không tạo trùng nhau
+      seenKeys.add(dedupeKey);
     } catch (err) {
       errors.push({
         row: rowIndex,
@@ -818,14 +721,6 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
     /* ignore cleanup */
   }
 
-  // Audit: KHÔNG ghi ở đây nữa — question.controller.js đã ghi audit log
-  // đúng chuẩn (action: 'IMPORT_QUESTIONS', kèm metadata.detail đầy đủ cả
-  // số dòng thành công/lỗi/bỏ qua trùng) ngay sau khi gọi hàm này, cùng lý
-  // do như updateQuestion() ở trên — tránh trùng log. Giữ nguyên logic
-  // created.length > 0 không còn cần thiết vì controller luôn ghi log dù
-  // created.length = 0 hay không, để không mất dấu vết các lần import lỗi
-  // toàn bộ.
-
   return {
     imported: created.length,
     failed: errors.length,
@@ -836,17 +731,7 @@ export async function confirmImportQuestions(token, options, createdBy, actorUse
   };
 }
 
-/**
- * Thống kê số câu hỏi ACTIVE theo 1 chủ đề, dùng cho form "Tạo đề xuất kỳ
- * thi" (ExamProposalTab) — giúp người soạn biết trước tối đa có thể nhập
- * bao nhiêu câu chung / câu riêng cho từng phòng ban, tránh nhập vượt quá số
- * câu thực có trong ngân hàng câu hỏi.
- *
- * Trả về: { topicId, commonCount, departments: [{ departmentId, name, code, count }] }
- * `departments` liệt kê TẤT CẢ phòng ban đang hoạt động (kể cả phòng ban 0
- * câu hỏi riêng thuộc chủ đề này), để UI hiển thị đủ, không bị ẩn mất phòng
- * ban thiếu câu hỏi.
- */
+// Thống kê cơ cấu câu hỏi khả dụng (Chung và Theo phòng ban) của một chủ đề phục vụ tạo kỳ thi
 export async function getQuestionStatsByTopic(topicId) {
   if (!mongoose.isValidObjectId(topicId)) {
     throw new ApiError(400, 'topicId không hợp lệ', 'QUESTION_STATS_INVALID_TOPIC');
@@ -883,4 +768,4 @@ export async function getQuestionStatsByTopic(topicId) {
       count: countByDeptId.get(dept._id.toString()) ?? 0,
     })),
   };
-}
+}

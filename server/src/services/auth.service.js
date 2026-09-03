@@ -1,3 +1,8 @@
+/**
+ * Service Xác thực & Quản lý Phiên Người dùng (Authentication & Session Service).
+ * Xử lý ký/xác minh JWT Token, đăng nhập bảo mật, chống tấn công brute-force và cơ chế đơn phiên (Single Active Session).
+ */
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
@@ -6,6 +11,7 @@ import { ApiError, assertFound } from '../utils/api-error.js';
 
 const REFRESH_COOKIE = 'refreshToken';
 
+// Cấu hình Cookie an toàn cho Refresh Token
 export function refreshCookieOptions() {
   return {
     httpOnly: true,
@@ -18,6 +24,7 @@ export function refreshCookieOptions() {
 
 export { REFRESH_COOKIE };
 
+// Tạo chuỗi Access Token (JWT) ngắn hạn kèm tokenVersion (tv)
 function signAccessToken(user, roleCode) {
   return jwt.sign(
     {
@@ -30,6 +37,7 @@ function signAccessToken(user, roleCode) {
   );
 }
 
+// Tạo chuỗi Refresh Token (JWT) dài hạn kèm tokenVersion (tv)
 function signRefreshToken(user) {
   return jwt.sign(
     {
@@ -42,10 +50,12 @@ function signRefreshToken(user) {
   );
 }
 
+// Kiểm tra xem tài khoản có đang trong thời gian bị tạm khóa vì nhập sai mật khẩu nhiều lần
 function isAccountLocked(user) {
   return user.lockUntil && user.lockUntil > new Date();
 }
 
+// Ghi nhận số lần đăng nhập sai và tự động khóa tạm thời nếu vượt quá ngưỡng cấu hình
 async function registerFailedLogin(user) {
   const attempts = (user.failedLoginAttempts ?? 0) + 1;
   user.failedLoginAttempts = attempts;
@@ -56,6 +66,7 @@ async function registerFailedLogin(user) {
   await user.save();
 }
 
+// Xóa trạng thái đếm sai khi đăng nhập thành công
 async function clearFailedLogin(user) {
   if (user.failedLoginAttempts || user.lockUntil) {
     user.failedLoginAttempts = 0;
@@ -64,6 +75,7 @@ async function clearFailedLogin(user) {
   }
 }
 
+// Xác thực đăng nhập bằng username/password và sinh cặp token mới (hủy phiên đăng nhập cũ trên thiết bị khác)
 export async function loginWithUsernamePassword(username, password) {
   const normalized = username.trim().toLowerCase();
   const user = await User.findOne({ username: normalized })
@@ -95,13 +107,7 @@ export async function loginWithUsernamePassword(username, password) {
 
   await clearFailedLogin(user);
 
-  // Mỗi lần đăng nhập thành công đều tăng tokenVersion — nghĩa là bất kỳ
-  // access/refresh token nào đã cấp trước đó (ví dụ đang mở ở 1 trình duyệt
-  // khác) sẽ ngay lập tức lệch `tv` so với DB và bị middleware `authenticate`
-  // từ chối với mã AUTH_ACCESS_REVOKED ở request kế tiếp của nó — tận dụng
-  // đúng cơ chế thu hồi phiên đã có sẵn (vốn dùng cho đổi mật khẩu/logout),
-  // để đạt hiệu quả "chỉ 1 phiên đăng nhập hoạt động tại 1 thời điểm" mà
-  // không cần thêm field/schema mới.
+  // Tăng tokenVersion để vô hiệu hóa tất cả các token đã cấp trước đó của tài khoản này
   user.tokenVersion = (user.tokenVersion ?? 0) + 1;
   await user.save();
 
@@ -121,6 +127,7 @@ export async function loginWithUsernamePassword(username, password) {
   };
 }
 
+// Làm mới Access Token từ Refresh Token hợp lệ
 export async function refreshAccessToken(refreshToken) {
   if (!refreshToken) {
     throw new ApiError(401, 'Phiên đăng nhập hết hạn', 'AUTH_REFRESH_MISSING');
@@ -169,6 +176,7 @@ export async function refreshAccessToken(refreshToken) {
   };
 }
 
+// Đăng xuất: tăng tokenVersion để vô hiệu hóa phiên làm việc của người dùng
 export async function logoutUser(userId) {
   const user = await User.findById(userId);
   if (user) {
@@ -177,6 +185,7 @@ export async function logoutUser(userId) {
   }
 }
 
+// Lấy thông tin tóm tắt hồ sơ người dùng đang xác thực
 export async function getAuthProfile(userId) {
   const user = await User.findById(userId).populate('roleId');
   assertFound(user, 'Người dùng không tồn tại', 'AUTH_USER_NOT_FOUND');
@@ -193,6 +202,7 @@ export async function getAuthProfile(userId) {
   };
 }
 
+// Đổi mật khẩu tài khoản và thu hồi tất cả các phiên đăng nhập cũ
 export async function changePassword(userId, currentPassword, newPassword) {
   const user = await User.findById(userId).select('+passwordHash');
   assertFound(user, 'Người dùng không tồn tại', 'AUTH_USER_NOT_FOUND');
@@ -212,18 +222,7 @@ export async function changePassword(userId, currentPassword, newPassword) {
   await user.save();
 }
 
-/**
- * MỚI: phân biệt "access token hết hạn do quá thời gian sống" (JWT
- * TokenExpiredError) với "token không hợp lệ" (sai chữ ký, bị sửa, sai
- * định dạng...). Trước đây cả 2 trường hợp đều chung 1 mã AUTH_ACCESS_INVALID
- * nên frontend không thể biết khi nào nên tự động gọi /auth/refresh rồi thử
- * lại, so với khi nào nên đăng xuất luôn (token rác/giả mạo thì refresh cũng
- * vô ích, không nên tốn 1 lượt gọi API).
- *
- * jsonwebtoken ném ra instance TokenExpiredError (kế thừa từ JsonWebTokenError)
- * khi token còn đúng chữ ký nhưng đã qua `exp` — dùng `err.name` để phân biệt
- * thay vì `instanceof` để không phải import thêm class từ thư viện.
- */
+// Xác thực chữ ký và thời hạn của Access Token
 export function verifyAccessToken(token) {
   try {
     return jwt.verify(token, env.jwtSecret);

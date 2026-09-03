@@ -1,12 +1,17 @@
+/**
+ * Service Nhật ký Kiểm toán & Bảo mật (Audit Log Service).
+ * Lưu vết hành động của người dùng và hỗ trợ truy vấn, tìm kiếm thông tin kiểm toán kèm hồ sơ nhân viên.
+ */
+
 import { AuditLog, Employee, Department } from '../models/index.js';
 
-// Ký tự đặc biệt cần escape khi dựng RegExp từ input người dùng (tránh lỗi cú pháp regex / ReDoS đơn giản)
+// Ký tự đặc biệt cần escape khi dựng RegExp từ input người dùng
 function escapeRegExp(str) {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export const auditService = {
-  /** Ghi audit — không lưu nội dung câu hỏi/đáp án trong metadata (SKILLS.md mục 4.1). */
+  // Ghi nhật ký thao tác (không lưu nội dung nhạy cảm của đề thi/đáp án)
   async writeAudit({ actorUserId, action, resourceType, resourceId, metadata, ipAddress }) {
     await AuditLog.create({
       actorUserId,
@@ -18,16 +23,7 @@ export const auditService = {
     });
   },
 
-  /**
-   * @param {object} filters
-   * @param {number|string} [filters.page]
-   * @param {number|string} [filters.limit]
-   * @param {string} [filters.action] - 1 hoặc nhiều action, phân tách bởi dấu phẩy (vd "LOCK_USER,RESET_PASSWORD")
-   * @param {string} [filters.resourceType]
-   * @param {string} [filters.from] - ISO date, lọc createdAt >= from (00:00:00)
-   * @param {string} [filters.to] - ISO date, lọc createdAt <= to (23:59:59)
-   * @param {string} [filters.q] - từ khóa tìm theo họ tên / mã nhân viên / tên phòng ban của người thực hiện
-   */
+  // Truy vấn danh sách nhật ký kiểm toán (hỗ trợ phân trang, lọc theo action, thời gian, từ khóa nhân viên/phòng ban)
   async getAuditLogs(filters = {}) {
     const { page = 1, limit = 20, action, resourceType, from, to, q } = filters;
     const numericPage = Number(page) || 1;
@@ -64,7 +60,7 @@ export const auditService = {
       if (Object.keys(query.createdAt).length === 0) delete query.createdAt;
     }
 
-    // Tìm theo tên / mã nhân viên / phòng ban: suy ra danh sách actorUserId phù hợp trước
+    // Khối tìm kiếm: chuyển đổi từ khóa tên / mã nhân viên / phòng ban sang danh sách actorUserId
     if (q && q.trim()) {
       const regex = new RegExp(escapeRegExp(q.trim()), 'i');
 
@@ -78,7 +74,6 @@ export const auditService = {
       const userIds = matchedEmployees.map((e) => e.userId);
 
       if (userIds.length === 0) {
-        // Không có nhân viên nào khớp từ khóa -> chắc chắn không có log nào phù hợp
         return {
           items: [],
           pagination: { total: 0, page: numericPage, limit: numericLimit, totalPages: 0 },
@@ -97,7 +92,7 @@ export const auditService = {
       AuditLog.countDocuments(query),
     ]);
 
-    // Ghép thêm hồ sơ nhân viên (họ tên, mã NV, phòng ban) cho từng log hiển thị
+    // Khối làm giàu dữ liệu: ghép nối thêm thông tin Họ tên, Mã nhân viên và Phòng ban thực tế
     const actorIds = [...new Set(items.map((i) => i.actorUserId?._id?.toString()).filter(Boolean))];
     const employees = actorIds.length
       ? await Employee.find({ userId: { $in: actorIds } })
@@ -133,7 +128,7 @@ export const auditService = {
   },
 };
 
-// Vẫn export function độc lập để tương thích với các module khác nếu đang import trực tiếp
+// Xuất khẩu hàm ghi log độc lập tương thích ngược
 export async function writeAudit(params) {
   return auditService.writeAudit(params);
 }

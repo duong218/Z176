@@ -1,12 +1,15 @@
+/**
+ * Service Báo cáo Thống kê & Xuất Dữ liệu Kết quả Thi (Report Service).
+ * Hỗ trợ các thống kê tổng quan, theo phòng ban, theo kỳ thi, tra cứu kết quả công khai và xuất báo cáo Excel định dạng chuyên nghiệp.
+ */
+
 import mongoose from 'mongoose';
 import xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
 import { Result } from '../models/result.model.js';
 import { Employee } from '../models/employee.model.js';
 
-/**
- * Common aggregation pipeline to join Result -> ExamAttempt -> ExamCandidate -> Employee -> Department & Exam
- */
+// Pipeline kết nối cơ sở (Base Pipeline): Result -> ExamAttempt -> ExamCandidate -> Employee -> Department -> Exam -> Topic
 const getBasePipeline = () => [
   {
     $lookup: {
@@ -53,8 +56,6 @@ const getBasePipeline = () => [
     },
   },
   { $unwind: '$exam' },
-  // Bài thi (exam) gắn với 1 chủ đề (topic). Nếu exam của bạn không có field
-  // `topicId`, sửa lại `localField` bên dưới cho đúng schema thực tế.
   {
     $lookup: {
       from: 'topics',
@@ -68,13 +69,12 @@ const getBasePipeline = () => [
   },
 ];
 
-// Escape ký tự đặc biệt regex trước khi đưa vào $regex — tránh regex injection
-// từ input người dùng nhập ở ô tra cứu public.
+// Hàm phụ trợ escape ký tự đặc biệt trong Regex tránh lỗi Regex Injection
 function escapeRegex(str) {
   return String(str ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// ============ Excel styling helpers (ExcelJS) ============
+// ============ Cấu hình định dạng file Excel (ExcelJS Styling) ============
 const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF008BC5' } };
 const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
 const THIN_BORDER = {
@@ -84,6 +84,7 @@ const THIN_BORDER = {
   right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
 };
 
+// Định dạng hàng tiêu đề bảng Excel
 function styleHeaderRow(row) {
   row.eachCell((cell) => {
     cell.fill = HEADER_FILL;
@@ -94,6 +95,7 @@ function styleHeaderRow(row) {
   row.height = 24;
 }
 
+// Định dạng hàng dữ liệu bảng Excel (căn lề và tô màu trạng thái Đạt / Không đạt)
 function styleDataRow(row, { centerCols = [], passedCol = null, passedValue = null } = {}) {
   row.eachCell((cell, colNumber) => {
     cell.border = THIN_BORDER;
@@ -113,6 +115,7 @@ function styleDataRow(row, { centerCols = [], passedCol = null, passedValue = nu
 }
 
 export const reportService = {
+  // Lấy các chỉ số thống kê tổng quan toàn hệ thống (Tổng lượt nộp, Thí sinh, Số lượng đạt/hỏng, Điểm TB)
   async getOverviewStats() {
     const pipeline = [
       ...getBasePipeline(),
@@ -156,6 +159,7 @@ export const reportService = {
     };
   },
 
+  // Thống kê tỷ lệ thi đạt và điểm trung bình theo từng Phòng ban / Đơn vị
   async getResultsByDepartment() {
     const pipeline = [
       ...getBasePipeline(),
@@ -198,11 +202,7 @@ export const reportService = {
     }));
   },
 
-  /**
-   * MỚI — Thống kê kết quả thi theo Bài thi (exam), kèm tên Chủ đề (topic) mà
-   * bài thi đó thuộc về. Cùng dạng dữ liệu như getResultsByDepartment() để FE
-   * dùng chung 1 kiểu bảng.
-   */
+  // Thống kê kết quả thi theo từng Bài thi / Kỳ thi và Chủ đề liên kết
   async getResultsByExam() {
     const pipeline = [
       ...getBasePipeline(),
@@ -247,13 +247,7 @@ export const reportService = {
     }));
   },
 
-  /**
-   * PUBLIC — dùng cho trang chủ (không đăng nhập). Chỉ trả về tên phòng ban +
-   * tỷ lệ đạt (%) + tổng số lượt thi. KHÔNG trả passedCount/failedCount/avgScore
-   * hay bất kỳ thông tin cá nhân nào — tuyệt đối không dùng lại nguyên hàm
-   * getResultsByDepartment() ở trên cho route public vì nó lộ nhiều field hơn
-   * mức cần thiết.
-   */
+  // Lấy tỷ lệ thi đạt theo phòng ban cho Trang chủ Công khai (Không cần đăng nhập, ẩn các thông tin nhạy cảm)
   async getPublicResultsByDepartment() {
     const pipeline = [
       ...getBasePipeline(),
@@ -286,13 +280,7 @@ export const reportService = {
     return results.map(r => ({ ...r, passRate: Number(r.passRate.toFixed(2)) }));
   },
 
-  /**
-   * PUBLIC — tra cứu kết quả CÁ NHÂN theo mã nhân viên (khớp chính xác) hoặc họ
-   * tên (khớp gần đúng, có thể trùng tên nhiều người → giới hạn 20 kết quả).
-   * Chỉ trả về đúng các field cần hiển thị: tên, mã NV, phòng ban, điểm, kết
-   * quả, thời gian nộp bài — KHÔNG trả examAttemptId, employee._id hay bất kỳ
-   * field nội bộ nào khác.
-   */
+  // Tra cứu kết quả thi cá nhân công khai theo Họ tên hoặc Mã nhân viên
   async lookupPublicResult(term) {
     const q = String(term ?? '').trim();
     if (!q) return [];
@@ -324,6 +312,7 @@ export const reportService = {
     }));
   },
 
+  // Lấy danh sách kết quả thi chi tiết kèm phân trang và các bộ lọc tìm kiếm
   async getDetailedResults(filters = {}) {
     const matchStage = {};
     if (filters.departmentId) {
@@ -365,8 +354,6 @@ export const reportService = {
 
     const formattedData = data.map(item => ({
       _id: item._id,
-      // MỚI — cần để Leader gọi API cấp lại lượt thi (grant-attempt) cho đúng
-      // thí sinh + đúng kỳ thi. Không đổi các field khác để không phá vỡ FE cũ.
       examCandidateId: item.candidate._id,
       employeeName: item.employee.fullname,
       departmentName: item.department.name,
@@ -387,8 +374,8 @@ export const reportService = {
     };
   },
 
+  // Xuất file Excel bảng kết quả chi tiết
   async exportDetailedResultsExcel(filters = {}) {
-    // Re-use logic but get all records
     const matchStage = {};
     if (filters.departmentId) {
       matchStage['department._id'] = new mongoose.Types.ObjectId(filters.departmentId);
@@ -429,7 +416,6 @@ export const reportService = {
 
     const worksheet = xlsx.utils.json_to_sheet(worksheetData);
 
-    // Auto-size columns
     const maxWidths = [5, 25, 20, 30, 10, 15, 20];
     worksheet['!cols'] = maxWidths.map(w => ({ wch: w }));
 
@@ -439,16 +425,7 @@ export const reportService = {
     return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   },
 
-  /**
-   * MỚI — Xuất Excel danh sách kết quả thi theo Bài thi (exam/topic), định
-   * dạng đẹp bằng ExcelJS: header có màu nền + chữ trắng đậm, border cho toàn
-   * bảng, đóng băng dòng tiêu đề, tô màu xanh/đỏ cho cột "Đạt/Không đạt",
-   * auto-width cột.
-   *
-   * Có 2 sheet:
-   *  - "Tong_hop": số liệu tổng hợp theo từng bài thi (giống bảng hiển thị FE)
-   *  - "Chi_tiet": danh sách từng lượt thi, group theo bài thi
-   */
+  // Xuất file Excel báo cáo phân loại theo Bài thi (gồm 2 Sheet: Tổng hợp & Chi tiết)
   async exportResultsByExamExcel() {
     const summary = await this.getResultsByExam();
 
@@ -459,7 +436,7 @@ export const reportService = {
     workbook.creator = 'Z176 - He thong thi noi bo';
     workbook.created = new Date();
 
-    // ---------- Sheet 1: Tổng hợp theo bài thi ----------
+    // Sheet 1: Tổng hợp số liệu theo từng bài thi
     const sumSheet = workbook.addWorksheet('Tong_hop', {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
@@ -482,7 +459,7 @@ export const reportService = {
     });
     sumSheet.autoFilter = { from: 'A1', to: `H${summary.length + 1}` };
 
-    // ---------- Sheet 2: Chi tiết từng lượt thi ----------
+    // Sheet 2: Chi tiết từng lượt nộp bài
     const detailSheet = workbook.addWorksheet('Chi_tiet', {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
@@ -521,18 +498,11 @@ export const reportService = {
     return workbook.xlsx.writeBuffer();
   },
 
-  /**
-   * MỚI — Lịch sử kết quả thi của chính thí sinh đang đăng nhập (role 'candidate').
-   * Khác các hàm trên (dành cho leader/admin xem toàn hệ thống), hàm này chỉ trả
-   * dữ liệu của đúng 1 employee gắn với userId hiện tại — match theo employee._id
-   * ngay từ đầu pipeline để không lộ dữ liệu người khác.
-   */
+  // Xem lịch sử kết quả thi của chính thí sinh đang đăng nhập
   async getMyResults(userId) {
     const employee = await Employee.findOne({ userId }).populate('departmentId').lean();
 
     if (!employee) {
-      // Tài khoản chưa được gắn với hồ sơ nhân viên nào (vd tài khoản admin/examiner/leader
-      // không có Employee tương ứng) — trả rỗng thay vì lỗi để FE tự xử lý hiển thị.
       return { employee: null, results: [] };
     }
 

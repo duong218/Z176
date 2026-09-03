@@ -1,3 +1,8 @@
+/**
+ * Service Quản lý Quá trình Thi & Chấm điểm (Exam Attempt Service).
+ * Xử lý: Lấy đề thi, Bắt đầu ca thi, Autosave từng câu trả lời, Heartbeat chống gian lận/treo ca thi, Chấm điểm server-side và Cấp thêm lượt thi.
+ */
+
 import {
   Employee,
   Exam,
@@ -16,25 +21,15 @@ import {
 } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
-// Mặc định mỗi thí sinh có 1 lượt thi CHÍNH THỨC cho 1 kỳ thi. Người duyệt đề
-// có thể cấp thêm lượt qua grantExtraAttempt() bên dưới — khi đó giới hạn
-// thực tế cho thí sinh đó là MAX_OFFICIAL_ATTEMPTS + examCandidate.extraAttemptsGranted
-// (xem exam-candidate.model.js). KHÔNG sửa hằng số này để cấp lượt — luôn đi
-// qua field extraAttemptsGranted để giữ đúng lịch sử theo từng thí sinh.
-const MAX_OFFICIAL_ATTEMPTS = 1;
+const MAX_OFFICIAL_ATTEMPTS = 1; // Số lượt thi chính thức mặc định
+const INACTIVITY_TIMEOUT_MS = 60_000; // Tự động nộp nếu rời ca thi > 1 phút (không heartbeat/thao tác)
 
-/**
- * Nếu thí sinh rời trang thi (không heartbeat/thao tác gì) quá thời gian này
- * thì lượt thi đang in_progress sẽ bị hệ thống tự động nộp.
- */
-const INACTIVITY_TIMEOUT_MS = 60_000; // 1 phút
-
-/** Số lượt thi tối đa thực tế của 1 thí sinh cho 1 kỳ thi, gồm cả lượt được cấp thêm. */
+// Tính tổng số lượt thi tối đa của thí sinh (bao gồm số lượt được cấp thêm)
 function resolveMaxAttempts(examCandidate) {
   return MAX_OFFICIAL_ATTEMPTS + (examCandidate.extraAttemptsGranted ?? 0);
 }
 
-/** Trộn ngẫu nhiên mảng (Fisher–Yates), không sửa mảng gốc. */
+// Thuật toán xáo trộn ngẫu nhiên Fisher–Yates
 function shuffle(arr) {
   const result = [...arr];
   for (let i = result.length - 1; i > 0; i -= 1) {
@@ -44,12 +39,7 @@ function shuffle(arr) {
   return result;
 }
 
-/**
- * Sinh snapshot câu hỏi + đáp án đã xáo RIÊNG cho 1 lượt thi cụ thể, dựa trên
- * đúng bộ câu hỏi của phòng ban (ExamCodeQuestion) — không đổi tập câu hỏi,
- * chỉ đổi thứ tự hiển thị cho từng thí sinh. Idempotent theo unique index,
- * nhưng chỉ nên gọi 1 lần lúc tạo attempt mới (không gọi lại khi resume).
- */
+// Sinh Snapshot câu hỏi và thứ tự đáp án xáo ngẫu nhiên dành riêng cho lượt thi cụ thể
 async function generateAttemptQuestionSnapshot(attemptId, examCodeId) {
   const examCodeQuestions = await ExamCodeQuestion.find({ examCodeId }).select('questionId');
   const questionIds = examCodeQuestions.map((q) => q.questionId);
@@ -75,7 +65,7 @@ async function generateAttemptQuestionSnapshot(attemptId, examCodeId) {
   }
 }
 
-/** Dựng lại danh sách câu hỏi (kèm option đã đúng thứ tự xáo) từ snapshot của 1 lượt thi. */
+// Tái hiện danh sách câu hỏi và các lựa chọn đáp án từ snapshot của lượt thi
 async function buildQuestionsFromSnapshot(attemptId) {
   const snapshot = await AttemptQuestion.find({ examAttemptId: attemptId }).sort({ orderIndex: 1 });
   if (snapshot.length === 0) return [];
@@ -109,10 +99,7 @@ async function buildQuestionsFromSnapshot(attemptId) {
     });
 }
 
-/**
- * Xác định employee + kỳ thi đang published + ExamCandidate (đề đã gán) cho
- * userId hiện tại. Dùng chung cho cả các endpoint để đảm bảo cùng 1 nguồn sự thật.
- */
+// Xác định ngữ cảnh thí sinh (hồ sơ nhân viên, kỳ thi đang mở, mã đề đã gán)
 async function resolveCandidateContext(userId) {
   const employee = await Employee.findOne({ userId });
   if (!employee) {
@@ -132,6 +119,7 @@ async function resolveCandidateContext(userId) {
   return { employee, exam, examCandidate };
 }
 
+// Lấy danh sách các lượt thi chính thức của thí sinh
 async function getOfficialAttempts(examCandidateId) {
   return ExamAttempt.find({
     examCandidateId,
@@ -139,7 +127,7 @@ async function getOfficialAttempts(examCandidateId) {
   }).sort({ createdAt: -1 });
 }
 
-/** Nếu lượt thi đang in_progress mà đã quá expiresAt thì tự chuyển sang expired. */
+// Tự động chuyển trạng thái ca thi sang EXPIRED nếu đã quá thời gian làm bài
 async function expireIfNeeded(attempt) {
   if (
     attempt.status === ATTEMPT_STATUS.IN_PROGRESS &&
@@ -152,23 +140,7 @@ async function expireIfNeeded(attempt) {
   return attempt;
 }
 
-/**
- * Kiểm tra 1 attempt đang in_progress có bị thí sinh rời đi quá
- * INACTIVITY_TIMEOUT_MS hay không (dựa trên lastActiveAt — mốc thời gian gần
- * nhất server nhận được heartbeat/getMyExam/answer cho lượt thi này).
- *
- * Nếu vượt quá hạn: tự nộp bài NGAY tại đây bằng cách gọi lại submitAttempt
- * (không có answersPayload — submitAttempt sẽ tự lấy đáp án đã autosave trong
- * CandidateAnswer), đánh dấu autoSubmitReason = 'inactive_timeout'.
- *
- * Nếu attempt chưa từng có lastActiveAt (thí sinh vừa start, chưa kịp
- * heartbeat/thao tác lần nào) thì KHÔNG tính là bỏ đi — tránh tự nộp oan lượt
- * thi vừa mới bắt đầu.
- *
- * Gọi hàm này ở đầu mọi luồng có thể nhận request cho 1 attempt cụ thể
- * (getMyExam, recordAnswer, heartbeat) để đảm bảo phát hiện timeout dù thí
- * sinh thao tác lại từ bất kỳ đâu (kể cả đổi thiết bị).
- */
+// Kiểm tra và tự động nộp bài nếu thí sinh rời khỏi giao diện thi quá thời gian quy định
 async function checkAndAutoSubmitIfInactive(attempt, userId) {
   if (attempt.status !== ATTEMPT_STATUS.IN_PROGRESS) return attempt;
   if (!attempt.lastActiveAt) return attempt;
@@ -181,22 +153,7 @@ async function checkAndAutoSubmitIfInactive(attempt, userId) {
 }
 
 export const examAttemptService = {
-  /**
-   * Trả về đề thi của thí sinh (câu hỏi + đáp án, ẩn isCorrect) cùng trạng thái
-   * lượt thi hiện tại. Chỉ trả câu hỏi khi thí sinh còn được phép làm bài
-   * (đang có lượt in_progress để tiếp tục, hoặc chưa dùng hết lượt).
-   *
-   * Nếu đang có lượt in_progress: trả đúng thứ tự câu/đáp án đã xáo riêng cho
-   * lượt đó (từ AttemptQuestion snapshot) — giữ nguyên xuyên suốt lượt thi —
-   * kèm `savedAnswers` (đáp án đã autosave) để thí sinh mở lại từ thiết bị
-   * khác vẫn thấy đúng lựa chọn đã chọn trước đó.
-   * Nếu chưa bắt đầu (màn xác nhận): trả theo thứ tự mặc định của phòng ban —
-   * chỉ để xem trước, chưa cần xáo (việc xáo thật diễn ra lúc bấm "Bắt đầu thi").
-   *
-   * Mỗi lần gọi cũng kiểm tra timeout: nếu lượt in_progress đã bị bỏ quá 1
-   * phút thì tự động nộp ngay trong lần gọi này, và trả `autoSubmitted` để
-   * client biết hiển thị đúng thông báo.
-   */
+  // Lấy thông tin đề thi và khôi phục trạng thái làm bài của thí sinh
   async getMyExam(userId) {
     const { exam, examCandidate } = await resolveCandidateContext(userId);
     const maxAttempts = resolveMaxAttempts(examCandidate);
@@ -214,7 +171,6 @@ export const examAttemptService = {
       if (afterCheck.status !== ATTEMPT_STATUS.IN_PROGRESS) {
         autoSubmitted = { reason: afterCheck.autoSubmitReason ?? 'inactive_timeout' };
       }
-      // Refetch toàn bộ danh sách — attempt vừa check có thể vừa chuyển sang submitted.
       attempts = await getOfficialAttempts(examCandidate._id);
     }
 
@@ -224,8 +180,6 @@ export const examAttemptService = {
       await inProgress.save();
     }
 
-    // Mã đề cố định đã gán cho thí sinh (không đổi trong suốt kỳ thi, dùng
-    // ExamCandidate.examCodeId — độc lập với việc đang thi dở hay chưa bắt đầu).
     const examCode = await ExamCode.findById(examCandidate.examCodeId).select('code');
 
     const finishedCount = attempts.filter((a) => a.status !== ATTEMPT_STATUS.IN_PROGRESS).length;
@@ -297,19 +251,11 @@ export const examAttemptService = {
       canTake,
       questions,
       savedAnswers,
-      // Khác null CHỈ trong lần gọi getMyExam ngay sau khi hệ thống vừa phát
-      // hiện và tự nộp bài do rời quá lâu — để client hiện đúng thông báo
-      // "Bạn đã rời khỏi ca thi quá 1 phút, hệ thống đã tự động nộp bài."
       autoSubmitted,
     };
   },
 
-  /**
-   * Bắt đầu lượt thi chính thức. Nếu đang có lượt in_progress còn hạn thì trả về
-   * đúng lượt đó (resume) thay vì tạo mới — tránh mất lượt khi thí sinh lỡ tải
-   * lại trang / mất kết nối giữa chừng. Chỉ sinh snapshot xáo câu/đáp án khi
-   * THỰC SỰ tạo lượt mới (không sinh lại khi resume, giữ nguyên thứ tự đã thấy).
-   */
+  // Bắt đầu một ca thi mới hoặc tiếp tục ca thi đang dở dang (Resume)
   async startAttempt(userId) {
     const { exam, examCandidate } = await resolveCandidateContext(userId);
     const maxAttempts = resolveMaxAttempts(examCandidate);
@@ -362,13 +308,7 @@ export const examAttemptService = {
     };
   },
 
-  /**
-   * Autosave 1 câu trả lời — upsert đúng 1 dòng CandidateAnswer cho
-   * {examAttemptId, questionId}, KHÔNG tính điểm ở đây (isCorrect chỉ được
-   * chấm thật lúc submitAttempt). Cũng cập nhật lastActiveAt để tính vào
-   * heartbeat, và kiểm tra timeout trước khi cho ghi (tránh autosave vào 1
-   * lượt thi vừa bị tự động nộp).
-   */
+  // Tự động lưu (Autosave) câu trả lời của thí sinh vào CSDL theo từng câu
   async recordAnswer(userId, attemptId, questionId, selectedAnswerIds) {
     if (!questionId) {
       throw new ApiError(400, 'Thiếu questionId', 'QUESTION_ID_REQUIRED');
@@ -406,12 +346,7 @@ export const examAttemptService = {
     return { attemptId: attempt._id, savedAt: attempt.lastActiveAt };
   },
 
-  /**
-   * Heartbeat giữ phiên "còn sống". Client chỉ nên gọi định kỳ (vd ~15s) khi
-   * tab đang hiển thị (document.visibilityState === 'visible'). Nếu server
-   * phát hiện thí sinh đã idle quá hạn TRƯỚC heartbeat này thì tự nộp bài
-   * ngay và trả rõ autoSubmitReason để client hiển thị thông báo.
-   */
+  // Heartbeat định kỳ duy trì trạng thái hoạt động của ca thi
   async heartbeat(userId, attemptId) {
     const { examCandidate } = await resolveCandidateContext(userId);
 
@@ -434,26 +369,7 @@ export const examAttemptService = {
     };
   },
 
-  /**
-   * Nộp bài — chấm điểm phía server dựa trên Answer.isCorrect thật (không tin
-   * điểm/đúng-sai gửi từ client), ghi CandidateAnswer + Result, đóng ExamAttempt.
-   * Idempotent: nếu lượt thi đã submitted rồi (vd double-click) thì trả lại đúng
-   * Result đã có, không chấm lại / không tạo Result trùng.
-   *
-   * Chấm theo đúng tập câu hỏi trong AttemptQuestion snapshot của lượt thi này
-   * (không phải theo ExamCodeQuestion của phòng ban) — khớp chính xác với những
-   * gì thí sinh đã thực sự nhìn thấy trong lượt thi đó.
-   *
-   * `answersPayload`:
-   *   - Mảng [{questionId, selectedAnswerIds}]: nộp bài bình thường (thí sinh
-   *     tự bấm nộp) — dùng đúng payload FE gửi lên.
-   *   - null/undefined: TỰ ĐỘNG nộp (vd do checkAndAutoSubmitIfInactive gọi) —
-   *     khi đó lấy đáp án từ CandidateAnswer đã autosave trong DB, vì không có
-   *     request nào từ client mang theo đáp án cả.
-   *
-   * `autoSubmitReason`: truyền 'inactive_timeout' khi đây là lượt nộp do hệ
-   * thống tự động phát hiện rời quá lâu, để lưu lại lý do trên ExamAttempt.
-   */
+  // Nộp bài và chấm điểm phía Server (tự động so khớp với đáp án đúng trong CSDL)
   async submitAttempt(userId, attemptId, answersPayload, autoSubmitReason = null) {
     const { exam, examCandidate } = await resolveCandidateContext(userId);
 
@@ -462,6 +378,7 @@ export const examAttemptService = {
       throw new ApiError(404, 'Không tìm thấy lượt thi', 'ATTEMPT_NOT_FOUND');
     }
 
+    // Nếu đã nộp trước đó thì trả về kết quả đã lưu (Idempotent)
     if (attempt.status === ATTEMPT_STATUS.SUBMITTED) {
       const existing = await Result.findOne({ examAttemptId: attempt._id });
       if (existing) {
@@ -492,9 +409,7 @@ export const examAttemptService = {
       correctByQuestion.get(key).add(a._id.toString());
     }
 
-    // Nếu có payload từ client thì dùng payload đó (nộp bài bình thường).
-    // Nếu không (tự động nộp do timeout) thì lấy đáp án đã autosave trong DB —
-    // đây chính là lý do autosave (recordAnswer) phải tồn tại từ trước.
+    // Lấy đáp án từ payload client gửi lên hoặc fallback từ CandidateAnswer đã autosave
     const answersMap = new Map();
     if (Array.isArray(answersPayload)) {
       for (const item of answersPayload) {
@@ -511,6 +426,7 @@ export const examAttemptService = {
       }
     }
 
+    // So khớp đáp án và tính điểm
     let correctCount = 0;
     const candidateAnswerDocs = [];
     for (const s of snapshot) {
@@ -530,8 +446,6 @@ export const examAttemptService = {
       });
     }
 
-    // Xoá câu trả lời cũ (autosave hoặc lần nộp trước) để tránh vi phạm unique
-    // index { examAttemptId, questionId } khi ghi lại kết quả chấm chính thức.
     await CandidateAnswer.deleteMany({ examAttemptId: attempt._id });
     if (candidateAnswerDocs.length > 0) {
       await CandidateAnswer.insertMany(candidateAnswerDocs);
@@ -565,20 +479,7 @@ export const examAttemptService = {
     };
   },
 
-  /**
-   * MỚI — Người duyệt đề (leader) cấp thêm 1 lượt thi chính thức cho 1 thí
-   * sinh cụ thể trong 1 kỳ thi cụ thể (xác định qua examCandidateId, KHÔNG
-   * phải employeeId hay examId riêng lẻ — vì 1 employee có thể có nhiều
-   * ExamCandidate ở các kỳ thi khác nhau).
-   *
-   * Đây chỉ là CẤP QUYỀN — không tự tạo ExamAttempt mới. Thí sinh vẫn phải tự
-   * đăng nhập và bấm "Bắt đầu thi" (startAttempt) như bình thường; khi đó
-   * finishedCount < maxAttempts (đã tăng thêm 1) sẽ cho phép tạo lượt mới.
-   *
-   * Không giới hạn số lần cấp — Leader có thể gọi nhiều lần để cấp nhiều lượt
-   * liên tiếp nếu cần. Không cho cấp nếu kỳ thi không còn ở trạng thái
-   * published (không còn ý nghĩa cấp thêm lượt cho kỳ thi đã lưu trữ/chưa mở).
-   */
+  // Leader cấp quyền thêm lượt thi cho một thí sinh cụ thể
   async grantExtraAttempt(examCandidateId, leaderUserId) {
     const examCandidate = await ExamCandidate.findById(examCandidateId).populate('employeeId', 'fullname');
     if (!examCandidate) {
@@ -610,4 +511,4 @@ export const examAttemptService = {
       grantedBy: leaderUserId,
     };
   },
-};
+};

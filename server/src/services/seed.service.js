@@ -1,8 +1,13 @@
+/**
+ * Service Khởi tạo Dữ liệu Mặc định (Seed Data Service).
+ * Tự động tạo các vai trò mặc định (admin, examiner, candidate, leader) và tài khoản Quản trị viên (Admin) lúc khởi động.
+ */
+
 import bcrypt from 'bcryptjs';
 import { env } from '../config/env.js';
 import { Role, User } from '../models/index.js';
 
-/** Mã role mặc định — document trong DB, không enum cứng toàn app */
+// Danh sách các vai trò mặc định của hệ thống
 const DEFAULT_ROLES = [
   {
     code: 'admin',
@@ -26,15 +31,8 @@ const DEFAULT_ROLES = [
   },
 ];
 
+// Khởi tạo danh sách các vai trò nếu chưa tồn tại trong CSDL
 export async function seedRolesIfEmpty() {
-  // MỚI — kiểm tra đã seed đủ role chưa TRƯỚC khi upsert, thay vì luôn bắn
-  // 4 lệnh updateOne mỗi lần server khởi động. Trong dev, node --watch
-  // restart lại toàn bộ process (kể cả connectDatabase + runStartupSeed)
-  // mỗi lần lưu file — nếu 4 role đã tồn tại sẵn từ lâu (trường hợp phổ
-  // biến nhất), việc bắn lại 4 write không cần thiết chỉ làm mỗi lần
-  // restart chậm thêm mà không đổi gì trong DB. Chỉ khi thiếu ít nhất 1
-  // role (lần đầu chạy, hoặc DEFAULT_ROLES vừa thêm role mới) mới cần
-  // upsert đầy đủ như cũ.
   const existingCount = await Role.countDocuments({
     code: { $in: DEFAULT_ROLES.map((r) => r.code) },
   });
@@ -45,6 +43,7 @@ export async function seedRolesIfEmpty() {
   }
 }
 
+// Khởi tạo tài khoản Quản trị viên mặc định theo cấu hình biến môi trường
 export async function seedAdminIfConfigured() {
   if (!env.adminSeedEmail || !env.adminSeedPassword) {
     return { seeded: false, reason: 'ADMIN_SEED_EMAIL/PASSWORD not set' };
@@ -76,6 +75,7 @@ export async function seedAdminIfConfigured() {
   };
 }
 
+// Điều phối toàn bộ quy trình Seed dữ liệu ban đầu
 export async function runStartupSeed({ includeAdmin = true } = {}) {
   await seedRolesIfEmpty();
   const adminResult = includeAdmin

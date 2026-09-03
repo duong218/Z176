@@ -1,12 +1,19 @@
+/**
+ * Service Quản lý Đơn vị / Phòng ban (Department Service).
+ * Hỗ trợ chuẩn hóa tên/mã phòng ban (slug), xử lý tìm kiếm không phân biệt hoa thường/dấu và tự động khôi phục dữ liệu import.
+ */
+
 import { Department } from '../models/index.js';
 import { normalizeDeptName, normalizeDeptCode } from '../models/department.model.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 
+// Lấy danh sách các đơn vị/phòng ban
 export async function listDepartments({ activeOnly = true } = {}) {
   const filter = activeOnly ? { isActive: true } : {};
   return Department.find(filter).sort({ name: 1 }).lean();
 }
 
+// Tạo mới phòng ban thủ công
 export async function createDepartment({ name, code, description }) {
   const trimmed = name?.trim();
   if (!trimmed) {
@@ -27,15 +34,7 @@ export async function createDepartment({ name, code, description }) {
   }
 }
 
-/**
- * Dùng khi tạo bộ phận từ luồng import Excel (câu hỏi/nhân viên): nếu tên
- * hoặc mã trùng với 1 bộ phận đã bị XOÁ MỀM (isActive:false) từ trước thì
- * KHÔI PHỤC LẠI bộ phận đó (bật isActive:true, cập nhật mã/mô tả mới) thay
- * vì báo lỗi "đã tồn tại" — trên giao diện người dùng bấm Xoá thì hiểu là
- * xoá hẳn, không ai biết hệ thống đang xoá mềm, nên báo lỗi trùng ở đây rất
- * khó hiểu và bắt người dùng phải vào tận DB mới gỡ được.
- * Nếu bộ phận trùng tên/mã đang ACTIVE sẵn thì dùng luôn (không đụng gì).
- */
+// Khối xử lý Upsert phòng ban khi Import Excel (tự động khôi phục nếu tên/mã trùng với bản ghi đã xóa mềm)
 export async function upsertDepartmentForImport({ name, code, description }) {
   const trimmedName = name?.trim();
   if (!trimmedName) {
@@ -44,16 +43,11 @@ export async function upsertDepartmentForImport({ name, code, description }) {
   const normalizedCode = code ? normalizeDeptCode(code) : undefined;
   const slug = normalizeDeptName(trimmedName);
 
-  // Tìm theo TÊN trước — kể cả bộ phận đang bị vô hiệu hoá (bỏ filter
-  // isActive so với findDepartmentByName()).
   let dept = await Department.findOne({ slug });
   if (!dept) {
-    // Fallback cho bộ phận cũ tạo trước khi có field slug.
     const candidates = await Department.find({ slug: { $exists: false } });
     dept = candidates.find((d) => normalizeDeptName(d.name) === slug) || null;
   }
-  // Không trùng tên -> thử trùng MÃ (vd người dùng đổi tên khác nhưng mã cũ
-  // vẫn đụng 1 bộ phận đã xoá mềm trước đó).
   if (!dept && normalizedCode) {
     dept = await Department.findOne({ code: normalizedCode });
   }
@@ -63,11 +57,9 @@ export async function upsertDepartmentForImport({ name, code, description }) {
   }
 
   if (dept.isActive) {
-    // Đã tồn tại và đang hoạt động sẵn -> dùng luôn, không tạo trùng.
     return dept.toObject();
   }
 
-  // Bị xoá mềm -> khôi phục, ghi đè bằng thông tin người dùng vừa nhập.
   dept.isActive = true;
   dept.name = trimmedName;
   if (normalizedCode) dept.code = normalizedCode;
@@ -87,14 +79,7 @@ export async function upsertDepartmentForImport({ name, code, description }) {
   return dept.toObject();
 }
 
-/**
- * Tìm phòng ban theo tên — KHÔNG phân biệt hoa/thường, có dấu hay không dấu,
- * khoảng trắng thừa (so khớp qua field `slug` đã chuẩn hoá).
- *
- * Có fallback cho các phòng ban được tạo TRƯỚC KHI field `slug` tồn tại:
- * quét trong bộ nhớ theo `name` chuẩn hoá, và tiện thể backfill `slug` cho
- * document đó để các lần tìm sau nhanh hơn (không cần chạy migration tay).
- */
+// Tìm phòng ban theo tên chuẩn hóa (không phân biệt hoa/thường, không dấu)
 export async function findDepartmentByName(name) {
   const slug = normalizeDeptName(name);
   if (!slug) return null;
@@ -110,17 +95,13 @@ export async function findDepartmentByName(name) {
   if (dept) {
     dept.slug = slug;
     await dept.save().catch(() => {
-      /* backfill best-effort, không chặn luồng chính nếu lỗi */
+      /* backfill best-effort */
     });
   }
   return dept;
 }
 
-/**
- * Tìm phòng ban theo tên (chuẩn hoá dấu/hoa-thường); nếu KHÔNG tìm thấy thì
- * TỰ ĐỘNG TẠO MỚI phòng ban với đúng tên đã nhập. Dùng khi Excel import
- * KHÔNG có cột mã phòng ban (tương thích file mẫu cũ).
- */
+// Tìm hoặc tự động tạo phòng ban mới theo tên
 export async function findOrCreateDepartmentByName(name) {
   const trimmed = name?.trim();
   if (!trimmed) return null;
@@ -128,12 +109,6 @@ export async function findOrCreateDepartmentByName(name) {
   const existing = await findDepartmentByName(trimmed);
   if (existing) return existing;
 
-  // Trùng tên với 1 bộ phận ĐÃ BỊ XOÁ MỀM (isActive:false) — findDepartmentByName()
-  // chỉ tìm bộ phận active nên không thấy được. Import nhân viên tự tạo phòng
-  // ban NGAY LÚC XEM TRƯỚC, không có bước cho người dùng sửa lỗi rồi thử lại
-  // như import câu hỏi, nên ở đây ưu tiên KHÔI PHỤC LẠI bộ phận cũ thay vì báo
-  // lỗi — người dùng xoá bộ phận trên giao diện thì hiểu là xoá hẳn, không
-  // biết đây là xoá mềm.
   const slug = normalizeDeptName(trimmed);
   const inactiveMatch = await Department.findOne({ slug, isActive: false });
   if (inactiveMatch) {
@@ -155,29 +130,14 @@ export async function findOrCreateDepartmentByName(name) {
   }
 }
 
-/**
- * Tìm phòng ban theo MÃ (không phân biệt hoa/thường/dấu — vd "cntt" và
- * "CNTT" luôn là 1 phòng ban).
- */
+// Tìm phòng ban theo mã định danh chuẩn hóa
 export async function findDepartmentByCode(code) {
   const normalizedCode = normalizeDeptCode(code);
   if (!normalizedCode) return null;
   return Department.findOne({ code: normalizedCode, isActive: true });
 }
 
-/**
- * Tìm phòng ban theo MÃ PHÒNG BAN — khoá chính để import Excel xác định
- * phòng ban (vd "CNTT" luôn ra đúng 1 phòng ban dù cột tên ghi "cong nghe
- * thong tin" hay "công nghệ thông tin" ở các dòng khác nhau).
- *
- * - Có mã trùng với phòng ban đã tồn tại -> trả về phòng ban đó (bỏ qua
- *   cột tên, mã là nguồn sự thật).
- * - Chưa có phòng ban nào mang mã này -> thử tìm theo TÊN trước (trường
- *   hợp phòng ban đã được tạo từ lần import trước bằng tên, chưa gắn mã)
- *   để gắn mã vào, tránh tạo trùng phòng ban.
- * - Không tìm thấy theo cả mã và tên -> tự tạo phòng ban mới với tên lấy
- *   từ cột "Phòng ban" (nếu có), hoặc dùng chính mã làm tên tạm.
- */
+// Tìm hoặc tự tạo phòng ban theo mã và tên khi Import Excel
 export async function findOrCreateDepartmentByCode({ code, name }) {
   const normalizedCode = normalizeDeptCode(code);
   if (!normalizedCode) return null;
@@ -192,19 +152,13 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
       if (!byName.code) {
         byName.code = normalizedCode;
         await byName.save().catch(() => {
-          /* nếu mã bị trùng với phòng ban khác do race condition, giữ
-           * nguyên phòng ban tìm theo tên, không chặn luồng import */
+          /* best-effort assignment */
         });
       }
       return byName;
     }
   }
 
-  // Trước khi tạo mới, kiểm tra xem có bộ phận nào ĐÃ BỊ XOÁ MỀM đang giữ
-  // đúng mã hoặc đúng tên này không -> khôi phục lại (giống hành vi
-  // findOrCreateDepartmentByName ở trên), thay vì tạo mới sẽ đụng unique
-  // index rồi vỡ ra lỗi Mongo thô — import nhân viên tự tạo phòng ban ngay
-  // lúc xem trước, không có bước sửa lỗi rồi thử lại như import câu hỏi.
   const inactiveMatch =
     (await Department.findOne({ code: normalizedCode, isActive: false })) ||
     (trimmedName
@@ -218,8 +172,7 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
       await inactiveMatch.save();
       return inactiveMatch;
     } catch {
-      /* mã bị trùng bộ phận khác do race condition -> rơi xuống nhánh tạo
-       * mới bên dưới, để logic 11000 ở đó xử lý tiếp */
+      /* fallback on race condition */
     }
   }
 
@@ -231,7 +184,6 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
     return doc;
   } catch (err) {
     if (err.code === 11000) {
-      // Race condition: dòng import khác cùng lúc tạo phòng ban với mã này.
       const dept = await findDepartmentByCode(normalizedCode);
       if (dept) return dept;
     }
@@ -239,6 +191,7 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
   }
 }
 
+// Cập nhật thông tin phòng ban
 export async function updateDepartment(id, { name, code, description, isActive } = {}) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
@@ -265,9 +218,7 @@ export async function updateDepartment(id, { name, code, description, isActive }
   return dept.toObject();
 }
 
-// Xóa mềm: chỉ tắt isActive, KHÔNG xóa hẳn khỏi DB, vì Question/Employee/
-// ExamCandidate... có thể đang tham chiếu departmentId tới bộ phận này. Xóa
-// cứng sẽ để lại dữ liệu mồ côi hoặc gãy tham chiếu.
+// Ngừng sử dụng (xóa mềm) phòng ban để bảo toàn liên kết khóa ngoại
 export async function deactivateDepartment(id) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
@@ -276,6 +227,7 @@ export async function deactivateDepartment(id) {
   return { id: dept._id.toString(), isActive: false };
 }
 
+// Lấy thông tin chi tiết phòng ban theo ID
 export async function getDepartmentById(id) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');

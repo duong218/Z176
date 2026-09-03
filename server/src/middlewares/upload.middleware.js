@@ -1,3 +1,8 @@
+/**
+ * Middleware xử lý Upload tập tin sử dụng Multer.
+ * Hỗ trợ upload file Excel (ngân hàng câu hỏi/danh sách nhân viên), tài liệu ôn tập (PDF/Word/Excel) và ảnh câu hỏi (Cloudinary).
+ */
+
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
@@ -6,7 +11,9 @@ import { ApiError } from '../utils/api-error.js';
 
 const MAX_EXCEL_BYTES = 5 * 1024 * 1024;
 const MAX_STUDY_DOCUMENT_BYTES = 20 * 1024 * 1024; // 20MB
+const MAX_QUESTION_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
 
+// Đảm bảo thư mục lưu trữ cục bộ tồn tại
 function ensureUploadDir() {
   const dir = path.resolve(env.uploadDir);
   if (!fs.existsSync(dir)) {
@@ -15,6 +22,7 @@ function ensureUploadDir() {
   return dir;
 }
 
+// Cấu hình lưu trữ trên ổ đĩa cho file tạm (Excel, tài liệu)
 const storage = multer.diskStorage({
   destination(_req, _file, cb) {
     cb(null, ensureUploadDir());
@@ -25,6 +33,7 @@ const storage = multer.diskStorage({
   },
 });
 
+// --- Khối xử lý Upload File Excel (Import) ---
 function excelFilter(_req, file, cb) {
   const ok =
     file.mimetype ===
@@ -45,9 +54,7 @@ export const uploadExcel = multer({
   fileFilter: excelFilter,
 }).single('file');
 
-// MỚI — Upload tài liệu ôn tập: PDF/Word/Excel, tối đa 20MB. Dùng chung
-// `storage` (diskStorage vào env.uploadDir) với uploadExcel — tên file được
-// đặt tiền tố timestamp nên không đụng nhau dù cùng thư mục.
+// --- Khối xử lý Upload Tài liệu ôn tập (PDF / Word / Excel) ---
 const STUDY_DOCUMENT_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -84,11 +91,8 @@ export const uploadStudyDocument = multer({
   fileFilter: studyDocumentFilter,
 }).single('file');
 
-// MỚI — Upload ảnh câu hỏi (đề bài). memoryStorage (KHÔNG diskStorage như
-// Excel/tài liệu) vì cần buffer trong RAM để hash SHA-256 làm public_id
-// Cloudinary rồi upload thẳng lên, không lưu file tạm trên đĩa server.
+// --- Khối xử lý Upload Ảnh câu hỏi (Lưu RAM buffer trước khi đẩy lên Cloudinary) ---
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
-const MAX_QUESTION_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
 
 function questionImageFilter(_req, file, cb) {
   const nameLower = file.originalname.toLowerCase();

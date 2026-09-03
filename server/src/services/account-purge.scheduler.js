@@ -1,9 +1,15 @@
+/**
+ * Tiến trình lập lịch Xóa tài khoản Khóa lâu ngày (Account Purge Scheduler).
+ * Tự động chạy định kỳ lúc 04:00 sáng mỗi ngày để dọn dẹp các tài khoản rác bị khóa liên tục > 6 tháng.
+ */
+
 import cron from 'node-cron';
 import { purgeExpiredLockedAccounts } from './account-purge.service.js';
 
 const CRON_EXPRESSION = '0 4 * * *'; // 04:00 mỗi ngày — sau backup (03:00), trước giờ hành chính
 const TIMEZONE = 'Asia/Ho_Chi_Minh';
 
+// Hàm thực thi tác vụ xóa tài khoản hết hạn khóa
 async function runAccountPurge() {
   try {
     const { purgedCount, purgedUsernames, skippedWithHistoryCount } = await purgeExpiredLockedAccounts();
@@ -18,15 +24,14 @@ async function runAccountPurge() {
       );
     }
   } catch (err) {
-    // Cron lỗi không được làm crash server
     console.error('[account-purge] Xóa cứng tài khoản khóa lâu ngày thất bại:', err.message);
   }
 }
 
-/** Gọi 1 lần khi server khởi động (trong src/index.js), đăng ký job chạy 04:00 mỗi ngày giờ VN. */
+// Khởi tạo và đăng ký Cron Job khi server khởi động
 export function initAccountPurgeScheduler() {
   cron.schedule(CRON_EXPRESSION, runAccountPurge, { timezone: TIMEZONE });
   console.log(`[account-purge] Đã đăng ký cron xóa cứng tài khoản khóa lâu: "${CRON_EXPRESSION}" (${TIMEZONE})`);
 }
 
-export { runAccountPurge };
+export { runAccountPurge };

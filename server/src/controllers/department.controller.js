@@ -1,13 +1,20 @@
+/**
+ * Controller Quản lý Phòng ban / Đơn vị (Department Management).
+ * Cung cấp các thao tác xem danh sách, tạo mới, cập nhật và ngừng sử dụng phòng ban.
+ */
+
 import * as departmentService from '../services/department.service.js';
 import { asyncHandler } from '../utils/async-handler.js';
 import { writeAudit } from '../services/audit.service.js';
 
+// Lấy danh sách phòng ban/đơn vị (hỗ trợ lọc theo trạng thái hoạt động)
 export const list = asyncHandler(async (req, res) => {
   const activeOnly = req.query.activeOnly !== 'false';
   const data = await departmentService.listDepartments({ activeOnly });
   res.json({ success: true, message: 'OK', code: 'DEPARTMENT_LIST_OK', data });
 });
 
+// Tạo mới phòng ban và ghi nhật ký kiểm toán
 export const create = asyncHandler(async (req, res) => {
   const { name, code, description } = req.body ?? {};
   const data = await departmentService.createDepartment({ name, code, description });
@@ -28,6 +35,7 @@ export const create = asyncHandler(async (req, res) => {
   });
 });
 
+// Cập nhật thông tin phòng ban (tên, mã, mô tả, trạng thái hoạt động)
 export const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, code, description, isActive } = req.body ?? {};
@@ -49,6 +57,7 @@ export const update = asyncHandler(async (req, res) => {
   });
 });
 
+// Ngừng kích hoạt (vô hiệu hóa) phòng ban
 export const remove = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const data = await departmentService.deactivateDepartment(id);
