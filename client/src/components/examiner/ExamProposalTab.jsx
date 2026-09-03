@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchMyExamProposals, createExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
-import { FilePlus, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { fetchMyExamProposals, createExamProposal, updateExamProposal, submitForReview, fetchTopics, fetchQuestionStatsByTopic } from '../../services/examiner.service';
+import { FilePlus, Pencil, Send, AlertCircle, AlertTriangle, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useToast } from '../ToastContext';
 import { useConfirm } from '../ConfirmDialog';
 import { useScrollLock } from '../../hooks/useScrollLock';
@@ -110,6 +110,18 @@ function TopicSelect({ value, options, onChange, placeholder = '-- Chọn chủ 
 // hiển thị 10 kỳ thi.
 const PAGE_SIZE = 10;
 
+// MỚI — Giá trị mặc định của form khi mở modal "Tạo đề xuất mới" (tách riêng
+// hằng số để openCreateModal() dùng lại được, tránh lặp lại object literal).
+const DEFAULT_FORM_DATA = {
+  title: '',
+  topicId: '',
+  durationMinutes: 30,
+  totalQuestions: 20,
+  commonQuestionCount: 10,
+  departmentQuestionCount: 10,
+  passThresholdPercent: 70,
+};
+
 export const ExamProposalTab = () => {
   const { showToast } = useToast();
   const confirmAction = useConfirm();
@@ -117,21 +129,17 @@ export const ExamProposalTab = () => {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // MỚI — id của đề đang được SỬA (null = modal đang ở chế độ "tạo mới").
+  // Dùng để form biết gọi updateExamProposal thay vì createExamProposal, và
+  // để đổi tiêu đề/nút bấm của modal cho đúng ngữ cảnh.
+  const [editingExamId, setEditingExamId] = useState(null);
 
   useScrollLock(isModalOpen);
   // MỚI — Trang hiện tại của danh sách đề xuất (phân trang client-side, 10
   // kỳ thi/trang). Reset về trang 1 mỗi khi tải lại danh sách (xem loadData).
   const [page, setPage] = useState(1);
 
-  const [formData, setFormData] = useState({
-    title: '',
-    topicId: '',
-    durationMinutes: 30,
-    totalQuestions: 20,
-    commonQuestionCount: 10,
-    departmentQuestionCount: 10,
-    passThresholdPercent: 70,
-  });
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
 
   // Thống kê số câu hỏi (chung + riêng theo từng bộ phận) của chủ đề đang
   // chọn trong form — dùng để hiển thị gợi ý và validate ngay trên UI, tránh
@@ -199,7 +207,42 @@ export const ExamProposalTab = () => {
     !!formData.topicId &&
     (commonExceedsPool || sumMismatch || infeasibleDepartments.some((d) => d.infeasible));
 
-  const handleCreate = async (e) => {
+  // MỚI — Mở modal ở chế độ "Tạo mới": reset form về mặc định, editingExamId
+  // = null để form biết gọi createExamProposal khi submit.
+  const openCreateModal = () => {
+    setEditingExamId(null);
+    setFormData(DEFAULT_FORM_DATA);
+    setIsModalOpen(true);
+  };
+
+  // MỚI — Mở modal ở chế độ "Chỉnh sửa": nạp sẵn dữ liệu của đề đang chọn
+  // vào form (đúng như dữ liệu hiện có, không phải giá trị mặc định), rồi
+  // mở modal y hệt giao diện tạo mới. topicId có thể là object đã populate
+  // (exam.topicId?.name) hoặc string id tuỳ nơi gọi — chuẩn hoá về string id
+  // để TopicSelect nhận đúng giá trị.
+  const openEditModal = (exam) => {
+    setEditingExamId(exam._id);
+    setFormData({
+      title: exam.title,
+      topicId: exam.topicId?._id ?? exam.topicId ?? '',
+      durationMinutes: exam.durationMinutes,
+      totalQuestions: exam.totalQuestions,
+      commonQuestionCount: exam.commonQuestionCount,
+      departmentQuestionCount: exam.departmentQuestionCount,
+      passThresholdPercent: exam.passThresholdPercent,
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingExamId(null);
+  };
+
+  // ĐỔI — Dùng chung cho cả "Tạo mới" và "Chỉnh sửa": nếu editingExamId có
+  // giá trị thì gọi updateExamProposal (PATCH), ngược lại gọi
+  // createExamProposal (POST) như trước. Cùng 1 validate, cùng 1 payload.
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
     if (!formData.topicId) {
       showToast('Vui lòng chọn chủ đề liên kết cho kỳ thi.', 'warning');
@@ -209,20 +252,26 @@ export const ExamProposalTab = () => {
       showToast('Cấu hình số câu hỏi chưa hợp lệ so với ngân hàng câu hỏi hiện có của chủ đề này. Vui lòng kiểm tra lại phần cảnh báo trong form.', 'warning');
       return;
     }
+    const payload = {
+      ...formData,
+      durationMinutes: Number(formData.durationMinutes),
+      totalQuestions: Number(formData.totalQuestions),
+      commonQuestionCount: Number(formData.commonQuestionCount),
+      departmentQuestionCount: Number(formData.departmentQuestionCount),
+      passThresholdPercent: Number(formData.passThresholdPercent),
+    };
     try {
-      await createExamProposal({
-        ...formData,
-        durationMinutes: Number(formData.durationMinutes),
-        totalQuestions: Number(formData.totalQuestions),
-        commonQuestionCount: Number(formData.commonQuestionCount),
-        departmentQuestionCount: Number(formData.departmentQuestionCount),
-        passThresholdPercent: Number(formData.passThresholdPercent),
-      });
-      setIsModalOpen(false);
-      showToast('Đã tạo đề xuất kỳ thi thành công.', 'success');
+      if (editingExamId) {
+        await updateExamProposal(editingExamId, payload);
+        showToast('Đã lưu thay đổi. Đề xuất đã quay về trạng thái Nháp — nhớ Gửi duyệt lại nhé.', 'success');
+      } else {
+        await createExamProposal(payload);
+        showToast('Đã tạo đề xuất kỳ thi thành công.', 'success');
+      }
+      closeModal();
       loadData();
     } catch (error) {
-      showToast(error.message || 'Lỗi khi tạo đề xuất', 'error');
+      showToast(error.message || (editingExamId ? 'Lỗi khi lưu thay đổi' : 'Lỗi khi tạo đề xuất'), 'error');
     }
   };
 
@@ -307,7 +356,7 @@ export const ExamProposalTab = () => {
           <p className="text-sm text-slate-500">Tạo cấu trúc đề thi và trình Người duyệt đề phê duyệt</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-[#008BC5] hover:bg-sky-600 active:bg-sky-600 text-white rounded-lg font-medium transition-colors w-full sm:w-auto"
         >
           <FilePlus className="w-4 h-4" /> Tạo đề xuất mới
@@ -363,12 +412,20 @@ export const ExamProposalTab = () => {
                 )}
 
                 {(exam.status === 'draft' || exam.status === 'rejected') && (
-                  <button
-                    onClick={() => handleSubmitReview(exam._id)}
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-[#FFFBEB] hover:bg-[#FDECC8] active:bg-[#FDECC8] text-[#92400E] rounded-lg font-medium transition-colors"
-                  >
-                    <Send className="w-4 h-4" /> Gửi duyệt
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEditModal(exam)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 active:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" /> Chỉnh sửa
+                    </button>
+                    <button
+                      onClick={() => handleSubmitReview(exam._id)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-[#FFFBEB] hover:bg-[#FDECC8] active:bg-[#FDECC8] text-[#92400E] rounded-lg font-medium transition-colors"
+                    >
+                      <Send className="w-4 h-4" /> Gửi duyệt
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -409,12 +466,20 @@ export const ExamProposalTab = () => {
                       </td>
                       <td className="p-4 text-right">
                         {(exam.status === 'draft' || exam.status === 'rejected') && (
-                          <button
-                            onClick={() => handleSubmitReview(exam._id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFBEB] hover:bg-[#FDECC8] text-[#92400E] rounded font-medium transition-colors"
-                          >
-                            <Send className="w-4 h-4" /> Gửi duyệt
-                          </button>
+                          <div className="inline-flex gap-2">
+                            <button
+                              onClick={() => openEditModal(exam)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-medium transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" /> Chỉnh sửa
+                            </button>
+                            <button
+                              onClick={() => handleSubmitReview(exam._id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFBEB] hover:bg-[#FDECC8] text-[#92400E] rounded font-medium transition-colors"
+                            >
+                              <Send className="w-4 h-4" /> Gửi duyệt
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -458,9 +523,11 @@ export const ExamProposalTab = () => {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50">
           <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
             <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-800">Tạo đề xuất kỳ thi mới</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800">
+                {editingExamId ? 'Chỉnh sửa đề xuất kỳ thi' : 'Tạo đề xuất kỳ thi mới'}
+              </h2>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="text-slate-400 hover:text-slate-600 p-2 -mr-2 min-h-[40px] min-w-[40px] flex items-center justify-center"
               >
                 <XCircle className="w-6 h-6" />
@@ -468,7 +535,7 @@ export const ExamProposalTab = () => {
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto" data-lenis-prevent>
-              <form id="createExamForm" onSubmit={handleCreate} className="space-y-4">
+              <form id="createExamForm" onSubmit={handleSubmitForm} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tên kỳ thi</label>
                   <input required type="text" className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
@@ -576,12 +643,12 @@ export const ExamProposalTab = () => {
             </div>
 
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-3 shrink-0">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-3 min-h-[46px] bg-slate-200 hover:bg-slate-300 active:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
+              <button type="button" onClick={closeModal} className="px-4 py-3 min-h-[46px] bg-slate-200 hover:bg-slate-300 active:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors">
                 Hủy
               </button>
               <button type="submit" form="createExamForm" disabled={hasBlockingError}
                 className="px-4 py-3 min-h-[46px] bg-[#008BC5] hover:bg-sky-600 active:bg-sky-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#008BC5]">
-                Lưu đề xuất
+                {editingExamId ? 'Lưu thay đổi' : 'Lưu đề xuất'}
               </button>
             </div>
           </div>

@@ -179,6 +179,15 @@ export async function createExamProposal(payload) {
   return res.data;
 }
 
+export async function updateExamProposal(examId, payload) {
+  const res = await apiRequest(`/exams/${examId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
 export async function submitForReview(examId) {
   const res = await apiRequest(`/exams/${examId}/submit`, {
     method: 'POST',

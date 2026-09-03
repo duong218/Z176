@@ -44,6 +44,23 @@ export const examController = {
     res.status(201).json({ success: true, message: 'Tạo đề xuất thành công', data });
   }),
 
+  // Examiner sửa lại đề xuất của mình (áp dụng cho đề đang ở trạng thái
+  // draft hoặc rejected) — đề tự động quay về draft sau khi sửa.
+  update: asyncHandler(async (req, res) => {
+    const data = await examService.updateExamProposal(req.params.id, req.body, req.auth.userId);
+
+    await writeAudit({
+      actorUserId: req.auth.userId,
+      action: 'UPDATE_EXAM',
+      resourceType: 'Exam',
+      resourceId: data._id,
+      metadata: { detail: `Chỉnh sửa đề xuất kỳ thi: ${data.title}` },
+      ipAddress: clientIp(req),
+    });
+
+    res.json({ success: true, message: 'Đã lưu thay đổi', data });
+  }),
+
   // Examiner nộp bản thảo đề xuất kỳ thi lên cấp trên chờ duyệt
   submit: asyncHandler(async (req, res) => {
     const data = await examService.submitExamForReview(req.params.id, req.auth.userId);

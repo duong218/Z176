@@ -18,6 +18,7 @@ const ACTION_LABELS = {
   EXPORT_CANDIDATE_CREDENTIALS: 'Xuất danh sách tài khoản nhân viên',
   // Đề thi
   CREATE_EXAM: 'Tạo đề thi',
+  UPDATE_EXAM: 'Chỉnh sửa đề xuất kỳ thi',
   SUBMIT_EXAM: 'Gửi đề thi để phê duyệt',
   APPROVE_EXAM: 'Duyệt đề thi',
   REJECT_EXAM: 'Từ chối đề thi',

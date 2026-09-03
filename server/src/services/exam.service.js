@@ -50,6 +50,42 @@ export const examService = {
     return exam;
   },
 
+  // MỚI — Examiner sửa lại đề xuất của chính mình (áp dụng cho đề đang ở
+  // trạng thái draft hoặc rejected — cùng điều kiện với submitExamForReview).
+  // Sau khi sửa, đề TỰ ĐỘNG quay về draft (kể cả khi đang rejected) và xoá
+  // rejectionReason cũ — vì nội dung đã đổi, lý do từ chối trước đó không
+  // còn phản ánh đúng đề hiện tại nữa. Examiner cần bấm "Gửi duyệt" lại như
+  // bình thường sau khi sửa, KHÔNG tự động gửi duyệt ngay trong hàm này —
+  // để họ có cơ hội xem lại lần cuối trước khi gửi.
+  async updateExamProposal(examId, payload, userId) {
+    const exam = await Exam.findOne({ _id: examId, createdBy: userId });
+    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+
+    if (![EXAM_STATUS.DRAFT, EXAM_STATUS.REJECTED].includes(exam.status)) {
+      throw new ApiError(400, 'Kỳ thi không ở trạng thái hợp lệ để chỉnh sửa', 'EXAM_INVALID_STATUS');
+    }
+
+    const { title, topicId, durationMinutes, totalQuestions, commonQuestionCount, departmentQuestionCount, passThresholdPercent } = payload;
+
+    if (topicId && String(topicId) !== String(exam.topicId)) {
+      const topic = await Topic.findById(topicId);
+      if (!topic) throw new ApiError(404, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
+    }
+
+    exam.title = title;
+    exam.topicId = topicId;
+    exam.durationMinutes = durationMinutes;
+    exam.totalQuestions = totalQuestions;
+    exam.commonQuestionCount = commonQuestionCount;
+    exam.departmentQuestionCount = departmentQuestionCount;
+    exam.passThresholdPercent = passThresholdPercent;
+    exam.status = EXAM_STATUS.DRAFT;
+    exam.rejectionReason = undefined;
+
+    await exam.save();
+    return exam;
+  },
+
   // Examiner gửi duyệt đề xuất kỳ thi -> Chuyển trạng thái sang PENDING_REVIEW và bắn thông báo tới Leader
   async submitExamForReview(examId, userId) {
     const exam = await Exam.findOne({ _id: examId, createdBy: userId });
