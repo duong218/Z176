@@ -605,6 +605,7 @@ export const AccountTab = ({ currentUser }) => {
                   <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
                     user.roleCode === 'admin' ? 'bg-purple-100 text-purple-700' :
                     user.roleCode === 'examiner' ? 'bg-blue-100 text-blue-700' :
+                    user.roleCode === 'leader' ? 'bg-emerald-100 text-emerald-700' :
                     'bg-slate-100 text-slate-700'
                   }`}>
                     {user.roleName || user.roleCode}
@@ -679,6 +680,7 @@ export const AccountTab = ({ currentUser }) => {
               <span className={`px-2.5 py-1 rounded-full text-sm font-medium ${
                 user.roleCode === 'admin' ? 'bg-purple-100 text-purple-700' :
                 user.roleCode === 'examiner' ? 'bg-blue-100 text-blue-700' :
+                user.roleCode === 'leader' ? 'bg-emerald-100 text-emerald-700' :
                 'bg-slate-100 text-slate-700'
               }`}>
                 {user.roleName || user.roleCode}
