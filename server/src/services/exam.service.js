@@ -8,6 +8,7 @@ import { EXAM_STATUS } from '../models/constants.js';
 import { ApiError } from '../utils/api-error.js';
 import { generateExamCodesAndAssignCandidates } from './exam-code-generation.service.js';
 import { notificationService } from './notification.service.js';
+import { examAttemptService } from './exam-attempt.service.js';
 
 // Khóa phát hành quá hạn (server sập giữa chừng) được coi là đã gỡ.
 const PUBLISH_LOCK_TTL_MS = 10 * 60 * 1000;
@@ -281,6 +282,9 @@ export const examService = {
     try {
       // Sinh mã đề và gán thí sinh (idempotent theo từng nhân viên)
       await generateExamCodesAndAssignCandidates(claimed);
+      // Kỳ thi cũ sắp bị lưu trữ: nộp và chấm các lượt thi còn làm dở của nó (đáp án đã tự lưu) để KHÔNG mất kết quả.
+      const replacedIds = await Exam.find({ status: EXAM_STATUS.PUBLISHED, _id: { $ne: claimed._id } }).distinct('_id');
+      await examAttemptService.finalizeAttemptsForReplacedExams(replacedIds);
       // Lưu trữ kỳ thi published cũ rồi đặt kỳ thi này thành published (có index chặn trùng)
       published = await finalizePublish(claimed._id, lockToken);
     } catch (err) {

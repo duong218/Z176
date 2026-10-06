@@ -35,10 +35,13 @@ const examAttemptSchema = new mongoose.Schema(
     /**
      * Lý do nếu lượt thi bị HỆ THỐNG tự động nộp thay vì thí sinh tự bấm nộp.
      * Để trống (undefined) nếu là nộp bài bình thường.
+     * - inactive_timeout: rời ca thi quá 1 phút.
+     * - exam_replaced: Người duyệt đề đăng kỳ thi mới khi thí sinh đang làm bài -> kỳ thi cũ bị lưu trữ,
+     *   hệ thống nộp và chấm bài với các đáp án đã tự lưu.
      */
     autoSubmitReason: {
       type: String,
-      enum: ['inactive_timeout'],
+      enum: ['inactive_timeout', 'exam_replaced'],
     },
   },
   { timestamps: true },

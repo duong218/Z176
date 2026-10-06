@@ -127,6 +127,33 @@ async function getOfficialAttempts(examCandidateId) {
   }).sort({ createdAt: -1 });
 }
 
+// Tìm lượt thi theo CHÍNH lượt thi đó (thuộc về thí sinh đang đăng nhập), KHÔNG phụ thuộc kỳ thi nào đang published.
+// Cần cho trường hợp kỳ thi bị thay thế giữa chừng: lượt thi cũ vẫn phải nộp/chấm được dù kỳ thi của nó đã lưu trữ.
+async function resolveOwnedAttempt(userId, attemptId) {
+  const employee = await Employee.findOne({ userId });
+  if (!employee) {
+    throw new ApiError(404, 'Tài khoản của bạn chưa được liên kết với hồ sơ nhân viên nào', 'EMPLOYEE_NOT_FOUND');
+  }
+  const attempt = await ExamAttempt.findById(attemptId);
+  const examCandidate = attempt
+    ? await ExamCandidate.findOne({ _id: attempt.examCandidateId, employeeId: employee._id })
+    : null;
+  if (!attempt || !examCandidate) {
+    throw new ApiError(404, 'Không tìm thấy lượt thi', 'ATTEMPT_NOT_FOUND');
+  }
+  const exam = await Exam.findById(examCandidate.examId);
+  if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+  return { employee, examCandidate, exam, attempt };
+}
+
+// Kỳ thi của lượt thi đã không còn published (bị thay thế/lưu trữ) mà lượt thi còn dở -> hệ thống nộp và chấm ngay.
+async function submitIfExamReplaced(attempt, exam, userId) {
+  const open = [ATTEMPT_STATUS.IN_PROGRESS, ATTEMPT_STATUS.EXPIRED].includes(attempt.status);
+  if (!open || exam.status === EXAM_STATUS.PUBLISHED) return attempt;
+  await examAttemptService.submitAttempt(userId, attempt._id.toString(), null, 'exam_replaced');
+  return ExamAttempt.findById(attempt._id);
+}
+
 // Tự động chuyển trạng thái ca thi sang EXPIRED nếu đã quá thời gian làm bài
 async function expireIfNeeded(attempt) {
   if (
@@ -314,22 +341,20 @@ export const examAttemptService = {
       throw new ApiError(400, 'Thiếu questionId', 'QUESTION_ID_REQUIRED');
     }
 
-    const { examCandidate } = await resolveCandidateContext(userId);
+    const owned = await resolveOwnedAttempt(userId, attemptId);
 
-    let attempt = await ExamAttempt.findOne({ _id: attemptId, examCandidateId: examCandidate._id });
-    if (!attempt) {
-      throw new ApiError(404, 'Không tìm thấy lượt thi', 'ATTEMPT_NOT_FOUND');
-    }
-
-    attempt = await expireIfNeeded(attempt);
+    let attempt = await expireIfNeeded(owned.attempt);
+    attempt = await submitIfExamReplaced(attempt, owned.exam, userId);
     attempt = await checkAndAutoSubmitIfInactive(attempt, userId);
 
     if (attempt.status !== ATTEMPT_STATUS.IN_PROGRESS) {
       throw new ApiError(
         400,
-        attempt.autoSubmitReason === 'inactive_timeout'
-          ? 'Bạn đã rời khỏi ca thi quá 1 phút, hệ thống đã tự động nộp bài.'
-          : 'Lượt thi không còn ở trạng thái đang làm bài',
+        attempt.autoSubmitReason === 'exam_replaced'
+          ? 'Kỳ thi đã được thay thế bằng kỳ thi mới, hệ thống đã tự động nộp bài của bạn.'
+          : attempt.autoSubmitReason === 'inactive_timeout'
+            ? 'Bạn đã rời khỏi ca thi quá 1 phút, hệ thống đã tự động nộp bài.'
+            : 'Lượt thi không còn ở trạng thái đang làm bài',
         'ATTEMPT_INVALID_STATUS',
       );
     }
@@ -348,14 +373,10 @@ export const examAttemptService = {
 
   // Heartbeat định kỳ duy trì trạng thái hoạt động của ca thi
   async heartbeat(userId, attemptId) {
-    const { examCandidate } = await resolveCandidateContext(userId);
+    const owned = await resolveOwnedAttempt(userId, attemptId);
 
-    let attempt = await ExamAttempt.findOne({ _id: attemptId, examCandidateId: examCandidate._id });
-    if (!attempt) {
-      throw new ApiError(404, 'Không tìm thấy lượt thi', 'ATTEMPT_NOT_FOUND');
-    }
-
-    attempt = await expireIfNeeded(attempt);
+    let attempt = await expireIfNeeded(owned.attempt);
+    attempt = await submitIfExamReplaced(attempt, owned.exam, userId);
     attempt = await checkAndAutoSubmitIfInactive(attempt, userId);
 
     if (attempt.status === ATTEMPT_STATUS.IN_PROGRESS) {
@@ -371,12 +392,8 @@ export const examAttemptService = {
 
   // Nộp bài và chấm điểm phía Server (tự động so khớp với đáp án đúng trong CSDL)
   async submitAttempt(userId, attemptId, answersPayload, autoSubmitReason = null) {
-    const { exam, examCandidate } = await resolveCandidateContext(userId);
-
-    const attempt = await ExamAttempt.findOne({ _id: attemptId, examCandidateId: examCandidate._id });
-    if (!attempt) {
-      throw new ApiError(404, 'Không tìm thấy lượt thi', 'ATTEMPT_NOT_FOUND');
-    }
+    // Dùng chính kỳ thi của lượt thi (không phải kỳ thi đang published) để vẫn nộp/chấm được khi kỳ thi đã bị thay thế.
+    const { exam, attempt } = await resolveOwnedAttempt(userId, attemptId);
 
     // Nếu đã nộp trước đó thì trả về kết quả đã lưu (Idempotent)
     if (attempt.status === ATTEMPT_STATUS.SUBMITTED) {
@@ -479,6 +496,39 @@ export const examAttemptService = {
     };
   },
 
+  // Gọi khi Người duyệt đề đăng kỳ thi mới, TRƯỚC khi lưu trữ kỳ thi cũ: nộp và chấm mọi lượt thi còn dở của các kỳ thi
+  // sắp bị thay thế (đáp án đã tự lưu) để thí sinh không mất kết quả. Lỗi từng lượt không làm hỏng việc đăng kỳ thi.
+  async finalizeAttemptsForReplacedExams(examIds) {
+    if (!examIds?.length) return { finalized: 0, failed: 0 };
+    const candidates = await ExamCandidate.find({ examId: { $in: examIds } }).select('_id employeeId');
+    if (candidates.length === 0) return { finalized: 0, failed: 0 };
+
+    const attempts = await ExamAttempt.find({
+      examCandidateId: { $in: candidates.map((c) => c._id) },
+      attemptType: ATTEMPT_TYPE.OFFICIAL,
+      status: { $in: [ATTEMPT_STATUS.IN_PROGRESS, ATTEMPT_STATUS.EXPIRED] },
+    });
+    if (attempts.length === 0) return { finalized: 0, failed: 0 };
+
+    const employees = await Employee.find({ _id: { $in: candidates.map((c) => c.employeeId) } }).select('userId');
+    const userByEmployee = new Map(employees.map((e) => [e._id.toString(), e.userId]));
+    const employeeByCandidate = new Map(candidates.map((c) => [c._id.toString(), c.employeeId.toString()]));
+
+    let finalized = 0;
+    let failed = 0;
+    for (const attempt of attempts) {
+      try {
+        const userId = userByEmployee.get(employeeByCandidate.get(attempt.examCandidateId.toString()));
+        await examAttemptService.submitAttempt(userId, attempt._id.toString(), null, 'exam_replaced');
+        finalized += 1;
+      } catch (err) {
+        failed += 1;
+        console.error(`[exam-attempt] Không tự nộp được lượt thi ${attempt._id}: ${err.message}`);
+      }
+    }
+    return { finalized, failed };
+  },
+
   // Leader cấp quyền thêm lượt thi cho một thí sinh cụ thể
   async grantExtraAttempt(examCandidateId, leaderUserId) {
     const examCandidate = await ExamCandidate.findById(examCandidateId).populate('employeeId', 'fullname');
@@ -511,4 +561,4 @@ export const examAttemptService = {
       grantedBy: leaderUserId,
     };
   },
-};
+};

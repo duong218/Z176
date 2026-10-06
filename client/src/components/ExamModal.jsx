@@ -139,6 +139,8 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
   const leaveActiveRef = useRef(false);
 
   const [resultData, setResultData] = useState(null);
+  // Lý do bài bị hệ thống tự nộp: 'inactive_timeout' (rời ca thi) hoặc 'exam_replaced' (kỳ thi bị thay bằng kỳ thi mới)
+  const [autoSubmitReason, setAutoSubmitReason] = useState(null);
 
   const finishingRef = useRef(false);
   // Giữ attemptId mới nhất trong ref để heartbeat/interval luôn đọc đúng giá
@@ -311,6 +313,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         if (cancelled) return;
         if (data?.autoSubmitReason) {
           clearDraftAnswers(currentAttemptId);
+          setAutoSubmitReason(data.autoSubmitReason);
           setStep('auto-submitted');
         }
       } catch {
@@ -436,6 +439,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         if (seq !== answerRequestSeqRef.current) return;
         if (data?.autoSubmitReason) {
           clearDraftAnswers(currentAttemptId);
+          setAutoSubmitReason(data.autoSubmitReason);
           setStep('auto-submitted');
         }
       } catch (err) {
@@ -443,6 +447,7 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
         // ngay giữa lúc client đang gửi câu trả lời — coi như đã tự nộp.
         if (err?.code === 'ATTEMPT_INVALID_STATUS') {
           clearDraftAnswers(currentAttemptId);
+          setAutoSubmitReason(/thay thế/.test(err?.message ?? '') ? 'exam_replaced' : null);
           setStep('auto-submitted');
         }
         // Các lỗi mạng khác: bỏ qua, đáp án vẫn còn trong localStorage draft
@@ -929,15 +934,30 @@ export const ExamModal = ({ isOpen, onClose, currentUser, onOpenLogin }) => {
               <AlertCircle className="w-10 h-10 text-white" />
             </div>
             <h3 className="text-xl font-bold text-[#0F172A]">Bài thi đã bị tự động nộp</h3>
-            <p className="text-sm text-[#334155] max-w-sm">
-              Hệ thống ghi nhận bạn <strong>không có thao tác nào trên trang thi trong hơn 1 phút</strong> — có thể do
-              chuyển sang tab/ứng dụng khác, khoá màn hình, đóng trình duyệt, hoặc mất kết nối mạng. Để đảm bảo tính
-              nghiêm túc của kỳ thi, hệ thống đã tự động nộp bài với các đáp án bạn đã chọn gần nhất trước khi rời đi.
-            </p>
-            <p className="text-sm text-[#334155] max-w-sm">
-              Nếu đây là sự cố ngoài ý muốn (mất mạng, rớt nguồn...) và cần thi lại, vui lòng liên hệ Người duyệt đề
-              để được xem xét cấp phép cho lượt thi mới.
-            </p>
+            {autoSubmitReason === 'exam_replaced' ? (
+              <>
+                <p className="text-sm text-[#334155] max-w-sm">
+                  Người duyệt đề vừa <strong>đăng một kỳ thi mới</strong> nên kỳ thi bạn đang làm đã được lưu trữ. Hệ
+                  thống đã tự động nộp và chấm bài của bạn với các đáp án đã chọn gần nhất; kết quả được lưu trong lịch
+                  sử của bạn.
+                </p>
+                <p className="text-sm text-[#334155] max-w-sm">
+                  Nếu cần làm lại theo kỳ thi mới, vui lòng đóng cửa sổ này và vào thi lại từ trang chủ.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[#334155] max-w-sm">
+                  Hệ thống ghi nhận bạn <strong>không có thao tác nào trên trang thi trong hơn 1 phút</strong> — có thể do
+                  chuyển sang tab/ứng dụng khác, khoá màn hình, đóng trình duyệt, hoặc mất kết nối mạng. Để đảm bảo tính
+                  nghiêm túc của kỳ thi, hệ thống đã tự động nộp bài với các đáp án bạn đã chọn gần nhất trước khi rời đi.
+                </p>
+                <p className="text-sm text-[#334155] max-w-sm">
+                  Nếu đây là sự cố ngoài ý muốn (mất mạng, rớt nguồn...) và cần thi lại, vui lòng liên hệ Người duyệt đề
+                  để được xem xét cấp phép cho lượt thi mới.
+                </p>
+              </>
+            )}
             <button
               onClick={onClose}
               className="mt-2 px-6 py-3 bg-[#334155] text-white font-bold text-base rounded-lg hover:bg-[#1e293b] transition-colors min-touch-target"
