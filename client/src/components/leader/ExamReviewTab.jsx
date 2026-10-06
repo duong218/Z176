@@ -20,6 +20,13 @@ const STATUS_BADGE = {
   archived: { label: 'Đã lưu trữ', className: 'bg-[#F6F8FA] text-[#334155]' },
 };
 
+const nowLocal = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16); // 'YYYY-MM-DDTHH:mm' theo giờ máy
+};
+const isExpired = (exam) => new Date(exam.endDate) <= new Date();
+
 function StatusBadge({ status }) {
   const cfg = STATUS_BADGE[status] || { label: status, className: 'bg-[#F6F8FA] text-[#334155]' };
   return (
@@ -121,7 +128,10 @@ export const ExamReviewTab = () => {
   const handleApprove = async (e) => {
     e.preventDefault();
     try {
-      await approveExam(approveId, { startDate, endDate });
+      await approveExam(approveId, {
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
+      });
       setIsApproveModalOpen(false);
       setStartDate('');
       setEndDate('');
@@ -248,8 +258,11 @@ export const ExamReviewTab = () => {
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0] text-base">
                     {pendingExams.map(exam => (
-                      <tr key={exam._id} className="hover:bg-[#F6F8FA] transition-colors">
-                        <td className="p-4 font-medium text-[#0F172A]">{exam.title}</td>
+                      <tr key={exam._id} className={`transition-colors ${isExpired(exam) ? 'bg-slate-100 text-slate-400' : 'hover:bg-[#F6F8FA]'}`}>
+                        <td className="p-4 font-medium text-[#0F172A]">
+                          {exam.title}
+                          {isExpired(exam) && <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-white">Quá hạn</span>}
+                        </td>
                         <td className="p-4 text-[#334155]">{exam.topicId?.name}</td>
                         <td className="p-4 text-[#334155] text-sm">
                           <div>Tgian: {exam.durationMinutes}p | Qua: {exam.passThresholdPercent}%</div>
@@ -275,9 +288,12 @@ export const ExamReviewTab = () => {
             {/* Mobile Card List */}
             <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '0ms' }}>
               {pendingExams.map(exam => (
-                <div key={exam._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
+                <div key={exam._id} className={`p-4 rounded-xl border border-[#E2E8F0] space-y-3 ${isExpired(exam) ? 'bg-slate-100' : 'bg-white'}`}>
                   <div>
-                    <div className="font-bold text-[#0F172A] text-base">{exam.title}</div>
+                    <div className="font-bold text-[#0F172A] text-base">
+                      {exam.title}
+                      {isExpired(exam) && <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-white">Quá hạn</span>}
+                    </div>
                     <div className="text-base text-[#64748B]">{exam.topicId?.name}</div>
                   </div>
                   <div className="text-sm text-[#334155] bg-[#F6F8FA] rounded-lg p-2.5">
@@ -328,8 +344,11 @@ export const ExamReviewTab = () => {
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0] text-base">
                     {approvedExams.map(exam => (
-                      <tr key={exam._id} className="hover:bg-[#F6F8FA] transition-colors">
-                        <td className="p-4 font-medium text-[#0F172A]">{exam.title}</td>
+                      <tr key={exam._id} className={`transition-colors ${isExpired(exam) ? 'bg-slate-100 text-slate-400' : 'hover:bg-[#F6F8FA]'}`}>
+                        <td className="p-4 font-medium text-[#0F172A]">
+                          {exam.title}
+                          {isExpired(exam) && <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-white">Quá hạn</span>}
+                        </td>
                         <td className="p-4 text-[#334155]">{exam.topicId?.name}</td>
                         <td className="p-4 text-[#334155] text-sm">
                           <div>Bắt đầu: {new Date(exam.startDate).toLocaleString('vi-VN')}</div>
@@ -346,7 +365,7 @@ export const ExamReviewTab = () => {
                             </button>
                             <button
                               onClick={() => handlePublish(exam._id)}
-                              disabled={publishingId === exam._id || archivingId === exam._id}
+                              disabled={isExpired(exam) || publishingId === exam._id || archivingId === exam._id}
                               className="px-3 py-2 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
                             >
                               <Globe className="w-4 h-4" />
@@ -364,9 +383,12 @@ export const ExamReviewTab = () => {
             {/* Mobile Card List */}
             <div className="animate-fade-in-up sm:hidden space-y-3" style={{ '--stagger-delay': '100ms' }}>
               {approvedExams.map(exam => (
-                <div key={exam._id} className="bg-white p-4 rounded-xl border border-[#E2E8F0] space-y-3">
+                <div key={exam._id} className={`p-4 rounded-xl border border-[#E2E8F0] space-y-3 ${isExpired(exam) ? 'bg-slate-100' : 'bg-white'}`}>
                   <div>
-                    <div className="font-bold text-[#0F172A] text-base">{exam.title}</div>
+                    <div className="font-bold text-[#0F172A] text-base">
+                      {exam.title}
+                      {isExpired(exam) && <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-white">Quá hạn</span>}
+                    </div>
                     <div className="text-base text-[#64748B]">{exam.topicId?.name}</div>
                   </div>
                   <div className="text-sm text-[#334155] bg-[#F6F8FA] rounded-lg p-2.5">
@@ -383,7 +405,7 @@ export const ExamReviewTab = () => {
                     </button>
                     <button
                       onClick={() => handlePublish(exam._id)}
-                      disabled={publishingId === exam._id || archivingId === exam._id}
+                      disabled={isExpired(exam) || publishingId === exam._id || archivingId === exam._id}
                       className="flex-1 h-11 bg-[#008BC5] hover:bg-[#0693E3] text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 text-base disabled:opacity-60 disabled:cursor-not-allowed min-touch-target"
                     >
                       <Globe className="w-4 h-4" />
@@ -557,6 +579,7 @@ export const ExamReviewTab = () => {
                 <input
                   required
                   type="datetime-local"
+                  min={nowLocal()}
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"
@@ -567,6 +590,7 @@ export const ExamReviewTab = () => {
                 <input
                   required
                   type="datetime-local"
+                  min={startDate || nowLocal()}
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="w-full p-2.5 text-base border border-slate-300 rounded-lg focus:border-[#008BC5] outline-none"

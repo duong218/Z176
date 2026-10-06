@@ -206,8 +206,12 @@ export const examService = {
     }
     const start = new Date(startDate);
     const end = new Date(endDate);
-    if (end <= start) {
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
       throw new ApiError(400, 'Ngày kết thúc phải sau ngày bắt đầu', 'EXAM_DATES_INVALID');
+    }
+    // Chỉ nhận hiện tại/tương lai (dung sai 1 phút vì input datetime-local chỉ chính xác tới phút)
+    if (start.getTime() < Date.now() - 60 * 1000) {
+      throw new ApiError(400, 'Thời gian bắt đầu không được ở quá khứ', 'EXAM_DATES_IN_PAST');
     }
 
     // Nguyên tử: chỉ 1 Người duyệt đề thắng khi nhiều người cùng bấm; người đến sau nhận lỗi, không ghi đè, không thông báo trùng.
@@ -267,6 +271,11 @@ export const examService = {
 
   // Công bố kỳ thi chính thức (PUBLISHED): Sinh các bộ mã đề thi, gán thí sinh và lưu trữ kỳ thi cũ
   async publishExam(examId, leaderId) {
+    // Quá hạn = đã duyệt nhưng endDate đã qua -> không cho đăng (tính động, không lưu DB)
+    const pre = await Exam.findById(examId).select('status endDate').lean();
+    if (pre?.status === EXAM_STATUS.APPROVED && pre.endDate && pre.endDate <= new Date()) {
+      throw new ApiError(400, 'Kỳ thi đã quá hạn (thời gian kết thúc đã qua), không thể đăng chính thức', 'EXAM_EXPIRED');
+    }
     // Chiếm khóa phát hành nguyên tử: 2 người cùng đăng 1 đề -> chỉ 1 người vào được; Lưu trữ cũng bị chặn trong lúc này.
     const lockToken = new Date();
     const claimed = await Exam.findOneAndUpdate(
