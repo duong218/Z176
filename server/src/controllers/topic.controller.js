@@ -99,4 +99,4 @@ export const remove = asyncHandler(async (req, res) => {
     code: 'TOPIC_DEACTIVATED',
     data,
   });
-});
+});

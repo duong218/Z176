@@ -768,4 +768,4 @@ export async function getQuestionStatsByTopic(topicId) {
       count: countByDeptId.get(dept._id.toString()) ?? 0,
     })),
   };
-}
+}

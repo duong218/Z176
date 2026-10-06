@@ -9,6 +9,68 @@ import { ApiError } from '../utils/api-error.js';
 import { generateExamCodesAndAssignCandidates } from './exam-code-generation.service.js';
 import { notificationService } from './notification.service.js';
 
+// Khóa phát hành quá hạn (server sập giữa chừng) được coi là đã gỡ.
+const PUBLISH_LOCK_TTL_MS = 10 * 60 * 1000;
+
+function publishLockFree() {
+  return {
+    $or: [
+      { publishLockedAt: { $exists: false } },
+      { publishLockedAt: null },
+      { publishLockedAt: { $lt: new Date(Date.now() - PUBLISH_LOCK_TTL_MS) } },
+    ],
+  };
+}
+
+// findOneAndUpdate không khớp: phân biệt "không tồn tại" (404) với "đã bị người khác xử lý" (409).
+async function buildTransitionError(examId, expectedStatuses, message) {
+  const current = await Exam.findById(examId).select('status').lean();
+  if (!current) return new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
+  if (expectedStatuses.includes(current.status)) {
+    return new ApiError(
+      409,
+      'Kỳ thi vừa được thay đổi ở nơi khác. Vui lòng tải lại danh sách rồi thử lại.',
+      'EXAM_CONFLICT',
+    );
+  }
+  return new ApiError(400, message, 'EXAM_INVALID_STATUS');
+}
+
+// Bước cuối của phát hành: lưu trữ kỳ thi published cũ rồi đặt kỳ thi này thành published.
+// Index duy nhất 'uniq_single_published_exam' đảm bảo không bao giờ có 2 kỳ thi published; nếu 2 kỳ thi khác nhau
+// được đăng sát nhau thì kỳ thi sau lưu trữ kỳ thi trước ("đăng mới đè đăng cũ") và thử lại.
+async function finalizePublish(examId, lockToken) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await Exam.updateMany(
+      { status: EXAM_STATUS.PUBLISHED, _id: { $ne: examId } },
+      { $set: { status: EXAM_STATUS.ARCHIVED }, $inc: { __v: 1 } },
+    );
+    try {
+      const published = await Exam.findOneAndUpdate(
+        { _id: examId, status: EXAM_STATUS.APPROVED, publishLockedAt: lockToken },
+        {
+          $set: { status: EXAM_STATUS.PUBLISHED, publishedAt: new Date() },
+          $unset: { publishLockedAt: 1 },
+          $inc: { __v: 1 },
+        },
+        { new: true },
+      );
+      if (!published) {
+        throw await buildTransitionError(examId, [EXAM_STATUS.APPROVED], 'Kỳ thi không còn ở trạng thái chờ phát hành');
+      }
+      return published;
+    } catch (err) {
+      if (err?.code === 11000) continue; // vừa có kỳ thi khác được đăng -> lưu trữ nó rồi thử lại
+      throw err;
+    }
+  }
+  throw new ApiError(
+    409,
+    'Đang có kỳ thi khác được đăng chính thức cùng lúc. Vui lòng tải lại danh sách rồi thử lại.',
+    'EXAM_PUBLISH_CONFLICT',
+  );
+}
+
 export const examService = {
   // Lấy danh sách kỳ thi theo bộ lọc (trạng thái, người tạo, chủ đề)
   async listExams(filters = {}) {
@@ -82,7 +144,19 @@ export const examService = {
     exam.status = EXAM_STATUS.DRAFT;
     exam.rejectionReason = undefined;
 
-    await exam.save();
+    try {
+      await exam.save();
+    } catch (err) {
+      // Đề vừa bị thao tác khác thay đổi (vd gửi duyệt từ tab khác) trong lúc đang sửa -> không ghi đè lặng lẽ.
+      if (err?.name === 'VersionError') {
+        throw new ApiError(
+          409,
+          'Đề xuất vừa được thay đổi ở nơi khác (có thể đã được gửi duyệt từ tab hoặc thiết bị khác). Vui lòng tải lại danh sách rồi thử lại.',
+          'EXAM_CONFLICT',
+        );
+      }
+      throw err;
+    }
     return exam;
   },
 
@@ -95,16 +169,33 @@ export const examService = {
       throw new ApiError(400, 'Kỳ thi không ở trạng thái hợp lệ để gửi duyệt', 'EXAM_INVALID_STATUS');
     }
 
-    exam.status = EXAM_STATUS.PENDING_REVIEW;
-    await exam.save();
+    // Nguyên tử: chỉ chuyển được khi đề VẪN ở draft/rejected và CHƯA bị sửa kể từ lúc đọc (khớp __v).
+    // Hai lần nộp đồng thời (double-click) -> chỉ 1 lần thắng, không tạo thông báo trùng cho Leader.
+    const submitted = await Exam.findOneAndUpdate(
+      {
+        _id: exam._id,
+        createdBy: userId,
+        status: { $in: [EXAM_STATUS.DRAFT, EXAM_STATUS.REJECTED] },
+        __v: exam.__v,
+      },
+      { $set: { status: EXAM_STATUS.PENDING_REVIEW }, $inc: { __v: 1 } },
+      { new: true },
+    );
+    if (!submitted) {
+      throw await buildTransitionError(
+        exam._id,
+        [EXAM_STATUS.DRAFT, EXAM_STATUS.REJECTED],
+        'Kỳ thi không ở trạng thái hợp lệ để gửi duyệt',
+      );
+    }
 
     try {
-      await notificationService.notifyExamSubmitted(exam);
+      await notificationService.notifyExamSubmitted(submitted);
     } catch (err) {
       console.error('notifyExamSubmitted failed:', err);
     }
 
-    return exam;
+    return submitted;
   },
 
   // Leader phê duyệt kỳ thi (APPROVED) và ấn định khung thời gian thi
@@ -118,18 +209,24 @@ export const examService = {
       throw new ApiError(400, 'Ngày kết thúc phải sau ngày bắt đầu', 'EXAM_DATES_INVALID');
     }
 
-    const exam = await Exam.findById(examId);
-    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
-    if (exam.status !== EXAM_STATUS.PENDING_REVIEW) {
-      throw new ApiError(400, 'Kỳ thi không ở trạng thái chờ duyệt', 'EXAM_INVALID_STATUS');
+    // Nguyên tử: chỉ 1 Người duyệt đề thắng khi nhiều người cùng bấm; người đến sau nhận lỗi, không ghi đè, không thông báo trùng.
+    const exam = await Exam.findOneAndUpdate(
+      { _id: examId, status: EXAM_STATUS.PENDING_REVIEW },
+      {
+        $set: {
+          status: EXAM_STATUS.APPROVED,
+          startDate: start,
+          endDate: end,
+          approvedBy: leaderId,
+          approvedAt: new Date(),
+        },
+        $inc: { __v: 1 },
+      },
+      { new: true },
+    );
+    if (!exam) {
+      throw await buildTransitionError(examId, [EXAM_STATUS.PENDING_REVIEW], 'Kỳ thi không ở trạng thái chờ duyệt');
     }
-
-    exam.status = EXAM_STATUS.APPROVED;
-    exam.startDate = start;
-    exam.endDate = end;
-    exam.approvedBy = leaderId;
-    exam.approvedAt = new Date();
-    await exam.save();
 
     try {
       await notificationService.notifyExamApproved(exam);
@@ -146,16 +243,17 @@ export const examService = {
       throw new ApiError(400, 'Vui lòng cung cấp lý do từ chối', 'REASON_REQUIRED');
     }
 
-    const exam = await Exam.findById(examId);
-    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
-    if (exam.status !== EXAM_STATUS.PENDING_REVIEW) {
-      throw new ApiError(400, 'Kỳ thi không ở trạng thái chờ duyệt', 'EXAM_INVALID_STATUS');
+    const exam = await Exam.findOneAndUpdate(
+      { _id: examId, status: EXAM_STATUS.PENDING_REVIEW },
+      {
+        $set: { status: EXAM_STATUS.REJECTED, rejectionReason: rejectionReason.trim(), approvedBy: leaderId },
+        $inc: { __v: 1 },
+      },
+      { new: true },
+    );
+    if (!exam) {
+      throw await buildTransitionError(examId, [EXAM_STATUS.PENDING_REVIEW], 'Kỳ thi không ở trạng thái chờ duyệt');
     }
-
-    exam.status = EXAM_STATUS.REJECTED;
-    exam.rejectionReason = rejectionReason;
-    exam.approvedBy = leaderId;
-    await exam.save();
 
     try {
       await notificationService.notifyExamRejected(exam);
@@ -168,45 +266,56 @@ export const examService = {
 
   // Công bố kỳ thi chính thức (PUBLISHED): Sinh các bộ mã đề thi, gán thí sinh và lưu trữ kỳ thi cũ
   async publishExam(examId, leaderId) {
-    const exam = await Exam.findById(examId);
-    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
-    if (exam.status !== EXAM_STATUS.APPROVED) {
-      throw new ApiError(400, 'Chỉ có thể phát hành kỳ thi đã được duyệt', 'EXAM_INVALID_STATUS');
+    // Chiếm khóa phát hành nguyên tử: 2 người cùng đăng 1 đề -> chỉ 1 người vào được; Lưu trữ cũng bị chặn trong lúc này.
+    const lockToken = new Date();
+    const claimed = await Exam.findOneAndUpdate(
+      { _id: examId, status: EXAM_STATUS.APPROVED, ...publishLockFree() },
+      { $set: { publishLockedAt: lockToken }, $inc: { __v: 1 } },
+      { new: true },
+    );
+    if (!claimed) {
+      throw await buildTransitionError(examId, [EXAM_STATUS.APPROVED], 'Chỉ có thể phát hành kỳ thi đã được duyệt');
     }
 
-    // Sinh mã đề và gán thí sinh
-    await generateExamCodesAndAssignCandidates(exam);
-
-    // Chuyển kỳ thi đang publish trước đó về trạng thái lưu trữ ARCHIVED
-    await Exam.updateMany(
-      { status: EXAM_STATUS.PUBLISHED },
-      { $set: { status: EXAM_STATUS.ARCHIVED } }
-    );
-
-    exam.status = EXAM_STATUS.PUBLISHED;
-    exam.publishedAt = new Date();
-    await exam.save();
+    let published;
+    try {
+      // Sinh mã đề và gán thí sinh (idempotent theo từng nhân viên)
+      await generateExamCodesAndAssignCandidates(claimed);
+      // Lưu trữ kỳ thi published cũ rồi đặt kỳ thi này thành published (có index chặn trùng)
+      published = await finalizePublish(claimed._id, lockToken);
+    } catch (err) {
+      // Lỗi -> gỡ khóa để Người duyệt đề thử lại được ngay
+      await Exam.updateOne(
+        { _id: claimed._id, publishLockedAt: lockToken },
+        { $unset: { publishLockedAt: 1 } },
+      ).catch((releaseErr) => console.error('release publish lock failed:', releaseErr));
+      throw err;
+    }
 
     try {
-      await notificationService.notifyExamPublished(exam, leaderId);
+      await notificationService.notifyExamPublished(published, leaderId);
     } catch (err) {
       console.error('notifyExamPublished failed:', err);
     }
 
-    return exam;
+    return published;
   },
 
   // Lưu trữ (ARCHIVE) một kỳ thi đã duyệt mà Leader quyết định không xuất bản nữa
   async archiveExam(examId, leaderId) {
-    const exam = await Exam.findById(examId);
-    if (!exam) throw new ApiError(404, 'Không tìm thấy kỳ thi', 'EXAM_NOT_FOUND');
-    if (exam.status !== EXAM_STATUS.APPROVED) {
-      throw new ApiError(400, 'Chỉ có thể bỏ qua kỳ thi đang ở trạng thái chờ phát hành', 'EXAM_INVALID_STATUS');
+    // Nguyên tử + không được chen ngang khi đề đang được một Người duyệt đề khác phát hành.
+    const exam = await Exam.findOneAndUpdate(
+      { _id: examId, status: EXAM_STATUS.APPROVED, ...publishLockFree() },
+      { $set: { status: EXAM_STATUS.ARCHIVED, approvedBy: leaderId }, $inc: { __v: 1 } },
+      { new: true },
+    );
+    if (!exam) {
+      throw await buildTransitionError(
+        examId,
+        [EXAM_STATUS.APPROVED],
+        'Chỉ có thể bỏ qua kỳ thi đang ở trạng thái chờ phát hành',
+      );
     }
-
-    exam.status = EXAM_STATUS.ARCHIVED;
-    exam.approvedBy = leaderId;
-    await exam.save();
     return exam;
   },
 

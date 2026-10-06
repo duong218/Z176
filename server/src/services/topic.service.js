@@ -120,4 +120,4 @@ export async function getTopicById(id) {
   const topic = await Topic.findById(id);
   assertFound(topic, 'Không tìm thấy chủ đề', 'TOPIC_NOT_FOUND');
   return topic;
-}
+}
