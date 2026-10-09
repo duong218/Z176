@@ -3,7 +3,14 @@
  * Hỗ trợ chuẩn hóa tên/mã phòng ban (slug), xử lý tìm kiếm không phân biệt hoa thường/dấu và tự động khôi phục dữ liệu import.
  */
 
-import { Department } from '../models/index.js';
+import {
+  Department,
+  Employee,
+  User,
+  ExamCandidate,
+  ExamAttempt,
+  ATTEMPT_STATUS,
+} from '../models/index.js';
 import { normalizeDeptName, normalizeDeptCode } from '../models/department.model.js';
 import { ApiError, assertFound } from '../utils/api-error.js';
 
@@ -191,8 +198,69 @@ export async function findOrCreateDepartmentByCode({ code, name }) {
   }
 }
 
-// Cập nhật thông tin phòng ban
-export async function updateDepartment(id, { name, code, description, isActive } = {}) {
+// Quyết định có cho ngừng sử dụng phòng ban hay không (hàm thuần, dễ test). Trả về null nếu được phép,
+// hoặc { code, message } nếu bị chặn / cần xác nhận. Thứ tự ưu tiên:
+// 1) Có thí sinh của phòng này đang làm bài thi  -> CHẶN, đợi họ nộp bài.
+// 2) Còn nhân viên đang hoạt động                -> CẢNH BÁO, đồng ý (force = true) thì cho ngừng.
+export function evaluateDepartmentDeactivation(
+  deptName,
+  { inProgressAttempts = 0, activeEmployees = 0 } = {},
+  { force = false } = {},
+) {
+  if (inProgressAttempts > 0) {
+    return {
+      code: 'DEPARTMENT_HAS_ACTIVE_ATTEMPT',
+      message: `Không thể ngừng sử dụng bộ phận "${deptName}" vì đang có ${inProgressAttempts} thí sinh đang làm bài thi của bộ phận này. Vui lòng đợi họ nộp bài rồi thử lại.`,
+    };
+  }
+  if (activeEmployees > 0 && force !== true) {
+    return {
+      code: 'DEPARTMENT_HAS_ACTIVE_EMPLOYEES',
+      message: `Bộ phận "${deptName}" vẫn còn ${activeEmployees} nhân viên có tài khoản đang hoạt động. Nếu ngừng sử dụng, họ sẽ không còn thấy bộ phận này để chọn và có thể không vào được kỳ thi theo bộ phận này. Bạn có chắc muốn tiếp tục ngừng sử dụng bộ phận không?`,
+    };
+  }
+  return null;
+}
+
+// Nạp dữ liệu liên quan rồi áp dụng evaluateDepartmentDeactivation; bị chặn/cần xác nhận thì ném ApiError 409.
+async function assertDepartmentDeactivatable(dept, { force = false } = {}) {
+  const employees = await Employee.find({ departmentId: dept._id, isActive: true })
+    .select('_id userId')
+    .lean();
+
+  // "Tài khoản đang hoạt động" = hồ sơ nhân viên còn hoạt động VÀ tài khoản đăng nhập chưa bị khóa.
+  const activeUserIds = new Set(
+    (
+      await User.find({ _id: { $in: employees.map((e) => e.userId) }, isActive: true })
+        .select('_id')
+        .lean()
+    ).map((u) => String(u._id)),
+  );
+  const activeEmployees = employees.filter((e) => activeUserIds.has(String(e.userId)));
+
+  // Lượt thi đang làm dở: ExamAttempt -> ExamCandidate -> Employee (thuộc phòng này).
+  const candidateIds = (
+    await ExamCandidate.find({ employeeId: { $in: employees.map((e) => e._id) } })
+      .select('_id')
+      .lean()
+  ).map((c) => c._id);
+  const inProgressAttempts = candidateIds.length
+    ? await ExamAttempt.countDocuments({
+        examCandidateId: { $in: candidateIds },
+        status: ATTEMPT_STATUS.IN_PROGRESS,
+      })
+    : 0;
+
+  const verdict = evaluateDepartmentDeactivation(
+    dept.name,
+    { inProgressAttempts, activeEmployees: activeEmployees.length },
+    { force },
+  );
+  if (verdict) throw new ApiError(409, verdict.message, verdict.code);
+}
+
+// Cập nhật thông tin phòng ban. force = true: đã xác nhận bỏ qua cảnh báo khi tắt phòng ban (isActive = false).
+export async function updateDepartment(id, { name, code, description, isActive } = {}, { force = false } = {}) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
 
@@ -205,7 +273,11 @@ export async function updateDepartment(id, { name, code, description, isActive }
   }
   if (code !== undefined) dept.code = code?.trim() || undefined;
   if (description !== undefined) dept.description = description?.trim() || '';
-  if (isActive !== undefined) dept.isActive = Boolean(isActive);
+  if (isActive !== undefined) {
+    // Tắt phòng ban qua PATCH cũng phải qua đúng các kiểm tra như khi xóa (tránh lách bằng cách gọi API trực tiếp).
+    if (!isActive && dept.isActive) await assertDepartmentDeactivatable(dept, { force });
+    dept.isActive = Boolean(isActive);
+  }
 
   try {
     await dept.save();
@@ -218,10 +290,12 @@ export async function updateDepartment(id, { name, code, description, isActive }
   return dept.toObject();
 }
 
-// Ngừng sử dụng (xóa mềm) phòng ban để bảo toàn liên kết khóa ngoại
-export async function deactivateDepartment(id) {
+// Ngừng sử dụng (xóa mềm) phòng ban để bảo toàn liên kết khóa ngoại.
+// Bị chặn nếu có thí sinh đang làm bài; cảnh báo nếu còn nhân viên hoạt động (truyền force = true để xác nhận).
+export async function deactivateDepartment(id, { force = false } = {}) {
   const dept = await Department.findById(id);
   assertFound(dept, 'Không tìm thấy bộ phận', 'DEPARTMENT_NOT_FOUND');
+  await assertDepartmentDeactivatable(dept, { force });
   dept.isActive = false;
   await dept.save();
   return { id: dept._id.toString(), isActive: false };
