@@ -279,7 +279,11 @@ export const AuditLogTab = () => {
     return parts.length ? parts.join(' · ') : null;
   };
 
-  const getDetailText = (log) => log.metadata?.detail || log.metadata?.questionId || '-';
+  // Ẩn mã lỗi kỹ thuật dạng "(TOPIC_HAS_ACTIVE_EXAM)" trong chi tiết — người quản lý không cần thấy.
+  const getDetailText = (log) => {
+    const raw = log.metadata?.detail || log.metadata?.questionId;
+    return raw ? String(raw).replace(/\s*\([A-Z][A-Z0-9_]+\)/g, '') : '-';
+  };
 
   return (
     <div className="space-y-4">
