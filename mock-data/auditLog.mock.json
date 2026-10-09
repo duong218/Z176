@@ -1,26 +1,68 @@
 [
   {
     "_id": "65b9a8f1e4b0a1c2d3e4fa01",
-    "actorId": "65b9a8f1e4b0a1c2d3e4f002",
-    "action": "question.create",
-    "targetId": "65b9a8f1e4b0a1c2d3e4f501",
-    "meta": { "topicId": "65b9a8f1e4b0a1c2d3e4f401" },
+    "actorUserId": "65b9a8f1e4b0a1c2d3e4f002",
+    "action": "CREATE_QUESTION",
+    "resourceType": "Question",
+    "resourceId": "65b9a8f1e4b0a1c2d3e4f501",
+    "metadata": {
+      "detail": "Tạo câu hỏi mới",
+      "topicId": "65b9a8f1e4b0a1c2d3e4f401",
+      "scope": "Common"
+    },
+    "ipAddress": "127.0.0.1",
     "createdAt": "2026-06-06T08:00:00.000Z"
   },
   {
     "_id": "65b9a8f1e4b0a1c2d3e4fa02",
-    "actorId": "65b9a8f1e4b0a1c2d3e4f003",
-    "action": "exam.publish",
-    "targetId": "65b9a8f1e4b0a1c2d3e4f701",
-    "meta": { "codeCount": 5 },
+    "actorUserId": "65b9a8f1e4b0a1c2d3e4f003",
+    "action": "PUBLISH_EXAM",
+    "resourceType": "Exam",
+    "resourceId": "65b9a8f1e4b0a1c2d3e4f701",
+    "metadata": {
+      "detail": "Phát hành đề thi chính thức: Kỳ thi chuyên môn định kỳ Q3 - Z176 (Demo)",
+      "examId": "65b9a8f1e4b0a1c2d3e4f701"
+    },
+    "ipAddress": "127.0.0.1",
     "createdAt": "2026-08-20T08:05:00.000Z"
   },
   {
     "_id": "65b9a8f1e4b0a1c2d3e4fa03",
-    "actorId": "65b9a8f1e4b0a1c2d3e4f001",
-    "action": "user.lock",
-    "targetId": "65b9a8f1e4b0a1c2d3e4f005",
-    "meta": { "username": "candidate.demo2" },
+    "actorUserId": "65b9a8f1e4b0a1c2d3e4f001",
+    "action": "LOCK_USER",
+    "resourceType": "User",
+    "resourceId": "65b9a8f1e4b0a1c2d3e4f006",
+    "metadata": {
+      "detail": "Khóa tài khoản candidate.locked_demo",
+      "username": "candidate.locked_demo"
+    },
+    "ipAddress": "127.0.0.1",
     "createdAt": "2026-08-21T09:00:00.000Z"
+  },
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fa04",
+    "actorUserId": "65b9a8f1e4b0a1c2d3e4f002",
+    "action": "DEACTIVATE_DEPARTMENT_BLOCKED",
+    "resourceType": "Department",
+    "resourceId": "65b9a8f1e4b0a1c2d3e4f303",
+    "metadata": {
+      "detail": "Bị chặn ngừng sử dụng bộ phận (DEPARTMENT_HAS_ACTIVE_ATTEMPT): Không thể ngừng sử dụng bộ phận \"Xưởng Dệt may 1\" vì đang có thí sinh đang làm bài thi của bộ phận này."
+    },
+    "ipAddress": "127.0.0.1",
+    "createdAt": "2026-09-02T10:05:00.000Z"
+  },
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fa05",
+    "actorUserId": "65b9a8f1e4b0a1c2d3e4f003",
+    "action": "GRANT_EXTRA_EXAM_ATTEMPT",
+    "resourceType": "ExamCandidate",
+    "resourceId": "65b9a8f1e4b0a1c2d3e4fb02",
+    "metadata": {
+      "detail": "Cấp thêm lượt thi cho thí sinh Hoàng Văn E (demo)",
+      "examId": "65b9a8f1e4b0a1c2d3e4f701",
+      "employeeId": "65b9a8f1e4b0a1c2d3e4f205"
+    },
+    "ipAddress": "127.0.0.1",
+    "createdAt": "2026-09-02T10:20:00.000Z"
   }
 ]

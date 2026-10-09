@@ -13,18 +13,21 @@
 
 | File | Mô tả | Tương ứng model |
 |---|---|---|
-| `users.mock.json` | Tài khoản mẫu (admin, examiner, leader, candidate) kèm thông tin mustChangePassword | `User` |
+| `users.mock.json` | Tài khoản mẫu (admin, examiner, leader, candidate) kèm thông tin mustChangePassword, lockedAt | `User` |
 | `roles.mock.json` | 4 vai trò của hệ thống (admin, examiner, leader, candidate) | `Role` |
 | `employees.mock.json` | Hồ sơ nhân viên tương ứng liên kết với User và phòng ban | `Employee` |
-| `departments.mock.json` | Danh sách phòng ban chuyên môn mẫu | `Department` |
-| `topics.mock.json` | Danh sách chủ đề thi trắc nghiệm mẫu | `Topic` |
-| `questions.mock.json` | Ngân hàng câu hỏi mẫu, phân loại theo độ khó, phạm vi và chủ đề | `Question` |
+| `departments.mock.json` | Danh sách phòng ban chuyên môn mẫu kèm slug chuẩn hóa | `Department` |
+| `topics.mock.json` | Danh sách chủ đề thi trắc nghiệm mẫu kèm mô tả và trạng thái | `Topic` |
+| `questions.mock.json` | Ngân hàng câu hỏi mẫu, phân loại theo độ khó, phạm vi (Common/DepartmentSpecific) và chủ đề | `Question` |
 | `answers.mock.json` | Đáp án của các câu hỏi mẫu tương ứng | `Answer` |
-| `exams.mock.json` | Đề xuất kỳ thi mẫu (draft, published, cấu hình câu hỏi chung/riêng) | `Exam` |
-| `examCandidates.mock.json` | Danh sách thí sinh được phân mã đề tham gia kỳ thi | `ExamCandidate` |
-| `examAttempts.mock.json` | Các lượt thi mẫu của thí sinh (in_progress, submitted, expired) | `ExamAttempt` |
+| `exams.mock.json` | Đề xuất kỳ thi mẫu (draft, published, cấu hình câu hỏi chung/riêng, ngưỡng đạt) | `Exam` |
+| `examCodes.mock.json` | Các biến thể mã đề thi mẫu sinh cho từng cá nhân/phòng ban | `ExamCode` |
+| `examCandidates.mock.json` | Danh sách thí sinh được phân mã đề tham gia kỳ thi kèm số lượt thi bổ sung | `ExamCandidate` |
+| `examAttempts.mock.json` | Các lượt thi mẫu của thí sinh (in_progress, submitted, expired, autoSubmitReason) | `ExamAttempt` |
 | `results.mock.json` | Kết quả thi mẫu, chấm điểm tự động gắn với lượt thi | `Result` |
-| `auditLog.mock.json` | Nhật ký hệ thống mẫu ghi lại các hành động nhạy cảm của người dùng | `AuditLog` |
+| `studyDocuments.mock.json` | Danh mục tài liệu ôn tập lưu trữ máy chủ nội bộ (Common/DepartmentSpecific) | `StudyDocument` |
+| `notifications.mock.json` | Danh sách thông báo in-app gửi cho người dùng | `Notification` |
+| `auditLog.mock.json` | Nhật ký hệ thống mẫu ghi lại các hành động nhạy cảm và các lần bị chặn an toàn | `AuditLog` |
 
 ## Lưu ý kỹ thuật
 

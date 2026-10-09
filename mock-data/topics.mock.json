@@ -1,14 +1,26 @@
 [
   {
     "_id": "65b9a8f1e4b0a1c2d3e4f401",
-    "name": "Kiến thức chung Nhà máy Z176"
+    "name": "Kiến thức chung Nhà máy Z176",
+    "description": "Nội quy, quy chế và các tiêu chuẩn văn hóa doanh nghiệp Z176",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:00:00.000Z",
+    "updatedAt": "2026-06-01T08:00:00.000Z"
   },
   {
     "_id": "65b9a8f1e4b0a1c2d3e4f402",
-    "name": "An toàn lao động và Bảo hộ lao động"
+    "name": "An toàn lao động và Bảo hộ lao động",
+    "description": "Quy tắc an toàn PCCC, an toàn điện và sử dụng bảo hộ lao động",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:00:00.000Z",
+    "updatedAt": "2026-06-01T08:00:00.000Z"
   },
   {
     "_id": "65b9a8f1e4b0a1c2d3e4f403",
-    "name": "Kỹ thuật Dệt may chuyên môn"
+    "name": "Kỹ thuật Dệt may chuyên môn",
+    "description": "Quy trình công nghệ may, tiêu chuẩn đường may và định mức kỹ thuật",
+    "isActive": true,
+    "createdAt": "2026-06-01T08:00:00.000Z",
+    "updatedAt": "2026-06-01T08:00:00.000Z"
   }
 ]

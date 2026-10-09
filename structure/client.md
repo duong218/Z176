@@ -58,12 +58,12 @@ client/
 │   │
 │   ├── components/admin/
 │   │   ├── AccountTab.jsx                  # Tab quản lý tài khoản: CRUD user, tạo inline phòng ban, import Excel 2 bước, xuất Excel credentials, phân role, khóa/mở, reset password, useScrollLock
-│   │   ├── AuditLogTab.jsx                 # Tab nhật ký hệ thống: phân trang, lọc theo action/user/resource/thời gian, chi tiết metadata
+│   │   ├── AuditLogTab.jsx                 # Tab nhật ký hệ thống: phân trang, lọc theo action/user/resource/thời gian, chi tiết metadata, hỗ trợ các action mới (chặn ngừng sử dụng phòng ban/chủ đề)
 │   │   ├── BackupTab.jsx                   # Tab sao lưu & phục hồi: danh sách backup Drive, tạo backup, restore file .gz với progress % và phrase xác nhận
 │   │   └── OverviewTab.jsx                 # Tab tổng quan admin: thống kê tài khoản theo role, kỳ thi active, số lượng câu hỏi
 │   │
 │   ├── components/examiner/
-│   │   ├── DepartmentTab.jsx               # Tab quản lý phòng ban: CRUD phòng ban, mã code, slug, tìm kiếm, ngừng sử dụng/khôi phục, useScrollLock
+│   │   ├── DepartmentTab.jsx               # Tab quản lý phòng ban: CRUD phòng ban, mã code, slug, tìm kiếm, ngừng sử dụng/khôi phục, cơ chế 2 bước cảnh báo/chặn xóa nhầm khi có thí sinh thi hoặc còn nhân viên active, useScrollLock
 │   │   ├── ExamProposalTab.jsx             # Tab đề xuất kỳ thi: tạo mới / chỉnh sửa dự thảo (draft/rejected), cấu hình câu hỏi theo độ khó/phạm vi, thời gian thi, nộp duyệt, useScrollLock
 │   │   ├── OverviewTab.jsx                 # Tab tổng quan examiner: thống kê ngân hàng câu hỏi, chủ đề, trạng thái đề xuất
 │   │   ├── QuestionBankTab.jsx             # Tab ngân hàng câu hỏi: CRUD câu hỏi trắc nghiệm đơn/nhiều đáp án, upload ảnh Cloudinary, import Excel 2 bước, xóa hàng loạt, useScrollLock

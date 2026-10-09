@@ -21,7 +21,7 @@ server/
     │   ├── audit.controller.js                     # Xử lý request tra cứu nhật ký hệ thống (phân trang, lọc theo action/user/resource/thời gian)
     │   ├── auth.controller.js                      # Xử lý request xác thực: đăng nhập, refresh token, đăng xuất, lấy hồ sơ cá nhân (/me), đổi mật khẩu
     │   ├── backup.controller.js                    # Xử lý request sao lưu: danh sách bản lưu trên Drive, tạo sao lưu mới, tải về máy, khôi phục từ file .gz
-    │   ├── department.controller.js                # Xử lý request CRUD phòng ban, mã đơn vị, ngừng sử dụng (xóa mềm) và khôi phục
+    │   ├── department.controller.js                # Xử lý request CRUD phòng ban, mã đơn vị, ngừng sử dụng (xóa mềm), ghi audit log (bao gồm ghi vết khi bị chặn do có người đang thi)
     │   ├── exam.controller.js                      # Xử lý request kỳ thi: tạo dự thảo, chỉnh sửa đề xuất, nộp duyệt, phê duyệt, từ chối, phát hành, lưu trữ, lấy kỳ thi active
     │   ├── exam-attempt.controller.js              # Xử lý request lượt thi: lấy đề thi, bắt đầu/resume, nộp bài, autosave đáp án, heartbeat 15s, cấp thêm lượt
     │   ├── notification.controller.js              # Xử lý request thông báo: danh sách, đếm chưa đọc, đánh dấu đã đọc / đọc tất cả
@@ -86,7 +86,7 @@ server/
     │   ├── backup.service.js                       # Logic sao lưu: mongodump nén .gz, kết nối Google Drive API v3, upload, xoay vòng lưu trữ tối đa 5 bản, khôi phục mongorestore --drop
     │   ├── backup.scheduler.js                     # Cron scheduler: Tự động sao lưu dữ liệu lúc 03:00 hàng ngày (Asia/Ho_Chi_Minh)
     │   ├── upload-cleanup.scheduler.js             # Cron scheduler: Tự động dọn dẹp tệp tin tạm quá 6 giờ trong thư mục upload (chạy mỗi giờ)
-    │   ├── department.service.js                   # Logic phòng ban: CRUD, xóa mềm, tự động khôi phục khi tạo trùng, slugify chuẩn hóa tiếng Việt, đếm nhân viên
+    │   ├── department.service.js                   # Logic phòng ban: CRUD, xóa mềm, tự động khôi phục khi tạo trùng, slugify chuẩn hóa tiếng Việt, cơ chế chặn xóa nhầm (chặn khi có thí sinh thi, cảnh báo khi còn nhân viên active)
     │   ├── exam.service.js                         # Logic kỳ thi: tạo dự thảo, chỉnh sửa đề xuất (draft/rejected → draft), đệ trình duyệt, approve/reject kèm lý do, publish, archive, truy vấn kỳ thi active
     │   ├── exam-attempt.service.js                 # Logic làm bài thi: sinh snapshot câu hỏi xáo trộn, start/resume, autosave, heartbeat giữ phiên, tự nộp khi vắng mặt >1 phút, chấm điểm tự động, cấp thêm lượt thi
     │   ├── exam-code-generation.service.js         # Logic sinh mã đề thi: thuật toán phân bổ câu hỏi chung/riêng theo phòng ban, xáo Fisher-Yates, sinh mã đề và gán thí sinh tự động
@@ -200,8 +200,8 @@ server/
 |---|---|---|---|
 | `GET` | `/api/departments` | Admin, Examiner | Danh sách phòng ban cơ quan (hỗ trợ lọc `activeOnly`). |
 | `POST` | `/api/departments` | Admin, Examiner | Tạo mới phòng ban (kèm mã code và tự động sinh slug). |
-| `PATCH` | `/api/departments/:id` | Admin, Examiner | Cập nhật tên, mã hoặc mô tả phòng ban. |
-| `DELETE` | `/api/departments/:id` | Admin, Examiner | Ngừng sử dụng phòng ban (xóa mềm). |
+| `PATCH` | `/api/departments/:id` | Admin, Examiner | Cập nhật tên, mã, mô tả hoặc trạng thái hoạt động (bảo vệ bằng cơ chế kiểm tra an toàn khi tắt phòng ban). |
+| `DELETE` | `/api/departments/:id` | Admin, Examiner | Ngừng sử dụng phòng ban (xóa mềm; chặn cứng nếu có thí sinh đang thi, cảnh báo nếu còn nhân viên active, hỗ trợ query `force=true`). |
 
 ### 7. `/api/questions` — Ngân hàng Câu hỏi
 | Method | Endpoint | Quyền hạn | Chức năng |

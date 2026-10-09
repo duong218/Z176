@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fc01",
+    "examId": "65b9a8f1e4b0a1c2d3e4f701",
+    "code": "DE-XDM1-NV004",
+    "departmentId": "65b9a8f1e4b0a1c2d3e4f303",
+    "questionSetFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "createdAt": "2026-08-20T08:05:00.000Z",
+    "updatedAt": "2026-08-20T08:05:00.000Z"
+  },
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fc02",
+    "examId": "65b9a8f1e4b0a1c2d3e4f701",
+    "code": "DE-XDM1-NV005",
+    "departmentId": "65b9a8f1e4b0a1c2d3e4f303",
+    "questionSetFingerprint": "f4c8996fb92427ae41e4649b934ca495991b7852b855e3b0c44298fc1c149afb",
+    "createdAt": "2026-08-20T08:05:00.000Z",
+    "updatedAt": "2026-08-20T08:05:00.000Z"
+  }
+]

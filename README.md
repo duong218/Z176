@@ -38,7 +38,7 @@ Hệ thống được phát triển theo mô hình Client-Server phân lớp rõ
     *   **Sao lưu đám mây**: Tự động backup CSDL lên Google Drive lúc 03:00 hàng ngày (giữ tối đa 5 bản lưu xoay vòng) và hỗ trợ khôi phục an toàn.
     *   **Dọn file tạm**: Tự động dọn dẹp file tạm quá 6 tiếng trong thư mục upload mỗi giờ.
     *   **Dọn tài khoản khóa lâu**: Tự động quét và xóa cứng các tài khoản bị khóa liên tục quá 6 tháng không có vết lịch sử thi/audit lúc 04:00 hàng ngày.
-*   **Xử lý tệp tin & Đa phương tiện**: `exceljs` & `xlsx` (đọc/xuất báo cáo Excel chuyên nghiệp); `multer` + `Cloudinary` hỗ trợ tải ảnh minh họa câu hỏi và tài liệu ôn tập.
+*   **Xử lý tệp tin & Đa phương tiện**: `exceljs` & `xlsx` (đọc/xuất báo cáo Excel chuyên nghiệp); `multer` + `Cloudinary` hỗ trợ tải ảnh minh họa câu hỏi; lưu trữ và stream tài liệu ôn tập an toàn trên máy chủ nội bộ.
 
 ---
 
@@ -51,7 +51,7 @@ Hệ thống tổ chức dữ liệu một cách chặt chẽ và lưu trữ tr�
 | **Thông tin tài khoản, cấu trúc tổ chức** | Được import ban đầu qua file Excel chuẩn của nhà máy hoặc do Admin khởi tạo trực tiếp trên giao diện. | **MongoDB Atlas** (Cơ sở dữ liệu đám mây dạng NoSQL). |
 | **Ngân hàng đề thi & Câu hỏi** | Do Người ra đề (`examiner`) biên soạn hoặc import hàng loạt qua Excel, phân loại theo độ khó, chủ đề và phạm vi. | **MongoDB Atlas** (Chứa nội dung văn bản, đáp án và liên kết ảnh). |
 | **Hình ảnh minh họa câu hỏi** | Được tải lên từ máy tính của Người ra đề khi soạn thảo ngân hàng đề. | **Cloudinary** (Lưu trữ và tối ưu hóa hình ảnh đám mây). |
-| **Tài liệu ôn tập (.pdf, .docx, .xlsx)** | Do Người ra đề / Admin tải lên nhằm hỗ trợ thí sinh ôn luyện lý thuyết theo từng phòng ban chuyên môn. | **Cloudinary** (Dạng raw resources, xem/tải trực tuyến qua Stream bảo mật). |
+| **Tài liệu ôn tập (.pdf, .docx, .xlsx)** | Do Người ra đề / Admin tải lên nhằm hỗ trợ thí sinh ôn luyện lý thuyết theo từng phòng ban chuyên môn. | **Đĩa máy chủ nội bộ** (Thư mục uploads, phân quyền và stream trực tuyến có xác thực). |
 | **Kết quả và Lịch sử thi** | Do máy chủ tự động chấm điểm ngay sau khi thí sinh nộp bài hoặc khi ca thi tự động hết giờ. | **MongoDB Atlas** (Bảng kết quả `results` và chi tiết đáp án thí sinh chọn `candidate-answers`). |
 | **Bản sao lưu CSDL (.gz)** | Được hệ thống dump và nén tự động định kỳ 3h sáng hoặc sao lưu thủ công từ giao diện Admin. | **Google Drive** (Lưu trữ an toàn trên Google Drive OAuth2 cá nhân, tự xoay vòng). |
 | **Nhật ký hệ thống (Audit Logs)** | Tự động ghi lại các hành động nhạy cảm của người dùng (tạo/sửa/xóa user, reset mật khẩu, sao lưu, duyệt đề, gỡ tài liệu...). | **MongoDB Atlas** (Bảng `auditlogs` chuẩn hóa tại Controller, phục vụ kiểm toán an ninh). |
@@ -75,7 +75,7 @@ Hệ thống phân chia rõ ràng 4 nhóm vai trò nghiệp vụ khác nhau:
 ```
 
 1.  **Thí sinh (Candidate)**: Học tập tài liệu ôn tập được phân phối riêng cho phòng ban mình, vào phòng thi thực hiện làm bài kiểm tra trắc nghiệm (có tự động lưu đáp án và giữ nhịp heartbeat), tra cứu kết quả thi cá nhân.
-2.  **Người ra đề (Examiner)**: Quản lý phòng ban, chủ đề, biên soạn ngân hàng câu hỏi (đơn/nhiều đáp án, ảnh minh họa), upload tài liệu ôn tập và soạn thảo đề xuất kỳ thi đệ trình lên cấp trên duyệt.
+2.  **Người ra đề (Examiner)**: Quản lý phòng ban (với cơ chế chặn xóa nhầm khi có người thi hoặc còn nhân viên active), chủ đề, biên soạn ngân hàng câu hỏi (đơn/nhiều đáp án, ảnh minh họa), upload tài liệu ôn tập và soạn thảo đề xuất kỳ thi đệ trình lên cấp trên duyệt.
 3.  **Người duyệt đề (Leader)**: Phê duyệt/từ chối đề thi, phát hành kỳ thi chính thức (tự động sinh các mã đề thi ngẫu nhiên cho thí sinh), xem thống kê kết quả thi toàn diện theo kỳ thi / phòng ban, xuất file Excel kết quả, và cấp thêm lượt thi khi cần thiết.
 4.  **Quản trị viên (Admin)**: Quản trị tài khoản (tạo mới, tạo nhanh phòng ban inline, import/export Excel tài khoản kèm mật khẩu tạm, phân quyền, khóa/mở khóa, reset mật khẩu), sao lưu & khôi phục toàn bộ CSDL qua Google Drive, cấu hình logo đơn vị, và theo dõi nhật ký hệ thống (Audit Logs).
 
@@ -85,6 +85,7 @@ Hệ thống phân chia rõ ràng 4 nhóm vai trò nghiệp vụ khác nhau:
 
 *   ⚡ **Hệ thống làm bài thi thông minh**: Tự động lưu đáp án ngay khi chọn (Autosave), đếm ngược thời gian, kiểm tra nhịp tim (Heartbeat 15s/lần) và tự động thu bài nếu thí sinh rời ca thi quá 1 phút.
 *   🎲 **Xáo trộn mã đề ngẫu nhiên**: Khi duyệt phát hành, hệ thống tự động trộn ngẫu nhiên thứ tự câu hỏi và thứ tự các phương án trả lời để tạo ra các mã đề khác nhau cho thí sinh.
+*   🏢 **Quản lý phòng ban & Chặn xóa an toàn**: Tự động tạo/khôi phục phòng ban khi import Excel; cơ chế 2 tầng bảo vệ ngăn chặn ngừng sử dụng phòng ban khi có thí sinh đang thi hoặc cảnh báo xác nhận khi còn nhân viên đang hoạt động.
 *   📊 **Báo cáo & Xuất dữ liệu chuyên nghiệp**: Thống kê tỉ lệ đạt/không đạt trực quan bằng biểu đồ Recharts, xuất báo cáo kết quả và danh sách tài khoản thí sinh ra định dạng Excel chuẩn.
 *   🛡️ **Bảo mật & Kiểm toán toàn diện**: Phát hiện và chặn đăng nhập đồng thời qua `tokenVersion`, rate limit theo `userId` chống nghẽn phòng thi, ghi vết toàn bộ hoạt động nhạy cảm vào Audit Log với nhãn tiếng Việt chuẩn hóa.
 *   💾 **Sao lưu đám mây tự động & Khôi phục an toàn**: Tự động backup CSDL lên Google Drive lúc 3h sáng mỗi ngày, hỗ trợ Admin tải bản sao lưu và khôi phục CSDL trực tiếp có thanh tiến trình % trực quan.

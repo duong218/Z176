@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fd01",
+    "topicId": "65b9a8f1e4b0a1c2d3e4f401",
+    "title": "Tài liệu Văn hóa doanh nghiệp và Quy tắc ứng xử Z176",
+    "filePath": "./uploads/tai_lieu_van_hoa_z176_demo.pdf",
+    "originalFileName": "Tai_Lieu_Van_Hoa_Z176.pdf",
+    "mimeType": "application/pdf",
+    "scope": "Common",
+    "uploadedBy": "65b9a8f1e4b0a1c2d3e4f002",
+    "isActive": true,
+    "createdAt": "2026-06-05T08:00:00.000Z",
+    "updatedAt": "2026-06-05T08:00:00.000Z"
+  },
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fd02",
+    "topicId": "65b9a8f1e4b0a1c2d3e4f403",
+    "title": "Quy trình kỹ thuật may quân trang K67",
+    "filePath": "./uploads/quy_trinh_may_quan_trang_demo.docx",
+    "originalFileName": "Quy_Trinh_May_Quan_Trang.docx",
+    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "scope": "DepartmentSpecific",
+    "departmentId": "65b9a8f1e4b0a1c2d3e4f303",
+    "uploadedBy": "65b9a8f1e4b0a1c2d3e4f002",
+    "isActive": true,
+    "createdAt": "2026-06-05T09:00:00.000Z",
+    "updatedAt": "2026-06-05T09:00:00.000Z"
+  }
+]
