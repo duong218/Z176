@@ -31,6 +31,7 @@ import {
 } from 'recharts';
 import { fetchMyResults } from '../../services/report.service';
 import { fetchMyExam } from '../../services/exam-attempt.service';
+import { getExamEntryState } from '../../components/CTAButton';
 import {
   fetchMyStudyDocuments,
   previewStudyDocument,
@@ -319,7 +320,12 @@ export const CandidateDashboard = ({ onOpenExam, examModalOpen, activeExam }) =>
   const attemptsLeft = examStatus ? Math.max(0, maxAttempts - attemptsForActiveExam) : 0;
   // canTake đã tính cả trường hợp đang có lượt in_progress (được phép vào tiếp
   // dù attemptsLeft có thể hiện 0 sau khi lượt đó tính vào finishedCount).
-  const canStartExam = Boolean(activeExam) && Boolean(examStatus?.canTake);
+  // Khóa nút theo khung giờ kỳ thi (startDate/endDate): kỳ thi đã kết thúc thì dù lượt vẫn 0/1 cũng không cho vào thi.
+  // Lượt đang làm dở (examStatus.attempt) luôn được vào lại để resume/nộp bài — đồng bộ với server (resume được xét trước giờ thi).
+  // Tính lại mỗi lần render; bộ đếm 1 giây phía trên kích hoạt render mỗi giây nên nút tự mờ đúng lúc hết giờ.
+  const entryState = getExamEntryState(activeExam);
+  const timeBlocked = Boolean(activeExam) && !entryState.open && !examStatus?.attempt;
+  const canStartExam = Boolean(activeExam) && Boolean(examStatus?.canTake) && !timeBlocked;
 
   const handleStartExam = () => {
     if (typeof onOpenExam === 'function') {
@@ -710,6 +716,8 @@ export const CandidateDashboard = ({ onOpenExam, examModalOpen, activeExam }) =>
                           Bạn chưa được phân bổ đề thi cho kỳ thi "{activeExam.title}". Vui lòng liên hệ
                           Người ra đề hoặc Quản trị viên để được hỗ trợ.
                         </>
+                      ) : !examStatusErrorCode && timeBlocked ? (
+                        <>{entryState.message}</>
                       ) : examStatusErrorCode && examStatusErrorCode !== 'EXAM_NOT_ACTIVE' ? (
                         <>
                           Không thể tải trạng thái lượt thi ({examStatusErrorCode}). Vui lòng thử tải lại trang, hoặc

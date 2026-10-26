@@ -5,12 +5,27 @@ import { PlayCircle, ArrowRight, Info } from 'lucide-react';
 // - Chưa có activeExam (chưa publish kỳ thi nào) -> không cho vào thi.
 // - Đã có nhưng chưa tới startDate -> chưa bắt đầu, chưa cho vào thi.
 // - Đã quá endDate -> hết thời gian, không cho vào thi nữa.
-function isExamOpenForEntry(activeExam) {
-  if (!activeExam?.startDate || !activeExam?.endDate) return false;
+const formatVN = (value) => new Date(value).toLocaleString('vi-VN');
+
+// Kèm lý do khi chưa được vào — dùng chung cho nút ở trang chủ và nút "VÀO THI CHÍNH THỨC" ở Dashboard thí sinh.
+export function getExamEntryState(activeExam) {
+  if (!activeExam?.startDate || !activeExam?.endDate) {
+    return { open: false, message: 'Hiện tại chưa có kỳ thi nào đang diễn ra.' };
+  }
   const now = Date.now();
   const start = new Date(activeExam.startDate).getTime();
   const end = new Date(activeExam.endDate).getTime();
-  return now >= start && now <= end;
+  if (now < start) {
+    return { open: false, message: `Kỳ thi "${activeExam.title}" chưa bắt đầu. Thời gian bắt đầu: ${formatVN(start)}.` };
+  }
+  if (now > end) {
+    return { open: false, message: `Kỳ thi "${activeExam.title}" đã kết thúc lúc ${formatVN(end)}.` };
+  }
+  return { open: true, message: '' };
+}
+
+function isExamOpenForEntry(activeExam) {
+  return getExamEntryState(activeExam).open;
 }
 
 export const CTAButton = ({ onClick, activeExam }) => {

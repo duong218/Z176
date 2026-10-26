@@ -304,6 +304,25 @@ export const examAttemptService = {
       };
     }
 
+    // Chỉ cho BẮT ĐẦU lượt thi mới trong khung giờ kỳ thi (startDate..endDate). Lượt đang dở (resume ở trên) vẫn được làm tiếp
+    // và nộp sau endDate; lượt bắt đầu sát giờ kết thúc vẫn được làm đủ thời gian làm bài (expiresAt = lúc bắt đầu + thời lượng).
+    const nowMs = Date.now();
+    const fmtVN = (d) => new Date(d).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    if (exam.startDate && nowMs < new Date(exam.startDate).getTime()) {
+      throw new ApiError(
+        403,
+        `Kỳ thi "${exam.title}" chưa bắt đầu. Thời gian bắt đầu: ${fmtVN(exam.startDate)}.`,
+        'EXAM_NOT_STARTED',
+      );
+    }
+    if (exam.endDate && nowMs > new Date(exam.endDate).getTime()) {
+      throw new ApiError(
+        403,
+        `Kỳ thi "${exam.title}" đã kết thúc lúc ${fmtVN(exam.endDate)}, không thể bắt đầu lượt thi mới.`,
+        'EXAM_ENDED',
+      );
+    }
+
     const finishedCount = attempts.filter((a) => a.status !== ATTEMPT_STATUS.IN_PROGRESS).length;
     if (finishedCount >= maxAttempts) {
       throw new ApiError(
