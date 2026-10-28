@@ -69,6 +69,7 @@
 4.  **Giải thích thay đổi:** Tóm tắt ở cấp độ cao tại mỗi bước
 5.  **Ghi lại kết quả:** Thêm phần đánh giá vào `tasks/todo.md`
 6.  **Ghi nhận bài học:** Cập nhật `tasks/lessons.md` sau khi sửa lỗi
+7.  **Đồng bộ tài liệu dự án:** Khi có thay đổi kiến trúc/nghiệp vụ, chủ động cập nhật các file tài liệu nền tảng (`structure/`, `GLOSSARY.md`, `README.md`, `BRS_SRS_Module_Thi_Chuyen_Mon_Z176.md`, `SECURITY_BASELINE.md`, `SECURITY_REPORT.md`) để duy trì tính nhất quán.
 
 ## Nguyên tắc cốt lõi
 

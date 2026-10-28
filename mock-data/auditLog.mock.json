@@ -64,5 +64,18 @@
     },
     "ipAddress": "127.0.0.1",
     "createdAt": "2026-09-02T10:20:00.000Z"
+  },
+  {
+    "_id": "65b9a8f1e4b0a1c2d3e4fa06",
+    "actorUserId": null,
+    "action": "ACCOUNT_PURGE_AUTO",
+    "resourceType": "User",
+    "resourceId": null,
+    "metadata": {
+      "detail": "Tiến trình tự động xóa cứng các tài khoản bị khóa liên tục quá 6 tháng không có lịch sử",
+      "purgedCount": 1
+    },
+    "ipAddress": "127.0.0.1",
+    "createdAt": "2026-09-03T04:00:00.000Z"
   }
 ]

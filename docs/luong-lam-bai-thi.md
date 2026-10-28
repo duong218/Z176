@@ -47,7 +47,7 @@ Thí sinh mở Modal
    │                    (hoặc resume lượt in_progress còn hạn)
    │
    ├─ [3. Làm bài thi]
-   │     ├─ Thí sinh click chọn đáp án -> [4. recordAnswer (Autosave)] lưu tức thì vào DB
+   │     ├─ Thí sinh click chọn đáp án -> [4. recordAnswer (Autosave)] lưu tức thì vào CandidateAnswer
    │     ├─ Tab đang mở -> [5. Heartbeat] gửi mỗi 15s cập nhật lastActiveAt
    │     └─ Rời tab / tắt trình duyệt -> [6. Hai tầng bảo vệ tự động nộp bài]
    │

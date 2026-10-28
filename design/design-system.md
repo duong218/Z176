@@ -14,6 +14,7 @@ Người dùng làm việc/thi chủ yếu trên điện thoại. Toàn bộ h�
 - Bỏ màu nhấn "cyan công nghệ" và "tím điện" khỏi bộ nhận diện chính — hệ thống chỉ dùng đúng 5 màu chức năng: xanh dương (hành động chính), xanh lá (thành công/đạt), đỏ (lỗi/không đạt), vàng-cam (cảnh báo), xám (trung tính) — càng ít màu, người 30–60 tuổi càng dễ ghi nhớ ý nghĩa từng màu
 - Bo góc vừa phải, nhất quán (8–12px) — không dùng bo góc lớn kiểu "mềm mại hiện đại" (16px+) tràn lan, giữ cảm giác nghiêm túc thay vì "trẻ hóa"
 - Shadow tối giản, chỉ 1 mức duy nhất cho card — bỏ hệ thống nhiều lớp độ sâu (Level 0–3), tránh gây rối mắt với người không quen giao diện nhiều lớp
+- Khóa cuộn trang khi mở Overlay (Scroll Lock) — sử dụng hook `useScrollLock` phối hợp với instance singleton `Lenis` (`lib/lenis-instance.js`), tự động khóa cuộn (`lenis.stop()` và `overflow: hidden`) khi mở Modal/Drawer và phục hồi mượt mà khi đóng
 - Typography cỡ chữ lớn hơn mặt bằng chung ứng dụng hiện đại — cỡ chữ nội dung tối thiểu **16px** (không phải 15px), vì người 30–60 tuổi cần cỡ chữ lớn hơn để đọc thoải mái trên điện thoại
 - Icon luôn đi kèm nhãn chữ (text label) — không dùng icon đơn độc không có chữ giải thích, tránh người dùng phải đoán ý nghĩa biểu tượng
 - Layout nhất quán, lặp lại đúng 1 khuôn mẫu cho mỗi loại màn hình — không thay đổi bố cục giữa các phần để giảm gánh nặng học lại cách dùng
@@ -298,3 +299,4 @@ Trên mobile, **không đặt lưới điều hướng cố định trên màn h
 12. **Bottom action bar mobile tối đa 2 nút/hàng** ("Câu trước"/"Câu tiếp"); nút "Nộp bài" và nút mở danh sách câu hỏi đặt tách riêng.
 13. Trạng thái đúng/sai/đạt/không đạt luôn có **cả màu và chữ** đi kèm — không dựa hoàn toàn vào màu sắc để truyền đạt thông tin.
 14. **Sử dụng `ConfirmDialog` (`useConfirm`) và `ToastContext` (`useToast`)** thay cho các hộp thoại pop-up gốc của trình duyệt (`alert`, `confirm`).
+15. **Áp dụng `useScrollLock` cho toàn bộ Modal và Mobile Drawer** để ngăn cuộn trang nền không mong muốn khi tương tác với các lớp phủ giao diện.

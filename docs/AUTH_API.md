@@ -6,7 +6,7 @@ Hệ thống Z176 áp dụng cơ chế xác thực kép thông qua JSON Web Toke
 
 | Method | Path | Xác thực | Mô tả |
 | :--- | :--- | :--- | :--- |
-| **POST** | `/api/auth/login` | Public | Đăng nhập hệ thống. Nhận vào `{ username, password }`. Trả về `accessToken` ở JSON body; set `refreshToken` vào Cookie bảo mật với thuộc tính `httpOnly`, `secure`, `sameSite: 'strict'`. |
+| **POST** | `/api/auth/login` | Public | Đăng nhập hệ thống. Nhận vào `{ username, password }`. Trả về `accessToken` ở JSON body; set `refreshToken` vào Cookie bảo mật với thuộc tính `httpOnly`, `sameSite: 'lax'`, `secure` (production). |
 | **POST** | `/api/auth/refresh` | Cookie | Sử dụng `refreshToken` trong cookie để cấp mới cặp token. Có cơ chế rotate token tự động. |
 | **POST** | `/api/auth/logout` | Bearer | Đăng xuất người dùng. Thu hồi refresh token bằng cách tăng `tokenVersion` trong database của User, xóa cookie. |
 | **GET** | `/api/auth/me` | Bearer | Trả về thông tin chi tiết tài khoản của người dùng hiện tại kèm theo thông tin vai trò (`role`) và hồ sơ nhân viên (`employee`). |

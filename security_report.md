@@ -20,9 +20,9 @@
 | **4. An toàn dữ liệu & Lưu trữ (Data Protection & Storage)** | **88/100** | 🟡 Tốt | Bcrypt hash Salt=12, tài liệu lưu đĩa cục bộ stream xác thực JWT, ảnh Cloudinary hash SHA-256 qua RAM, dọn file rác tự động. |
 | **5. Giám sát & Nhật ký kiểm toán (Audit Logging & Monitoring)** | **90/100** | 🟢 Rất tốt | Ghi vết toàn bộ hành vi nhạy cảm của người dùng và các cron job tự động kèm IP, Actor, Metadata chi tiết. |
 | **6. Sao lưu & Phục hồi thảm họa (Disaster Recovery)** | **92/100** | 🟢 Rất tốt | Tự động sao lưu hàng ngày lúc 03:00 lên Google Drive qua OAuth2, xoay vòng 5 bản, cơ chế xác nhận nghiêm ngặt khi khôi phục (`confirm=RESTORE`). |
-| **7. An ninh hạ tầng & Tầng mạng (Infrastructure & Network)** | **82/100** | 🟡 Khá | Rate limiting đăng nhập & thi cử ở production, CORS whitelist. Cần cấu hình reverse proxy/HTTPS ở tầng môi trường triển khai thực tế. |
+| **7. An ninh hạ tầng & Tầng mạng (Infrastructure & Network)** | **88/100** | 🟢 Rất tốt | Rate limiting phân tách: Đăng nhập theo IP, phòng thi theo **userId** (chống nghẽn NAT phòng thi lớn), Helmet bảo vệ HTTP headers, CORS whitelist. |
 
-> ⭐ **ĐIỂM ĐÁNH GIÁ TRUNG BÌNH TOÀN HỆ THỐNG:** **90.4 / 100 (Hạng A - Sẵn sàng vận hành sản xuất)**
+> ⭐ **ĐIỂM ĐÁNH GIÁ TRUNG BÌNH TOÀN HỆ THỐNG:** **91.3 / 100 (Hạng A - Sẵn sàng vận hành sản xuất)**
 
 ---
 
@@ -77,10 +77,9 @@ Dưới đây là các điểm hạn chế kỹ thuật hiện tại và rủi r
 - **Rủi ro:** Nếu kẻ tấn công chiếm được quyền truy cập trực tiếp vào máy chủ cơ sở dữ liệu MongoDB hoặc lấy được file backup `.gz`, họ có thể đọc được toàn bộ ngân hàng câu hỏi mà không cần qua API.
 - **Mức độ nghiêm trọng:** **Trung bình (Medium)** — Trong môi trường mạng nội bộ quân đội có kiểm soát máy chủ vật lý, rủi ro này được giảm thiểu, nhưng chưa đạt chuẩn mã hóa cấp độ cao.
 
-#### 🟡 3.2. Giới hạn tần suất (Rate Limiting) dựa trên IP nguồn
-- **Hiện trạng:** `loginRateLimiter` và `examAttemptRateLimiter` đang giới hạn theo IP (`req.ip`).
-- **Hạn chế:** Trong mạng LAN của Nhà máy Z176, nếu nhiều máy tính cùng đi qua một cổng mạng NAT/Proxy chung, tất cả người dùng có thể chia sẻ cùng một địa chỉ IP public/gateway. Khi 1 người đăng nhập sai nhiều lần, có thể vô tình ảnh hưởng đến ngưỡng rate limit của người khác trong cùng dải IP.
-- **Khắc phục hiện tại:** Hệ thống đã phân tách riêng: Khóa tài khoản (`failedLoginAttempts`) theo **Username**, còn Rate Limit theo **IP**. Do đó tài khoản vẫn độc lập, chỉ có tầng mạng là chung ngưỡng.
+#### 🟢 3.2. Giới hạn tần suất (Rate Limiting) phòng thi theo userId
+- **Hiện trạng:** Đăng nhập được bảo vệ qua `loginRateLimiter` (giới hạn theo IP nhằm chống tấn công brute force). Đối với phòng thi (`examAttemptRateLimiter`), hệ thống giới hạn 100 req/phút dựa trên **userId** (`keyGenerator: (req) => req.auth?.userId ?? req.ip`).
+- **Ưu điểm:** Trong mạng LAN của Nhà máy Z176, khi hàng chục/hàng trăm máy tính cùng đi qua một cổng mạng NAT/Proxy chung, việc giới hạn theo userId đảm bảo mỗi thí sinh có hạn ngạch hoàn toàn độc lập, không lo bị nghẽn hay chặn nhầm chéo lẫn nhau. Đồng thời, cơ chế khóa tài khoản (`failedLoginAttempts`) quản lý theo Username giúp bảo vệ tài khoản độc lập.
 
 #### 🟡 3.3. Chưa triển khai Xác thực đa yếu tố (Two-Factor Authentication - 2FA)
 - **Hiện trạng:** Đăng nhập sử dụng tổ hợp Username + Password.

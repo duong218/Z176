@@ -14,14 +14,16 @@ Tài liệu này tổng hợp các tình huống ngoại lệ (edge cases) mà h
 
 ---
 
-### A2. Publish kỳ thi bị gián đoạn giữa chừng (Idempotent Recovery theo từng nhân viên)
+### A2. Publish kỳ thi bị gián đoạn giữa chừng (Idempotent Recovery & Khóa nguyên tử)
 
-**Tình huống:** Quá trình publish kỳ thi đã tạo xong `ExamCode` và `ExamCandidate` cho một số nhân viên thì gặp lỗi mạng hoặc DB timeout. Leader bấm "Đăng chính thức" lại lần nữa.
+**Tình huống:** Quá trình publish kỳ thi đã tạo xong `ExamCode` và `ExamCandidate` cho một số nhân viên thì gặp lỗi mạng hoặc DB timeout, hoặc 2 Leader cùng bấm publish đồng thời.
 
-**Cách khắc phục:** Hàm `generateExamCodesAndAssignCandidates` được thiết kế idempotent theo **từng nhân viên**:
-- Quét danh sách nhân viên đã có `ExamCandidate` cho kỳ thi này (`alreadyAssignedIds`) → bỏ qua, không tạo lại.
-- Chỉ tạo `ExamCode` và `ExamCandidate` cho những nhân viên còn thiếu (`pendingEmployees`).
-- Trạng thái kỳ thi chỉ chuyển sang `published` **sau khi** sinh đề và gán thành công cho tất cả nhân viên của mọi phòng ban → không bao giờ publish dở dang.
+**Cách khắc phục:**
+- Hệ thống áp dụng cờ khóa nguyên tử `publishLockedAt` trên model `Exam` để đảm bảo tại 1 thời điểm chỉ có duy nhất 1 tiến trình publish được thực thi, đồng thời ngăn chặn thao tác Archive chen ngang.
+- Hàm `generateExamCodesAndAssignCandidates` được thiết kế idempotent theo **từng nhân viên**:
+  - Quét danh sách nhân viên đã có `ExamCandidate` cho kỳ thi này (`alreadyAssignedIds`) → bỏ qua, không tạo lại.
+  - Chỉ tạo `ExamCode` và `ExamCandidate` cho những nhân viên còn thiếu (`pendingEmployees`).
+  - Trạng thái kỳ thi chỉ chuyển sang `published` **sau khi** sinh đề và gán thành công cho tất cả nhân viên của mọi phòng ban → không bao giờ publish dở dang. Mở khóa `publishLockedAt` ngay sau khi hoàn tất.
 
 ---
 

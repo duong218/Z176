@@ -11,6 +11,7 @@
     "departmentQuestionCount": 10,
     "status": "published",
     "passThresholdPercent": 70,
+    "publishLockedAt": null,
     "createdBy": "65b9a8f1e4b0a1c2d3e4f002",
     "approvedBy": "65b9a8f1e4b0a1c2d3e4f003",
     "approvedAt": "2026-08-20T08:00:00.000Z",

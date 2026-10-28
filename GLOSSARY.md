@@ -11,12 +11,12 @@
 | Thuật ngữ tiếng Việt | Tên gọi chuẩn trong code / Model | Định nghĩa | Ghi chú |
 |---|---|---|---|
 | Ngân hàng câu hỏi | `Question` / `QuestionBank` | Tập hợp toàn bộ câu hỏi trắc nghiệm chuyên môn, được phân loại theo chủ đề, độ khó, phạm vi và dạng câu trả lời. | Quản lý tại `QuestionBankTab.jsx`, API `/api/questions`. |
-| Câu hỏi | `Question` | Đơn vị câu hỏi trắc nghiệm. Gồm nội dung, ảnh minh họa (Cloudinary), độ khó (`easy`/`medium`/`hard`), phạm vi (`Common`/`DepartmentSpecific`), loại câu (`theory`/`practice`), kiểu đáp án (`single`/`multiple`). | Đáp án liên kết qua collection `Answer`. |
+| Câu hỏi | `Question` | Đơn vị câu hỏi trắc nghiệm. Gồm nội dung, ảnh minh họa (Cloudinary, quản lý qua `imagePublicId`), độ khó (`easy`/`medium`/`hard`), phạm vi (`Common`/`DepartmentSpecific`), loại câu (`theory`/`practice`), kiểu đáp án (`single`/`multiple`). | Đáp án liên kết qua collection `Answer`. |
 | Đáp án câu hỏi | `Answer` | Danh sách đáp án của một câu hỏi, gồm nội dung text và cờ `isCorrect`. | **Tuyệt đối không** trả về `isCorrect` cho thí sinh khi lấy đề thi. |
 | Chủ đề thi | `Topic` | Nhóm/chuyên đề kiến thức chuyên môn (ví dụ: An toàn lao động, Quy trình kỹ thuật...). | Quản lý tại `TopicTab.jsx`, API `/api/topics`. |
-| Phòng ban / Phân xưởng | `Department` | Đơn vị/phòng ban/phân xưởng trong nhà máy (ví dụ: XDM1, P.Kế hoạch, P.Kỹ thuật...). | Quản lý tại `DepartmentTab.jsx`, API `/api/departments`. |
+| Phòng ban / Phân xưởng | `Department` | Đơn vị/phòng ban/phân xưởng trong nhà máy (ví dụ: XDM1, P.Kế hoạch, P.Kỹ thuật...). Có mã chuẩn hóa (`code`) và `slug` bỏ dấu để so khớp import. | Quản lý tại `DepartmentTab.jsx`, API `/api/departments`. Có cơ chế 2 bước cảnh báo/chặn xóa nhầm. |
 | Nhân viên | `Employee` | Hồ sơ nhân sự: họ tên, mã nhân viên, phòng ban liên kết (`departmentId`), chức vụ, liên kết tài khoản (`userId`). | Dùng để phân quyền đề thi theo phòng ban và xuất báo cáo. |
-| Kỳ thi / Đề xuất kỳ thi | `Exam` | Kỳ thi chuyên môn. Chứa cấu hình đề thi (số câu theo độ khó, thời lượng, điểm đạt, số lượt thi tối đa) và trạng thái vòng đời (`draft` → `pending_review` → `approved` → `published` → `archived`). | Không dùng `Test` hay `Quiz`. |
+| Kỳ thi / Đề xuất kỳ thi | `Exam` | Kỳ thi chuyên môn. Chứa cấu hình đề thi (số câu theo độ khó, tỷ lệ câu chung/riêng, thời lượng, điểm đạt) và trạng thái vòng đời (`draft` → `pending_review` → `approved` → `published` → `archived`), có cờ khóa `publishLockedAt` và kiểm soát phiên bản `optimisticConcurrency`. | Không dùng `Test` hay `Quiz`. |
 | Mã đề thi | `ExamCode` | Bộ đề cụ thể được hệ thống xáo trộn ngẫu nhiên thứ tự câu hỏi và đáp án từ ngân hàng câu hỏi khi kỳ thi được duyệt phát hành (`published`). | Một `Exam` có nhiều `ExamCode` (đảo câu hỏi/đáp án). |
 | Câu hỏi trong mã đề | `ExamCodeQuestion` | Bảng liên kết câu hỏi và thứ tự hiển thị trong một mã đề thi cụ thể. | |
 | Thí sinh trong kỳ thi | `ExamCandidate` | Danh sách thí sinh được phân bổ vào kỳ thi, gắn với một mã đề thi (`ExamCode`), theo dõi số lượt thi đã sử dụng và giới hạn lượt thi. | Cho phép Leader cấp thêm lượt thi chính thức khi cần. |
@@ -24,7 +24,7 @@
 | Câu hỏi trong lượt thi (Autosave) | `AttemptQuestion` | Lưu tạm các đáp án thí sinh đã chọn trong quá trình làm bài phục vụ autosave và khôi phục khi reload/resume. | Tự động lưu mỗi khi thí sinh chọn đáp án. |
 | Đáp án thí sinh đã nộp | `CandidateAnswer` | Chi tiết toàn bộ đáp án thí sinh đã chọn sau khi chính thức nộp bài, phục vụ chấm điểm và tra cứu. | |
 | Kết quả thi | `Result` | Điểm số cuối cùng, trạng thái đạt/không đạt (`passed`/`failed`), số câu đúng, liên kết với `ExamAttempt`. | Lưu trữ phục vụ báo cáo và tra cứu kết quả. |
-| Tài liệu ôn tập | `StudyDocument` | Tài liệu dạng file (PDF, Word, Excel...) được tải lên Cloudinary, phân theo chủ đề và phạm vi phòng ban cho thí sinh ôn luyện. | Quản lý tại `StudyDocumentTab.jsx`, API `/api/study-documents`. |
+| Tài liệu ôn tập | `StudyDocument` | Tài liệu dạng file (PDF, Word, Excel...) được lưu trữ an toàn trên đĩa server nội bộ (`uploadDir`), phân theo chủ đề và phạm vi phòng ban cho thí sinh ôn luyện, stream trực tiếp qua xác thực. | Quản lý tại `StudyDocumentTab.jsx`, API `/api/study-documents`. |
 | Nhật ký hệ thống / Audit log | `AuditLog` | Bản ghi vết toàn bộ hành động nhạy cảm: tạo/sửa/xóa tài khoản, khóa/mở, reset mật khẩu, sao lưu/khôi phục, duyệt đề thi, chấm điểm, gỡ tài liệu... | Chuẩn hóa ghi tập trung tại tầng Controller. Xem `AuditLogTab.jsx`. |
 
 ---
@@ -52,9 +52,10 @@ Hệ thống có **4 vai trò** phân quyền rõ ràng:
 | **Refresh Token** | `refreshToken` | JWT dài hạn (7 ngày), lưu trong `httpOnly cookie` an toàn, dùng để cấp lại Access Token mới tự động khi hết hạn (Silent Refresh). |
 | **Phiên bản Token** | `tokenVersion` | Số nguyên trên model `User`. Tăng lên khi đăng nhập mới, đổi mật khẩu hoặc reset mật khẩu để lập tức vô hiệu hóa (thu hồi) toàn bộ token cũ ở các thiết bị/trình duyệt khác. |
 | **Giữ nhịp phiên thi** | `sendExamHeartbeat()` | Cơ chế ping định kỳ (15s/lần) từ client lên server khi thí sinh đang làm bài thi. Nếu thí sinh thoát khỏi bài thi quá 1 phút, hệ thống tự động thu bài (`autoSubmitted`). |
-| **Tự động lưu bài** | `answerExamQuestion()` / `autosave` | Gửi đáp án đã chọn lên server ngay lập tức khi thí sinh bấm chọn, lưu vào `AttemptQuestion` mà không cần chờ đến lúc nộp bài. |
+| **Tự động lưu bài** | `answerExamQuestion()` / `autosave` | Gửi đáp án đã chọn lên server ngay lập tức khi thí sinh bấm chọn, lưu vào `CandidateAnswer` mà không cần chờ đến lúc nộp bài. |
 | **Trộn đề ngẫu nhiên** | `exam-code-generation.service.js` | Sinh các mã đề xáo trộn thứ tự câu hỏi và thứ tự đáp án từ ngân hàng câu hỏi bằng thuật toán an toàn khi phát hành đề thi. |
 | **Sao lưu & Khôi phục** | `backup.service.js` | Dump cơ sở dữ liệu MongoDB ra file nén `.gz`, đồng bộ lên Google Drive (OAuth2 cá nhân) tự động xoay vòng (tối đa 5 bản), khôi phục trực tiếp với theo dõi tiến trình upload (`XMLHttpRequest.onprogress`). |
+| **Dọn dẹp tài khoản khóa** | `account-purge.service.js` | Tiến trình tự động (04:00 hàng ngày) xóa cứng các tài khoản bị khóa liên tục quá 6 tháng (`lockedAt <= now - 6m`) và chưa từng có vết lịch sử thi hay audit log. |
 
 ---
 

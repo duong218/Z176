@@ -31,7 +31,7 @@
 | **Quản lý Tài liệu ôn tập** (Upload, Xóa tài liệu PDF/Word) | **Toàn quyền** | **Toàn quyền** | Chỉ xem/tải | Chỉ xem/tải theo PB |
 | **Soạn thảo & Đệ trình Đề xuất kỳ thi** (`draft` -> `pending_review`) | ❌ Xem danh sách | **Toàn quyền tạo/gửi** | ❌ Chỉ thẩm định | ❌ Không có quyền |
 | **Thẩm định, Phê duyệt / Từ chối Đề xuất kỳ thi** | ❌ Không có quyền | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
-| **Phát hành kỳ thi & Kích hoạt sinh đề tự động** (`publish`) | ❌ Không có quyền | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
+| **Phát hành kỳ thi & Kích hoạt sinh đề tự động** (`publish`, khóa nguyên tử `publishLockedAt`) | ❌ Không có quyền | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
 | **Lưu trữ kỳ thi đã kết thúc** (`archive`) | ❌ Không có quyền | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
 | **Xem Báo cáo thống kê toàn diện & Xuất Excel** | **Toàn quyền** | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
 | **Cấp thêm lượt thi chính thức cho thí sinh** (`grant-attempt`) | ❌ Không có quyền | ❌ Không có quyền | **Toàn quyền** | ❌ Không có quyền |
@@ -136,7 +136,7 @@ Người ra đề chịu trách nhiệm xây dựng nội dung chuyên môn: qu�
     *   **Kiểu đáp án (`answerType`)**: `single` (Chọn 1 đáp án đúng) hoặc `multiple` (Chọn nhiều đáp án đúng).
 *   **Tải ảnh minh họa câu hỏi (`POST /api/questions/upload-image`)**:
     *   Tải ảnh minh họa trực tiếp lên Cloudinary sử dụng bộ nhớ đệm `memoryStorage` (không ghi file tạm ra đĩa).
-    *   Tạo `public_id` bằng chuỗi băm SHA-256 nội dung ảnh để chống trùng lặp. Tự động xóa ảnh cũ trên Cloudinary khi người dùng thay ảnh khác.
+    *   Tạo `public_id` (`imagePublicId`) bằng chuỗi băm SHA-256 nội dung ảnh để chống trùng lặp. Tự động xóa ảnh cũ trên Cloudinary khi người dùng thay ảnh khác.
 *   **Nhập câu hỏi thủ công**: Thêm/sửa từng câu hỏi, nội dung câu hỏi, danh sách 2-6 phương án trả lời, đánh dấu phương án đúng (`isCorrect`).
 *   **Import câu hỏi từ Excel (Quy trình 2 bước)**:
     1.  *Preview (`POST /api/questions/import/preview`)*: Đọc file Excel biểu mẫu câu hỏi, kiểm tra cú pháp, validate dữ liệu, trả về danh sách các câu hợp lệ và danh sách câu lỗi chi tiết từng dòng.

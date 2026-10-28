@@ -19,11 +19,12 @@ Hệ thống giúp tối ưu hóa từ khâu soạn đề đề xuất, phê duy
 Hệ thống được phát triển theo mô hình Client-Server phân lớp rõ ràng, đảm bảo hiệu năng và tính bảo mật cao:
 
 ### Client (Frontend)
-*   **Framework**: [React 19](https://react.dev/) & [Vite](https://vite.dev/) (Tối ưu tốc độ tải và xây dựng gói bundle cực nhanh).
+*   **Framework**: [React 19](https://react.dev/) & [Vite 6](https://vite.dev/) (Tối ưu tốc độ tải và xây dựng gói bundle cực nhanh).
 *   **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) (Hệ thống thiết kế tối giản, hiện đại và chuẩn Responsive).
 *   **Hiệu ứng & Hoạt ảnh**: [Lenis Smooth Scroll](https://github.com/darkroomengineering/lenis) (Cuộn trang mượt mà) & [Motion](https://motion.dev/) (Micro-animations sinh động).
 *   **Trực quan hóa dữ liệu**: [Recharts](https://recharts.org/) (Biểu đồ thống kê kết quả thi cho Admin & Leader).
 *   **Icons**: [Lucide React](https://lucide.dev/).
+*   **AI Integration**: [@google/genai](https://www.npmjs.com/package/@google/genai) (Google GenAI SDK tích hợp).
 
 ### Server (Backend)
 *   **Runtime**: Node.js (Phiên bản `>=22.0.0 <25.0.0`).
@@ -38,7 +39,7 @@ Hệ thống được phát triển theo mô hình Client-Server phân lớp rõ
     *   **Sao lưu đám mây**: Tự động backup CSDL lên Google Drive lúc 03:00 hàng ngày (giữ tối đa 5 bản lưu xoay vòng) và hỗ trợ khôi phục an toàn.
     *   **Dọn file tạm**: Tự động dọn dẹp file tạm quá 6 tiếng trong thư mục upload mỗi giờ.
     *   **Dọn tài khoản khóa lâu**: Tự động quét và xóa cứng các tài khoản bị khóa liên tục quá 6 tháng không có vết lịch sử thi/audit lúc 04:00 hàng ngày.
-*   **Xử lý tệp tin & Đa phương tiện**: `exceljs` & `xlsx` (đọc/xuất báo cáo Excel chuyên nghiệp); `multer` + `Cloudinary` hỗ trợ tải ảnh minh họa câu hỏi; lưu trữ và stream tài liệu ôn tập an toàn trên máy chủ nội bộ.
+*   **Xử lý tệp tin & Đa phương tiện**: `exceljs` & `xlsx` (đọc/xuất báo cáo Excel chuyên nghiệp); `multer` + `Cloudinary` hỗ trợ tải ảnh minh họa câu hỏi (quản lý `imagePublicId` phục vụ dọn dẹp asset); lưu trữ và stream tài liệu ôn tập an toàn trên máy chủ nội bộ.
 
 ---
 

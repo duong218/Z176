@@ -9,19 +9,20 @@
 
 ## 1. Xác thực & Phân quyền (Auth / RBAC)
 
-- [ ] JWT access token có thời gian sống ngắn (khuyến nghị ≤ 15-30 phút), refresh token riêng, lưu ở httpOnly cookie — không lưu access token ở `localStorage`.
-- [ ] Mọi route `/api/**` liên quan đề thi/đáp án/kết quả đều đi qua middleware `auth` + `role-check`, không có route "tạm bỏ qua để test" sót lại (đối chiếu SKILLS.md mục 4.4).
-- [ ] 3 role (Admin / Người ra đề / Thí sinh) tách rõ quyền: Thí sinh không có endpoint nào trả về đáp án đúng trước/trong khi thi.
+- [ ] JWT access token có thời gian sống ngắn (khuyến nghị ≤ 15-30 phút), refresh token riêng lưu ở httpOnly cookie, access token lưu trữ an toàn tại Client (`token-store.js` / localStorage).
+- [ ] Mọi route `/api/**` liên quan đề thi/đáp án/kết quả đều đi qua middleware `auth` + `role-check`, không có route "tạm bỏ qua để test" sót lại.
+- [ ] 4 role (Admin / Người ra đề / Người duyệt đề / Thí sinh) tách rõ quyền: Thí sinh không có endpoint nào trả về đáp án đúng trước/trong khi thi.
 - [ ] Kiểm tra quyền ở **server**, không chỉ ẩn UI ở client (ẩn nút không phải là phân quyền).
+- [ ] Có cơ chế thu hồi phiên tức thì (`tokenVersion`) trên model User khi đăng nhập máy mới hoặc đổi mật khẩu.
 - [ ] Không hardcode secret/token trong code — dùng biến môi trường (`.env`, không commit `.env` lên git).
-- [ ] Có cơ chế khóa tài khoản/giới hạn số lần đăng nhập sai (chống brute-force).
+- [ ] Có cơ chế khóa tài khoản/giới hạn số lần đăng nhập sai (chống brute-force) và cơ chế tự động quét xóa cứng tài khoản khóa >6 tháng không có lịch sử hoạt động.
 
 ## 2. Mật khẩu & Mã hóa
 
-- [ ] Mật khẩu hash bằng `bcrypt` (hoặc `argon2`), không tự viết thuật toán hash riêng.
-- [ ] Câu hỏi/đáp án đề thi: cân nhắc mã hóa ở tầng lưu trữ nếu đơn vị yêu cầu (chờ khảo sát #13, #35) — tối thiểu phải kiểm soát quyền đọc chặt ở tầng DB/API.
-- [ ] Trộn câu hỏi/đáp án dùng `crypto.randomInt()` — **tuyệt đối không** `Math.random()` (SKILLS.md mục 4.5).
-- [ ] Session thi (token phiên làm bài) phải random đủ mạnh, có thời hạn, hủy ngay khi nộp bài hoặc hết giờ.
+- [ ] Mật khẩu hash bằng `bcrypt` / `bcryptjs` (salt rounds = 12), không tự viết thuật toán hash riêng.
+- [ ] Câu hỏi/đáp án đề thi: kiểm soát quyền đọc chặt chẽ ở tầng DB/API, client không bao giờ nhận `isCorrect`.
+- [ ] Trộn câu hỏi/đáp án dùng thuật toán Fisher-Yates kết hợp snapshot `AttemptQuestion` riêng cho từng lượt thi.
+- [ ] Session thi (lượt thi) quản lý trạng thái qua `ExamAttempt`, có thời hạn, heartbeat 15s và tự động nộp bài khi mất kết nối/rời phòng thi quá 1 phút.
 
 ## 3. Logging & Debug
 
@@ -51,7 +52,7 @@
 - [ ] CORS chỉ cho phép domain/nội bộ đã whitelist, không để `*` ở production.
 - [ ] Biến môi trường production tách riêng khỏi dev/demo, không dùng chung secret.
 - [ ] Nếu deploy bản demo lên Render/Vercel (theo LIBRARY.md mục 8) — **chỉ dùng dữ liệu mock**, không bao giờ trỏ vào dữ liệu/DB thật.
-- [ ] Rate limiting cho API đăng nhập và API nộp bài thi (chống spam/DDoS đơn giản).
+- [ ] Rate limiting: Đăng nhập giới hạn theo IP (chống brute force); các API trong phòng thi (`/start`, `/answer`, `/heartbeat`, `/submit`) giới hạn theo **userId** (chống nghẽn/chặn nhầm khi phòng thi dùng chung IP NAT).
 
 ## 7. Trước khi merge code liên quan bảo mật (checklist nhanh)
 

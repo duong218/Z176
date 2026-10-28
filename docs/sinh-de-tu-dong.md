@@ -35,15 +35,17 @@ Quy trình sinh đề chỉ xảy ra ở **đúng 1 thời điểm**: Khi trạn
 
 Quy trình thực thi bên trong `publishExam`:
 ```text
-1. Kiểm tra trạng thái kỳ thi hiện tại phải là "approved" (nếu sai ném lỗi ApiError)
+1. Đặt khóa nguyên tử publishLockedAt (chặn publish trùng và chặn thao tác archive xen ngang)
    │
-2. Gọi generateExamCodesAndAssignCandidates(exam)   [Bước sinh đề và gán thí sinh]
+2. Kiểm tra trạng thái kỳ thi hiện tại phải là "approved" (nếu sai gỡ khóa và ném lỗi ApiError)
    │
-   ├─ Nếu có lỗi thiếu câu hỏi hoặc lỗi hệ thống: Dừng ngay, KHÔNG đổi trạng thái Exam
+3. Gọi generateExamCodesAndAssignCandidates(exam)   [Bước sinh đề và gán thí sinh]
    │
-3. Nếu sinh đề thành công: Cập nhật trạng thái kỳ thi sang "published"
+   ├─ Nếu có lỗi thiếu câu hỏi hoặc lỗi hệ thống: Gỡ khóa, dừng ngay, KHÔNG đổi trạng thái Exam
    │
-4. Gửi thông báo tự động (Notification) tới các thí sinh được gán vào kỳ thi
+4. Nếu sinh đề thành công: Cập nhật trạng thái kỳ thi sang "published", gỡ publishLockedAt
+   │
+5. Gửi thông báo tự động (Notification) tới các thí sinh được gán vào kỳ thi
 ```
 
 > [!IMPORTANT]
