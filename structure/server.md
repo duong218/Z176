@@ -3,17 +3,17 @@
 ## Phạm vi
 
 `server/` là hệ thống Backend RESTful API xây dựng trên nền tảng Node.js (`>=22 <25`), Express và cơ sở dữ liệu MongoDB thông qua Mongoose ODM.
-Hệ thống sử dụng cơ chế xác thực JWT kép (Access Token ngắn hạn + Refresh Token HttpOnly Cookie), mã hoá mật khẩu `bcryptjs`, quản lý lưu trữ tệp tin tải lên (Multer + Cloudinary SDK), xử lý định dạng tệp Excel bằng `exceljs` / `xlsx`, bảo mật tầng mạng bằng `helmet`, `cors`, `rate-limit`, và tự động hóa quy trình sao lưu dữ liệu lên Google Drive cá nhân thông qua Google OAuth2 (`googleapis`).
+Hệ thống sử dụng cơ chế xác thực JWT kép (Access Token ngắn hạn + Refresh Token HttpOnly Cookie), mã hoá mật khẩu `bcryptjs` / `bcrypt`, quản lý lưu trữ tệp tin tải lên (Multer + Cloudinary SDK), xử lý định dạng tệp Excel bằng `exceljs` / `xlsx`, bảo mật tầng mạng bằng `helmet`, `cors`, `rate-limit`, và tự động hóa quy trình sao lưu dữ liệu lên Google Drive cá nhân thông qua Google OAuth2 (`googleapis`).
 
 ```text
 server/
 ├── .env.example                                    # Mẫu khai báo biến môi trường (không chứa giá trị nhạy cảm)
-├── package.json                                    # Quản lý dependencies, engines và scripts (dev, start, seed, backup)
+├── package.json                                    # Quản lý dependencies, engines và scripts (dev, start, seed, backup, lint)
 ├── package-lock.json                               # Lockfile quản lý phiên bản gói npm
 ├── test_rate_limit.js                              # Kịch bản kiểm thử tự động cơ chế Rate Limiting
 └── src/
     ├── app.js                                      # Khởi tạo Express app: Helmet, CORS, cookie parser, JSON body, mount routes, global error handler
-    ├── index.js                                    # Entry point máy chủ: validate biến môi trường, kết nối MongoDB, chạy seed khởi tạo, đăng ký cron schedulers, lắng nghe cổng
+    ├── index.js                                    # Entry point máy chủ: validate biến môi trường, kết nối MongoDB, chạy seed khởi tạo, đăng ký 3 cron schedulers, lắng nghe cổng
     ├── config/
     │   ├── db.js                                   # Thiết lập kết nối MongoDB qua Mongoose với auto reconnect & event loggers
     │   └── env.js                                  # Định nghĩa, validate và export cấu hình môi trường (port, JWT secrets/TTL, DB URI, CORS origin, Cloudinary, Google OAuth2...)
@@ -45,13 +45,13 @@ server/
     │   ├── candidate-answer.model.js               # Schema đáp án thí sinh đã chọn khi nộp bài: attemptId, questionId, selectedAnswerIds
     │   ├── department.model.js                     # Schema phòng ban: tên, mã, mô tả, slug, trạng thái active
     │   ├── employee.model.js                       # Schema hồ sơ nhân sự: họ tên, mã nhân viên, phòng ban ref, chức vụ, liên kết tài khoản userId
-    │   ├── exam.model.js                           # Schema kỳ thi: tiêu đề, chủ đề ref, cấu hình số câu theo độ khó/phạm vi, thời gian làm bài, điểm đạt, trạng thái workflow
+    │   ├── exam.model.js                           # Schema kỳ thi: tiêu đề, chủ đề ref, cấu hình số câu theo độ khó/phạm vi, thời gian làm bài, điểm đạt, trạng thái workflow, publishLockedAt, optimisticConcurrency
     │   ├── exam-attempt.model.js                   # Schema lượt thi: thí sinh, kỳ thi, trạng thái (in_progress/submitted/expired), loại (practice/official), thời gian, lastHeartbeat
     │   ├── exam-candidate.model.js                 # Schema thí sinh được phân bổ vào kỳ thi: examId, userId, mã đề examCodeId, số lượt thi đã dùng, extraAttemptsGranted
     │   ├── exam-code.model.js                      # Schema mã đề thi: examId, departmentId, code, fingerprint (hash bộ câu hỏi)
     │   ├── exam-code-question.model.js             # Schema câu hỏi trong mã đề: examCodeId, questionId, thứ tự index
     │   ├── notification.model.js                   # Schema thông báo hệ thống: recipientUserId, title, message, type, examId, isRead
-    │   ├── question.model.js                       # Schema câu hỏi: content, imageUrl, topicId, departmentId, difficulty, scope, kind, answerType, isActive
+    │   ├── question.model.js                       # Schema câu hỏi: content, imageUrl, imagePublicId, topicId, departmentId, difficulty, scope, kind, answerType, isActive
     │   ├── result.model.js                         # Schema kết quả thi: userId, examId, attemptId, score, passed, correctCount, totalCount
     │   ├── role.model.js                           # Schema vai trò người dùng: code (admin/examiner/leader/candidate), name
     │   ├── schedule.model.js                       # Schema lịch thi: examId, startDate, endDate
@@ -59,7 +59,7 @@ server/
     │   ├── topic.model.js                          # Schema chủ đề thi: name, description, isActive
     │   └── user.model.js                           # Schema tài khoản người dùng: username, password (hash), roleId, isActive, lockedAt, lockUntil, mustChangePassword, tokenVersion
     ├── routes/
-    │   ├── index.js                                # Router tổng: định tuyến tất cả sub-routers vào tiền tố /api/*
+    │   ├── index.js                                # Router tổng: định tuyến tất cả sub-routes vào tiền tố /api/*
     │   ├── auth.routes.js                          # Tuyến API xác thực: /login, /refresh, /logout, /me, /change-password
     │   ├── backup.routes.js                        # Tuyến API sao lưu & phục hồi dữ liệu: danh sách, tạo backup, download, restore (Admin)
     │   ├── audit.routes.js                         # Tuyến API tra cứu audit log (Admin)
@@ -87,11 +87,11 @@ server/
     │   ├── backup.scheduler.js                     # Cron scheduler: Tự động sao lưu dữ liệu lúc 03:00 hàng ngày (Asia/Ho_Chi_Minh)
     │   ├── upload-cleanup.scheduler.js             # Cron scheduler: Tự động dọn dẹp tệp tin tạm quá 6 giờ trong thư mục upload (chạy mỗi giờ)
     │   ├── department.service.js                   # Logic phòng ban: CRUD, xóa mềm, tự động khôi phục khi tạo trùng, slugify chuẩn hóa tiếng Việt, cơ chế chặn xóa nhầm (chặn khi có thí sinh thi, cảnh báo khi còn nhân viên active)
-    │   ├── exam.service.js                         # Logic kỳ thi: tạo dự thảo, chỉnh sửa đề xuất (draft/rejected → draft), đệ trình duyệt, approve/reject kèm lý do, publish, archive, truy vấn kỳ thi active
+    │   ├── exam.service.js                         # Logic kỳ thi: tạo dự thảo, chỉnh sửa đề xuất (draft/rejected → draft), đệ trình duyệt, approve/reject kèm lý do, publish (khóa publishLockedAt), archive, truy vấn kỳ thi active
     │   ├── exam-attempt.service.js                 # Logic làm bài thi: sinh snapshot câu hỏi xáo trộn, start/resume, autosave, heartbeat giữ phiên, tự nộp khi vắng mặt >1 phút, chấm điểm tự động, cấp thêm lượt thi
     │   ├── exam-code-generation.service.js         # Logic sinh mã đề thi: thuật toán phân bổ câu hỏi chung/riêng theo phòng ban, xáo Fisher-Yates, sinh mã đề và gán thí sinh tự động
     │   ├── notification.service.js                 # Logic thông báo: tạo thông báo tự động theo sự kiện kỳ thi (nộp duyệt, phê duyệt, từ chối, phát hành), đánh dấu đã đọc
-    │   ├── question.service.js                     # Logic ngân hàng câu hỏi: CRUD, upload ảnh Cloudinary, import Excel 2 bước (preview phát hiện phòng ban thiếu/trùng -> confirm ghi DB), xóa hàng loạt
+    │   ├── question.service.js                     # Logic ngân hàng câu hỏi: CRUD, upload ảnh Cloudinary (quản lý imagePublicId để dọn dẹp), import Excel 2 bước (preview phát hiện phòng ban thiếu/trùng -> confirm ghi DB), xóa hàng loạt
     │   ├── report.service.js                       # Logic báo cáo: tổng quan thống kê, báo cáo phòng ban, báo cáo kỳ thi, bảng điểm chi tiết, xuất Excel chuẩn bằng ExcelJS, tra cứu công khai
     │   ├── role.service.js                         # Logic vai trò: truy vấn danh mục Role từ database
     │   ├── seed.service.js                         # Logic seed: tạo 4 role (admin/examiner/leader/candidate) và tài khoản Admin mặc định khi hệ thống khởi động
